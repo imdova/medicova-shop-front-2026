@@ -1,0 +1,251 @@
+import { ProductOption } from "@/types/product";
+
+// Dummy data for product options
+export const ProductOptions: ProductOption[] = [
+  {
+    id: "1",
+    slug: "processor-cpu",
+    name: { en: "Processor (CPU)", ar: "المعالج (CPU)" },
+    option_type: "dropdown",
+    isRequired: true,
+    createdAt: "2024-01-15T10:30:00Z",
+    option_values: [
+      {
+        id: "1",
+        label: { en: "Intel i5", ar: "إنتل i5" },
+        price: "150.00",
+        price_type: "fixed",
+      },
+      {
+        id: "2",
+        label: { en: "Intel i7", ar: "إنتل i7" },
+        price: "250.00",
+        price_type: "fixed",
+      },
+      {
+        id: "3",
+        label: { en: "AMD Ryzen 5", ar: "رايزن 5" },
+        price: "200.00",
+        price_type: "fixed",
+      },
+    ],
+  },
+  {
+    id: "2",
+    slug: "graphics-card-gpu",
+    name: { en: "Graphics Card (GPU)", ar: "كرت الشاشة (GPU)" },
+    option_type: "dropdown",
+    isRequired: true,
+    createdAt: "2024-01-16T14:20:00Z",
+    option_values: [
+      {
+        id: "1",
+        label: { en: "NVIDIA GTX 1660", ar: "إنفيديا GTX 1660" },
+        price: "300.00",
+        price_type: "fixed",
+      },
+      {
+        id: "2",
+        label: { en: "NVIDIA RTX 3060", ar: "إنفيديا RTX 3060" },
+        price: "500.00",
+        price_type: "fixed",
+      },
+      {
+        id: "3",
+        label: { en: "AMD Radeon RX 6600", ar: "رايدون RX 6600" },
+        price: "400.00",
+        price_type: "fixed",
+      },
+    ],
+  },
+  {
+    id: "3",
+    slug: "memory-ram",
+    name: { en: "Memory (RAM)", ar: "الذاكرة (RAM)" },
+    option_type: "dropdown",
+    isRequired: true,
+    createdAt: "2024-01-17T09:15:00Z",
+    option_values: [
+      {
+        id: "1",
+        label: { en: "8GB DDR4", ar: "8 جيجابايت DDR4" },
+        price: "40.00",
+        price_type: "fixed",
+      },
+      {
+        id: "2",
+        label: { en: "16GB DDR4", ar: "16 جيجابايت DDR4" },
+        price: "70.00",
+        price_type: "fixed",
+      },
+      {
+        id: "3",
+        label: { en: "32GB DDR4", ar: "32 جيجابايت DDR4" },
+        price: "130.00",
+        price_type: "fixed",
+      },
+    ],
+  },
+  {
+    id: "4",
+    slug: "storage-hdd-ssd",
+    name: { en: "Storage (HDD/SSD)", ar: "التخزين (HDD/SSD)" },
+    option_type: "dropdown",
+    isRequired: true,
+    createdAt: "2024-01-18T16:45:00Z",
+    option_values: [
+      {
+        id: "1",
+        label: { en: "512GB SSD", ar: "512 جيجابايت SSD" },
+        price: "60.00",
+        price_type: "fixed",
+      },
+      {
+        id: "2",
+        label: { en: "1TB SSD", ar: "1 تيرابايت SSD" },
+        price: "100.00",
+        price_type: "fixed",
+      },
+      {
+        id: "3",
+        label: { en: "2TB HDD", ar: "2 تيرابايت HDD" },
+        price: "80.00",
+        price_type: "fixed",
+      },
+    ],
+  },
+  {
+    id: "5",
+    slug: "motherboard",
+    name: { en: "Motherboard", ar: "اللوحة الأم" },
+    option_type: "dropdown",
+    isRequired: false,
+    createdAt: "2024-01-19T11:00:00Z",
+    option_values: [
+      {
+        id: "1",
+        label: { en: "ASUS Prime", ar: "أسوس برايم" },
+        price: "120.00",
+        price_type: "fixed",
+      },
+      {
+        id: "2",
+        label: { en: "MSI Pro", ar: "إم إس آي برو" },
+        price: "140.00",
+        price_type: "fixed",
+      },
+      {
+        id: "3",
+        label: { en: "Gigabyte Ultra", ar: "جيجابايت ألترا" },
+        price: "160.00",
+        price_type: "fixed",
+      },
+    ],
+  },
+  {
+    id: "6",
+    slug: "power-supply-psu",
+    name: { en: "Power Supply (PSU)", ar: "مزود الطاقة (PSU)" },
+    option_type: "dropdown",
+    isRequired: false,
+    createdAt: "2024-01-20T13:30:00Z",
+    option_values: [
+      {
+        id: "1",
+        label: { en: "550W Bronze", ar: "550 واط برونزي" },
+        price: "50.00",
+        price_type: "fixed",
+      },
+      {
+        id: "2",
+        label: { en: "650W Gold", ar: "650 واط ذهبي" },
+        price: "80.00",
+        price_type: "fixed",
+      },
+      {
+        id: "3",
+        label: { en: "750W Platinum", ar: "750 واط بلاتيني" },
+        price: "120.00",
+        price_type: "fixed",
+      },
+    ],
+  },
+  {
+    id: "7",
+    slug: "cooling-system",
+    name: { en: "Cooling System", ar: "نظام التبريد" },
+    option_type: "dropdown",
+    isRequired: false,
+    createdAt: "2024-01-21T15:20:00Z",
+    option_values: [
+      {
+        id: "1",
+        label: { en: "Air Cooler", ar: "مبرد هوائي" },
+        price: "30.00",
+        price_type: "fixed",
+      },
+      {
+        id: "2",
+        label: { en: "Liquid Cooler", ar: "مبرد سائل" },
+        price: "90.00",
+        price_type: "fixed",
+      },
+    ],
+  },
+  {
+    id: "8",
+    slug: "operating-system",
+    name: { en: "Operating System", ar: "نظام التشغيل" },
+    option_type: "dropdown",
+    isRequired: false,
+    createdAt: "2024-01-22T12:10:00Z",
+    option_values: [
+      {
+        id: "1",
+        label: { en: "Windows 10", ar: "ويندوز 10" },
+        price: "100.00",
+        price_type: "fixed",
+      },
+      {
+        id: "2",
+        label: { en: "Windows 11", ar: "ويندوز 11" },
+        price: "120.00",
+        price_type: "fixed",
+      },
+      {
+        id: "3",
+        label: { en: "Linux Ubuntu", ar: "لينكس أوبونتو" },
+        price: "0.00",
+        price_type: "fixed",
+      },
+    ],
+  },
+  {
+    id: "9",
+    slug: "size-options",
+    name: { en: "Size", ar: "الحجم" },
+    option_type: "dropdown",
+    isRequired: true,
+    createdAt: "2024-01-23T09:00:00Z",
+    option_values: [
+      {
+        id: "1",
+        label: { en: "Small", ar: "صغير" },
+        price: "5.00",
+        price_type: "fixed",
+      },
+      {
+        id: "2",
+        label: { en: "Medium", ar: "متوسط" },
+        price: "10.00",
+        price_type: "fixed",
+      },
+      {
+        id: "3",
+        label: { en: "Large", ar: "كبير" },
+        price: "15.00",
+        price_type: "fixed",
+      },
+    ],
+  },
+];

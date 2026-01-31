@@ -1,0 +1,432 @@
+"use client";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { signIn } from "next-auth/react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Input, PasswordInput } from "@/components/UI/input";
+import { Label } from "@/components/UI/label";
+import { Button } from "@/components/UI/button";
+import { Checkbox } from "@/components/UI/Check-Box";
+import { callRegisterApi } from "@/lib/auth/registerApi";
+import Link from "next/link";
+
+// UI text translations
+const translations = {
+  title: {
+    en: "Join Our Shopping Community!",
+    ar: "انضم إلى مجتمع التسوق لدينا!",
+  },
+  subtitle: {
+    en: "Create your account to begin your journey. Access a world of products and connect with trusted sellers.",
+    ar: "أنشئ حسابك لبدء رحلتك. احصل على عالم من المنتجات وتواصل مع البائعين الموثوقين.",
+  },
+  firstName: {
+    en: "First Name",
+    ar: "الاسم الأول",
+  },
+  lastName: {
+    en: "Last Name",
+    ar: "اسم العائلة",
+  },
+  email: {
+    en: "Email",
+    ar: "البريد الإلكتروني",
+  },
+  password: {
+    en: "Password",
+    ar: "كلمة المرور",
+  },
+  createAccount: {
+    en: "Create My Account",
+    ar: "إنشاء حسابي",
+  },
+  creating: {
+    en: "Creating account...",
+    ar: "جاري إنشاء الحساب...",
+  },
+  orContinueWith: {
+    en: "Or continue with",
+    ar: "أو تابع مع",
+  },
+  registerWithGoogle: {
+    en: "Register with Google",
+    ar: "التسجيل مع جوجل",
+  },
+  alreadyHaveAccount: {
+    en: "Already have account?",
+    ar: "لديك حساب بالفعل؟",
+  },
+  login: {
+    en: "Login",
+    ar: "تسجيل الدخول",
+  },
+  areYouVendor: {
+    en: "Are you a vendor?",
+    ar: "هل أنت بائع؟",
+  },
+  registerAsVendor: {
+    en: "Register as a vendor",
+    ar: "التسجيل كبائع",
+  },
+  registerAsSeller: {
+    en: "Register as a seller",
+    ar: "التسجيل كبائع",
+  },
+  registrationFailed: {
+    en: "Registration failed. Please try again.",
+    ar: "فشل التسجيل. يرجى المحاولة مرة أخرى.",
+  },
+};
+
+const RegisterPage: React.FC = () => {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSeller, setIsSeller] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { language, direction } = useLanguage();
+  const router = useRouter();
+
+  const t = (key: keyof typeof translations) => translations[key][language];
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Call the registration API
+      const registerData = await callRegisterApi({
+        firstName,
+        lastName,
+        email,
+        password,
+        role: isSeller ? "seller" : "user",
+        language: language,
+      });
+
+      if (registerData.status === "success" && registerData.data) {
+        // After successful registration, automatically sign in the user
+        // The registration API returns tokens, so we can use them directly
+        const result = await signIn("credentials", {
+          email,
+          password,
+          redirect: false,
+        });
+
+        if (result?.error) {
+          setError(t("registrationFailed"));
+        } else {
+          // Redirect based on user role
+          const userRole = registerData.data.user.role;
+          switch (userRole) {
+            case "admin":
+              router.push("/admin");
+              break;
+            case "seller":
+              router.push("/seller");
+              break;
+            case "user":
+            default:
+              router.push("/");
+              break;
+          }
+          router.refresh();
+        }
+      } else {
+        throw new Error(registerData.message || t("registrationFailed"));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("registrationFailed"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleRegister = () => {
+    // Google OAuth would be implemented here
+    console.log("Google registration clicked");
+  };
+
+  return (
+    <div dir={direction} className="min-h-screen flex">
+      {/* Green top border */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-green-600 z-10" />
+
+      {/* Left side - Illustration */}
+      <div className="hidden lg:flex flex-1 bg-green-50 relative overflow-hidden">
+        {/* Background pattern */}
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: `radial-gradient(circle, #16a34a 1px, transparent 1px)`,
+            backgroundSize: "40px 40px",
+          }}
+        />
+
+        {/* Office furniture outlines in background */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-10"
+          viewBox="0 0 600 600"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Filing cabinet */}
+          <rect x="50" y="200" width="80" height="200" stroke="#16a34a" strokeWidth="2" fill="none" />
+          <rect x="60" y="220" width="20" height="20" stroke="#16a34a" strokeWidth="1" fill="none" />
+          <rect x="100" y="220" width="20" height="20" stroke="#16a34a" strokeWidth="1" fill="none" />
+          
+          {/* Desk with monitor */}
+          <rect x="200" y="300" width="150" height="80" stroke="#16a34a" strokeWidth="2" fill="none" />
+          <rect x="220" y="250" width="110" height="60" stroke="#16a34a" strokeWidth="2" fill="none" />
+          <rect x="225" y="255" width="100" height="50" stroke="#16a34a" strokeWidth="1" fill="none" />
+          
+          {/* Window with blinds */}
+          <rect x="400" y="150" width="120" height="150" stroke="#16a34a" strokeWidth="2" fill="none" />
+          <line x1="400" y1="200" x2="520" y2="200" stroke="#16a34a" strokeWidth="1" />
+          <line x1="400" y1="225" x2="520" y2="225" stroke="#16a34a" strokeWidth="1" />
+          <line x1="400" y1="250" x2="520" y2="250" stroke="#16a34a" strokeWidth="1" />
+          
+          {/* Potted plant */}
+          <ellipse cx="480" cy="380" rx="25" ry="20" stroke="#16a34a" strokeWidth="2" fill="none" />
+          <rect x="475" y="400" width="10" height="30" stroke="#16a34a" strokeWidth="2" fill="none" />
+        </svg>
+
+        {/* Illustration SVG - Three people */}
+        <div className="relative w-full h-full flex items-center justify-center p-12">
+          <svg
+            viewBox="0 0 600 600"
+            className="w-full h-full max-w-2xl"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Leftmost Man - Dark skin, dark grey shirt, green tie, green pants */}
+            <g transform="translate(100, 350)">
+              {/* Head */}
+              <circle cx="30" cy="15" r="18" fill="#8b5a3c" />
+              {/* Body - dark grey shirt */}
+              <rect x="15" y="33" width="30" height="45" fill="#374151" rx="3" />
+              {/* Green tie */}
+              <path d="M 28 38 L 30 55 L 32 38" fill="#16a34a" />
+              {/* Green pants */}
+              <rect x="15" y="78" width="30" height="35" fill="#16a34a" rx="2" />
+              {/* Left hand on hip */}
+              <rect x="5" y="45" width="8" height="20" fill="#8b5a3c" rx="4" />
+              {/* Right arm bent, gesturing */}
+              <rect x="42" y="40" width="8" height="25" fill="#8b5a3c" rx="4" />
+              <circle cx="46" cy="65" r="6" fill="#8b5a3c" />
+              {/* Shoes */}
+              <rect x="18" y="113" width="10" height="6" fill="#000" rx="1" />
+              <rect x="32" y="113" width="10" height="6" fill="#000" rx="1" />
+            </g>
+
+            {/* Middle Man - Light skin, bright green shirt, dark grey tie, dark grey pants */}
+            <g transform="translate(250, 340)">
+              {/* Head */}
+              <circle cx="30" cy="15" r="18" fill="#fbbf24" />
+              {/* Body - bright green shirt */}
+              <rect x="15" y="33" width="30" height="45" fill="#22c55e" rx="3" />
+              {/* Dark grey tie */}
+              <path d="M 28 38 L 30 55 L 32 38" fill="#374151" />
+              {/* Dark grey pants */}
+              <rect x="15" y="78" width="30" height="35" fill="#374151" rx="2" />
+              {/* Right arm bent, hand near leftmost man's shoulder */}
+              <rect x="42" y="40" width="8" height="25" fill="#fbbf24" rx="4" />
+              <circle cx="46" cy="65" r="6" fill="#fbbf24" />
+              {/* Left arm bent, gesturing */}
+              <rect x="5" y="40" width="8" height="25" fill="#fbbf24" rx="4" />
+              <circle cx="9" cy="65" r="6" fill="#fbbf24" />
+              {/* Shoes */}
+              <rect x="18" y="113" width="10" height="6" fill="#374151" rx="1" />
+              <rect x="32" y="113" width="10" height="6" fill="#374151" rx="1" />
+            </g>
+
+            {/* Rightmost Woman - Light skin, dark grey blazer, bright green top, dark grey pants */}
+            <g transform="translate(400, 350)">
+              {/* Head */}
+              <circle cx="30" cy="15" r="18" fill="#fbbf24" />
+              {/* Blazer - dark grey */}
+              <rect x="12" y="33" width="36" height="50" fill="#374151" rx="3" />
+              {/* Green top visible under blazer */}
+              <rect x="18" y="40" width="24" height="35" fill="#22c55e" />
+              {/* Dark grey pants */}
+              <rect x="15" y="83" width="30" height="30" fill="#374151" rx="2" />
+              {/* Left arm bent, gesturing */}
+              <rect x="5" y="40" width="8" height="25" fill="#fbbf24" rx="4" />
+              <circle cx="9" cy="65" r="6" fill="#fbbf24" />
+              {/* Right arm bent */}
+              <rect x="47" y="45" width="8" height="20" fill="#fbbf24" rx="4" />
+              {/* Shoes */}
+              <rect x="18" y="113" width="10" height="6" fill="#374151" rx="1" />
+              <rect x="32" y="113" width="10" height="6" fill="#374151" rx="1" />
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      {/* Right side - Registration Form */}
+      <div className="flex-1 flex items-center justify-center bg-white px-8 py-12">
+        <div className="w-full max-w-md">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            {t("title")}
+          </h1>
+          <p className="text-gray-500 mb-8 text-sm">
+            {t("subtitle")}
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* First Name Field */}
+
+            <div className="flex gap-3">
+            <div className="space-y-2 w-1/2">
+              <Label htmlFor="firstName">{t("firstName")}</Label>
+              <Input
+                id="firstName"
+                type="text"
+                placeholder="eg. James"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                className="w-full"
+              />
+            </div>
+
+            {/* Last Name Field */}
+            <div className="space-y-2 w-1/2">
+              <Label htmlFor="lastName">{t("lastName")}</Label>
+              <Input
+                id="lastName"
+                type="text"
+                placeholder="eg. Bond"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+                className="w-full"
+              />
+            </div>
+            </div>
+
+
+            {/* Email Field */}
+            <div className="space-y-2">
+              <Label htmlFor="email">{t("email")}</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full"
+              />
+            </div>
+
+            {/* Password Field */}
+            <div className="space-y-2">
+              <Label htmlFor="password">{t("password")}</Label>
+              <PasswordInput
+                id="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full"
+              />
+            </div>
+
+            {/* Seller Role Checkbox */}
+            <div className={`flex items-center gap-2 ${direction === "rtl" ? "flex-row-reverse" : ""}`}>
+              <Checkbox
+                id="seller-role"
+                checked={isSeller}
+                onCheckedChange={(checked) => setIsSeller(checked === true)}
+              />
+              <Label
+                htmlFor="seller-role"
+                className="text-sm font-normal cursor-pointer text-gray-700"
+              >
+                {t("registerAsSeller")}
+              </Label>
+            </div>
+
+            {error && (
+              <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+                {error}
+              </div>
+            )}
+
+            {/* Create Account Button */}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-green-600 hover:bg-green-700 text-white h-11 text-base font-medium"
+            >
+              {isLoading ? t("creating") : t("createAccount")}
+            </Button>
+          </form>
+
+          {/* Separator */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="bg-white px-4 text-gray-500">
+                {t("orContinueWith")}
+              </span>
+            </div>
+          </div>
+
+          {/* Google Register Button */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGoogleRegister}
+            className="w-full h-11 border-gray-300 bg-white hover:bg-gray-50"
+          >
+            <svg
+              className="w-5 h-5 mr-2"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                fill="#4285F4"
+              />
+              <path
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                fill="#34A853"
+              />
+              <path
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                fill="#FBBC05"
+              />
+              <path
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                fill="#EA4335"
+              />
+            </svg>
+            {t("registerWithGoogle")}
+          </Button>
+
+          {/* Login Link */}
+          <div className="mt-6 text-center text-sm">
+            <span className="text-gray-600">{t("alreadyHaveAccount")} </span>
+            <Link
+              href="/auth/signin"
+              className="text-green-600 hover:text-green-700 underline font-medium"
+            >
+              {t("login")}
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default RegisterPage;
+

@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom animations */
+@keyframes spinSlow {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+:root {
+    --radius: 0.625rem;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+
+    --primary: oklch(62.5% 0.163 147.7);
+    --primary-foreground: oklch(97.671% 0.03611 153.019);
+    --primary-100: oklch(0.95 0.02 147.7);
+    --primary-900: oklch(0.3 0.15 147.7);
+    --primary-transparent: oklch(62.5% 0.163 147.7 / 0.5);
+
+    --secondary: oklch(74.744% 0.17392 132.168);
+    --secondary-foreground: oklch(0.985 0 0);
+
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --warning: oklch(0.769 0.188 70.08);
+
+    --border: oklch(0.95 0 0);
+    --input: oklch(0.9 0 0);
+    --ring: oklch(0.708 0 0);
+    --input-ring: oklch(62.49% 0.16404 147.502 / 0.275);
+    --chart-1: oklch(0.646 0.222 41.116);
+    --chart-2: oklch(0.6 0.118 184.704);
+    --chart-3: oklch(0.398 0.07 227.392);
+    --chart-4: oklch(0.828 0.189 84.429);
+    --chart-5: oklch(0.769 0.188 70.08);
+
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+}
+
+@layer components {
+    .card {
+        @apply rounded-2xl bg-white p-4 shadow;
+    }
+
+    .box {
+        @apply rounded-md bg-white p-4 shadow;
+    }
+
+    .elementskit-dropdown {
+        @apply invisible absolute top-full rounded-md bg-white p-4 opacity-0 shadow transition-all duration-200;
+    }
+
+    .group:hover .elementskit-dropdown {
+        @apply visible opacity-100;
+    }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+body {
+    font-family: var(--font-raleway, sans-serif);
+    scroll-behavior: smooth;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scroll-bar-hidden::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scroll-bar-hidden {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+}
+
+.scroll-bar-minimal::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.scroll-bar-minimal::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scroll-bar-minimal::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 20px;
+}
+
+.scroll-bar-minimal::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.4);
+}

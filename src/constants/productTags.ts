@@ -1,0 +1,91 @@
+import { ProductTag } from "@/types/product";
+
+export const ProductTags: ProductTag[] = [
+  {
+    id: "1",
+    name: { en: "Summer Collection", ar: "مجموعة الصيف" },
+    createdAt: "2024-01-15T10:30:00Z",
+    status: { en: "published", ar: "منشور" },
+    slug: "summer-collection",
+    description: { en: "Our summer collection", ar: "مجموعة الصيف لدينا" },
+    meta_title: { en: "Summer Collection", ar: "مجموعة الصيف" },
+    meta_description: {
+      en: "Shop the best summer items",
+      ar: "تسوق أفضل منتجات الصيف",
+    },
+    noindex: "false",
+  },
+  {
+    id: "2",
+    name: { en: "Winter Sale", ar: "تخفيضات الشتاء" },
+    createdAt: "2024-01-10T14:20:00Z",
+    status: { en: "published", ar: "منشور" },
+    slug: "winter-sale",
+    description: {
+      en: "Exclusive winter discounts",
+      ar: "تخفيضات حصرية لفصل الشتاء",
+    },
+    meta_title: { en: "Winter Sale", ar: "تخفيضات الشتاء" },
+    meta_description: {
+      en: "Save big this winter",
+      ar: "وفر الكثير هذا الشتاء",
+    },
+    noindex: "false",
+  },
+  {
+    id: "3",
+    name: { en: "New Arrivals", ar: "وصل حديثاً" },
+    createdAt: "2024-01-08T09:15:00Z",
+    status: { en: "published", ar: "منشور" },
+    slug: "new-arrivals",
+    description: {
+      en: "Check out new arrivals",
+      ar: "اطلع على المنتجات الجديدة",
+    },
+    meta_title: { en: "New Arrivals", ar: "وصل حديثاً" },
+    meta_description: {
+      en: "Fresh products just in",
+      ar: "منتجات جديدة وصلت للتو",
+    },
+    noindex: "false",
+  },
+  {
+    id: "4",
+    name: { en: "Clearance", ar: "تصفية" },
+    createdAt: "2024-01-05T16:45:00Z",
+    status: { en: "draft", ar: "مسودة" },
+    slug: "clearance",
+    description: { en: "Last chance clearance", ar: "فرصة أخيرة للتصفية" },
+    meta_title: { en: "Clearance", ar: "تصفية" },
+    meta_description: { en: "Biggest discounts", ar: "أكبر الخصومات" },
+    noindex: "true",
+  },
+  {
+    id: "5",
+    name: { en: "Featured Products", ar: "منتجات مميزة" },
+    createdAt: "2024-01-03T11:20:00Z",
+    status: { en: "published", ar: "منشور" },
+    slug: "featured-products",
+    description: { en: "Top featured products", ar: "أفضل المنتجات المميزة" },
+    meta_title: { en: "Featured Products", ar: "منتجات مميزة" },
+    meta_description: { en: "Handpicked just for you", ar: "منتقاة خصيصًا لك" },
+    noindex: "false",
+  },
+  {
+    id: "6",
+    name: { en: "Limited Edition", ar: "إصدار محدود" },
+    createdAt: "2024-01-01T08:00:00Z",
+    status: { en: "published", ar: "منشور" },
+    slug: "limited-edition",
+    description: {
+      en: "Rare limited edition items",
+      ar: "عناصر نادرة بإصدار محدود",
+    },
+    meta_title: { en: "Limited Edition", ar: "إصدار محدود" },
+    meta_description: {
+      en: "Get them before they’re gone",
+      ar: "احصل عليها قبل نفاد الكمية",
+    },
+    noindex: "false",
+  },
+];
