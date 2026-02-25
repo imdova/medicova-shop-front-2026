@@ -1,6 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import cartSlice from "@/store/slices/cartSlice";
-import localStorageMiddleware from "./localStorageMiddleware"; // Import your middleware
+import cookieMiddleware from "./cookieMiddleware";
 import wishlistSlice from "./slices/wishlistSlice";
 
 export const makeStore = () => {
@@ -10,7 +10,7 @@ export const makeStore = () => {
       wishlist: wishlistSlice,
     },
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().concat(localStorageMiddleware),
+      getDefaultMiddleware().concat(cookieMiddleware),
   });
 };
 

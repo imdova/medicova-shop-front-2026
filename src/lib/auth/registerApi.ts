@@ -30,22 +30,18 @@ interface RegisterRequest {
 export async function callRegisterApi(
   data: RegisterRequest
 ): Promise<RegisterResponse> {
-  // Use BASE_URL from environment for the backend API URL
-  // NEXTAUTH_URL is only for NextAuth callbacks, not for API requests
-  let baseUrl = process.env.BASE_URL;
+  // Prefer NEXT_PUBLIC_BASE_URL for client-side support, fallback to BASE_URL for server-side
+  let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL;
 
-  // Remove trailing slash if present
+  // Remove trailing slash and append /api/v1 if needed
   if (baseUrl) {
     baseUrl = baseUrl.replace(/\/$/, "");
-    // Ensure BASE_URL includes /api/v1 if it doesn't already
     if (!baseUrl.includes("/api/v1")) {
       baseUrl = `${baseUrl}/api/v1`;
     }
-  }
-
-  // Fallback to default external API if BASE_URL is not set
-  if (!baseUrl) {
-    baseUrl = "http://82.112.255.49/api/v1";
+  } else {
+    // Fallback to default external API if no environment variables are set
+    baseUrl = "https://82.112.255.49/api/v1";
   }
 
   const cleanBaseUrl = baseUrl.replace(/\/$/, "");

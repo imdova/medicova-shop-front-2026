@@ -1,5 +1,5 @@
 import { Review, ReviewType } from "@/types/product";
-import { products } from "./products";
+import { products } from "@/data";
 import { dummyCustomers } from "./customers";
 
 export const reviews: Review[] = [

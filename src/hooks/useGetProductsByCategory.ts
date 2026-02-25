@@ -1,7 +1,7 @@
 // hooks/useGetProductsByCategory.ts
 import { useEffect, useState } from "react";
 import { Product } from "@/types/product";
-import { products } from "@/constants/products";
+import { products } from "@/data";
 
 interface UseGetProductsByCategoryProps {
   categorySlug?: string;

@@ -1,4 +1,3 @@
-// store/slices/cartSlice.ts
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { CartItem } from "@/types/cart";
 import { Seller, shippingMethod } from "@/types/product";
@@ -10,22 +9,8 @@ interface CartState {
   totalPrice: number;
 }
 
-const loadCartFromLocalStorage = (): CartState => {
-  if (typeof window !== "undefined") {
-    try {
-      const savedCart = localStorage.getItem("cart");
-      return savedCart
-        ? JSON.parse(savedCart)
-        : { products: [], totalPrice: 0 };
-    } catch (e) {
-      console.error("Failed to parse cart from localStorage", e);
-      return { products: [], totalPrice: 0 };
-    }
-  }
-  return { products: [], totalPrice: 0 };
-};
 
-const initialState: CartState = loadCartFromLocalStorage();
+const initialState: CartState = { products: [], totalPrice: 0 };
 
 const cartSlice = createSlice({
   name: "cart",
@@ -153,7 +138,7 @@ const cartSlice = createSlice({
       state.totalPrice = 0;
     },
 
-    // New action to replace the entire cart state
+  
     setCart: (state, action: PayloadAction<CartState>) => {
       state.products = action.payload.products;
       state.totalPrice = action.payload.totalPrice;

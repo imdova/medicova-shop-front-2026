@@ -1,6 +1,5 @@
 import { FilterGroup } from "@/types";
 
-// Mock data for filters
 export const leftFilters: FilterGroup[] = [
   {
     id: "category",

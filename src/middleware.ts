@@ -1,57 +1,79 @@
-import { withAuth } from "next-auth/middleware";
-import { NextResponse } from "next/server";
+import createMiddleware from "next-intl/middleware";
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth/auth";
+import { routing } from "@/i18n/routing";
 
-export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token;
-    const pathname = req.nextUrl.pathname;
-    const userType = token?.role as string;
+const intlMiddleware = createMiddleware(routing);
 
-    const haveAccess = doesRoleHaveAccessToURL(userType, pathname);
-    if (!haveAccess) {
-      // Redirect to 403 page if user has no access to that particular page
-      return NextResponse.rewrite(new URL("/403", req.url));
-    }
-
-    return NextResponse.next();
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => {
-        return !!token;
-      },
-    },
-    pages: {
-      error: "/auth/error",
-    },
-  },
-);
-
-export const config = {
-  matcher: [
-    "/checkout",
-    "/checkout/:path*",
-    "/user/:path*",
-    "/seller/:path*",
-    "/admin/:path*",
-  ],
-};
+// Routes that require authentication
+const protectedPatterns = [
+  "/checkout",
+  "/user",
+  "/seller",
+  "/admin",
+  "/wishlist",
+];
 
 const roleAccessMap: Record<string, string[]> = {
-  user: ["/user", "/user/:path*", "/checkout", "/checkout/:path*"],
-  seller: ["/checkout", "/checkout/:path", "/seller", "/seller/:path*"],
+  user: ["/user", "/checkout", "/wishlist"],
+  seller: ["/checkout", "/seller"],
   admin: ["/*"],
 };
+
+function isProtectedRoute(pathname: string): boolean {
+  return protectedPatterns.some(
+    (pattern) => pathname === pattern || pathname.startsWith(`${pattern}/`),
+  );
+}
 
 function doesRoleHaveAccessToURL(userType: string, url: string): boolean {
   const accessibleRoutes = roleAccessMap[userType] || [];
   return accessibleRoutes.some((route) => {
-    // Create a regex from the route by replacing dynamic segments
-    const regexPattern = route
-      .replace(/:\w+/g, "[^/]+") // Replace path parameters like :path*
-      .replace(/\*/g, ".*") // Replace wildcards
-      .replace(/\//g, "\\/"); // Escape forward slashes
-    const regex = new RegExp(`^${regexPattern}$`);
-    return regex.test(url);
+    if (route === "/*") return true;
+    return url === route || url.startsWith(`${route}/`);
   });
 }
+
+/**
+ * Strip the locale prefix from a pathname to get the "bare" route.
+ */
+function stripLocale(pathname: string): string {
+  for (const locale of routing.locales) {
+    if (
+      locale !== routing.defaultLocale &&
+      (pathname === `/${locale}` || pathname.startsWith(`/${locale}/`))
+    ) {
+      return pathname.slice(`/${locale}`.length) || "/";
+    }
+  }
+  return pathname;
+}
+
+export default auth((req: NextRequest & { auth: any }) => {
+  const pathname = req.nextUrl.pathname;
+  const barePath = stripLocale(pathname);
+
+  // For protected routes, check auth first
+  if (isProtectedRoute(barePath)) {
+    const isLoggedIn = !!req.auth;
+
+    if (!isLoggedIn) {
+      // Redirect to sign-in
+      const signInUrl = new URL("/signin", req.url);
+      signInUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(signInUrl);
+    }
+
+    const userType = (req.auth?.user as any)?.role || "user";
+    if (!doesRoleHaveAccessToURL(userType, barePath)) {
+      return NextResponse.rewrite(new URL("/403", req.url));
+    }
+  }
+
+  // Run intl middleware for locale detection + routing
+  return intlMiddleware(req);
+});
+
+export const config = {
+  matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
+};
