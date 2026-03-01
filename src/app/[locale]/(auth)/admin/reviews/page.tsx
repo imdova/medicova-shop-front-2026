@@ -157,15 +157,8 @@ export default function ReviewsPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={productFilters}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -174,7 +167,7 @@ export default function ReviewsPage() {
       />
 
       <ReviewFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -223,8 +216,8 @@ export default function ReviewsPage() {
 
         <TabsContent value="all" className="mt-0 focus-visible:outline-none">
           <ReviewTableContainer
+            locale={locale}
             data={filteredReviews}
-
             onApprove={(r) => console.log("approve", r.id)}
             onReject={(r) => console.log("reject", r.id)}
             onDelete={(r) => console.log("delete", r.id)}
@@ -233,8 +226,8 @@ export default function ReviewsPage() {
         </TabsContent>
         <TabsContent value="manual" className="mt-0 focus-visible:outline-none">
           <ReviewTableContainer
+            locale={locale}
             data={filteredReviews}
-
             onApprove={(r) => console.log("approve", r.id)}
             onReject={(r) => console.log("reject", r.id)}
             onDelete={(r) => console.log("delete", r.id)}
@@ -243,8 +236,8 @@ export default function ReviewsPage() {
         </TabsContent>
         <TabsContent value="system" className="mt-0 focus-visible:outline-none">
           <ReviewTableContainer
+            locale={locale}
             data={filteredReviews}
-
             onApprove={(r) => console.log("approve", r.id)}
             onReject={(r) => console.log("reject", r.id)}
             onDelete={(r) => console.log("delete", r.id)}

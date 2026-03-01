@@ -12,6 +12,7 @@ type MobileCartNavbarProps = {
   setQuantity: (quantity: number) => void;
   handleAddToCart: () => void;
   loading: boolean;
+  locale?: LanguageType;
 };
 
 // Translations

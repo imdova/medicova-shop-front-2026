@@ -2,13 +2,12 @@
 
 import React, { useMemo } from "react";
 import Image from "next/image";
-import { Search, Plus, Download, PencilIcon, TrashIcon } from "lucide-react";
+import { PencilIcon, TrashIcon } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import DynamicTable from "@/components/features/tables/DTable";
 import StatusToggle from "@/components/shared/Buttons/StatusToggle";
+import TabContentLayout from "./TabContentLayout";
 import { Brand } from "../constants";
-import { LanguageType } from "@/util/translations";
-import Link from "next/link";
 
 interface BrandTabContentProps {
   data: Brand[];
@@ -17,6 +16,7 @@ interface BrandTabContentProps {
   onStatusChange: (brand: Brand, newStatus: boolean) => void;
   onEdit: (brand: Brand) => void;
   onDelete: (brand: Brand) => void;
+  onCreateClick: () => void;
 }
 
 const BrandTabContent: React.FC<BrandTabContentProps> = ({
@@ -26,10 +26,10 @@ const BrandTabContent: React.FC<BrandTabContentProps> = ({
   onStatusChange,
   onEdit,
   onDelete,
+  onCreateClick,
 }) => {
   const locale = useLocale() as "en" | "ar";
   const t = useTranslations("admin");
-  const isRTL = locale === "ar";
 
   const columns = useMemo(
     () => [
@@ -52,13 +52,6 @@ const BrandTabContent: React.FC<BrandTabContentProps> = ({
         header: t("brandName"),
         render: (item: Brand) => (
           <span className="font-bold text-gray-900">{item.name[locale]}</span>
-        ),
-      },
-      {
-        key: "date",
-        header: t("date"),
-        render: (item: Brand) => (
-          <span className="font-medium text-gray-500">{item.date}</span>
         ),
       },
       {
@@ -103,81 +96,38 @@ const BrandTabContent: React.FC<BrandTabContentProps> = ({
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-2xl text-primary shadow-inner">
-            <Plus size={24} />
-          </div>
-          <div>
-            <h3 className="text-xl font-black text-gray-900">
-              {t("allBrands")}
-            </h3>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
-              {data.length} {t("brands")}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row lg:max-w-2xl">
-          <div className="relative flex-1">
-            <Search
-              className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 ${isRTL ? "right-4" : "left-4"}`}
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder={t("searchPlaceholder")}
-              className={`focus:border-primary/30 focus:ring-primary/5 h-12 w-full rounded-2xl border border-gray-100 bg-gray-50/50 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4 ${isRTL ? "pl-4 pr-11" : "pl-11 pr-4"}`}
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <Link
-              href={`/${locale}/admin/product-settings/brands/create`}
-              className="shadow-primary/20 group flex h-12 items-center gap-2 rounded-2xl bg-primary px-6 text-sm font-bold text-white shadow-xl transition-all duration-300 hover:brightness-110 active:scale-95"
-            >
-              <Plus
-                size={18}
-                className="transition-transform duration-300 group-hover:rotate-90"
-              />
-              <span>{t("create")}</span>
-            </Link>
-            <button className="flex h-12 items-center gap-2 rounded-2xl border border-gray-100 bg-white px-6 text-sm font-bold text-gray-600 transition-all duration-300 hover:bg-gray-50 hover:text-primary hover:shadow-md">
-              <Download size={18} />
-              <span>{t("download")}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-white/60 bg-white/70 p-6 shadow-xl shadow-gray-200/40 backdrop-blur-xl">
-        <DynamicTable
-          data={data}
-          columns={columns}
-          minWidth={1000}
-          pagination={true}
-          itemsPerPage={5}
-          headerClassName="bg-gray-50/50 text-gray-400 text-[11px] font-black uppercase tracking-wider"
-          rowClassName="hover:bg-gray-50/80 transition-colors duration-300 border-b border-gray-50/50"
-          actions={[
-            {
-              label: t("edit"),
-              onClick: (item) => onEdit(item as Brand),
-              icon: <PencilIcon className="h-4 w-4" />,
-              className: "text-blue-600 font-bold",
-            },
-            {
-              label: t("delete"),
-              onClick: (item) => onDelete(item as Brand),
-              icon: <TrashIcon className="h-4 w-4" />,
-              className: "text-rose-600 font-bold",
-            },
-          ]}
-        />
-      </div>
-    </div>
+    <TabContentLayout
+      title={t("allBrands")}
+      itemCount={data.length}
+      itemLabel={t("brands")}
+      searchQuery={searchQuery}
+      onSearchChange={onSearchChange}
+      onCreateClick={onCreateClick}
+    >
+      <DynamicTable
+        data={data}
+        columns={columns}
+        minWidth={0}
+        pagination={true}
+        itemsPerPage={5}
+        headerClassName="bg-gray-50/50 text-gray-400 text-[11px] font-black uppercase tracking-wider"
+        rowClassName="hover:bg-gray-50/80 transition-colors duration-300 border-b border-gray-50/50"
+        actions={[
+          {
+            label: t("edit"),
+            onClick: (item) => onEdit(item as Brand),
+            icon: <PencilIcon className="h-4 w-4" />,
+            className: "text-blue-600 font-bold",
+          },
+          {
+            label: t("delete"),
+            onClick: (item) => onDelete(item as Brand),
+            icon: <TrashIcon className="h-4 w-4" />,
+            className: "text-rose-600 font-bold",
+          },
+        ]}
+      />
+    </TabContentLayout>
   );
 };
 

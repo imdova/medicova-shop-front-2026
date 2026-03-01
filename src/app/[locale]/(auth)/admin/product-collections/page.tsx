@@ -270,11 +270,8 @@ export default function ProductCollectionsListPanel() {
       </div>
 
       <DynamicFilter
-        t={t}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isRTL}
         drawerFilters={productFilters}
         showViewToggle={false}
         statusCounts={statusCounts}
@@ -324,7 +321,6 @@ export default function ProductCollectionsListPanel() {
               icon: <TrashIcon className="h-3 w-3" />,
             },
           ]}
-
         />
       </div>
     </div>

@@ -69,18 +69,18 @@ export default function SellersPage() {
             value="overview"
             className="mt-0 focus-visible:outline-none"
           >
-            <OverviewPanel />
+            <OverviewPanel locale={locale} />
           </TabsContent>
 
           <TabsContent value="list" className="mt-0 focus-visible:outline-none">
-            <SellersListPanel />
+            <SellersListPanel locale={locale} />
           </TabsContent>
         </Tabs>
 
         <AddSellerModal
           isModalOpen={isModalOpen}
           setIsModalOpen={setIsModalOpen}
-
+          locale={locale}
         />
       </div>
     </div>

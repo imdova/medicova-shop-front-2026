@@ -253,7 +253,6 @@ export default function EditPage() {
                               en: "Enter page name in English",
                               ar: "أدخل اسم الصفحة بالعربية",
                             }}
-                            
                             required
                           />
                         </FormControl>
@@ -294,7 +293,6 @@ export default function EditPage() {
                               en: "Enter short description in English",
                               ar: "أدخل وصف قصير بالعربية",
                             }}
-                            
                             type="textarea"
                           />
                         </FormControl>
@@ -343,7 +341,6 @@ export default function EditPage() {
                         <BilingualTextEditor
                           value={field.value}
                           onChange={field.onChange}
-                          
                           required
                           forPage={true}
                         />
@@ -362,7 +359,7 @@ export default function EditPage() {
                 <FAQManager
                   faqs={faqs}
                   onFaqsChange={handleFaqsChange}
-                  
+                  language={locale}
                 />
               </Card>
 
@@ -378,7 +375,7 @@ export default function EditPage() {
                     <SEOManager
                       seoData={seoData}
                       onSeoChange={handleSeoChange}
-                      
+                      language={locale}
                     />
                   </div>
                 </div>
@@ -473,7 +470,7 @@ export default function EditPage() {
                 <ImageUpload
                   value={featuredImage ?? "/images/placolder.png"}
                   onChange={handleFeaturedImageChange}
-                  
+                  language={locale}
                   type="featured"
                 />
               </Card>
@@ -518,7 +515,7 @@ export default function EditPage() {
                     <ImageUpload
                       value={breadcrumbBackground ?? "/images/placolder.png"}
                       onChange={handleBreadcrumbBackgroundChange}
-                      
+                      language={locale}
                       type="breadcrumb"
                     />
                   </div>

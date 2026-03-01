@@ -107,15 +107,8 @@ export default function TestimonialsPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={[]}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -124,7 +117,7 @@ export default function TestimonialsPage() {
       />
 
       <TestimonialFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -146,8 +139,8 @@ export default function TestimonialsPage() {
       </div>
 
       <TestimonialTableContainer
+        locale={locale}
         data={filteredTestimonials}
-
         onEdit={(t) =>
           router.push(`/${locale}/admin/testimonials/edit/${t.id}`)
         }

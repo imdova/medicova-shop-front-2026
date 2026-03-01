@@ -130,15 +130,8 @@ export default function ShipmentsPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={productFilters}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -147,7 +140,7 @@ export default function ShipmentsPage() {
       />
 
       <ShipmentFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -169,8 +162,8 @@ export default function ShipmentsPage() {
       </div>
 
       <ShipmentTableContainer
+        locale={locale}
         data={filteredShipments}
-
         onEdit={(s) => router.push(`/${locale}/admin/shipments/edit/${s.id}`)}
         onDelete={(s) => console.log("delete", s.id)}
       />

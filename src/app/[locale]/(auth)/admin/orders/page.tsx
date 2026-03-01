@@ -56,14 +56,14 @@ export default function OrdersPage() {
             value="all-orders"
             className="mt-0 focus-visible:outline-none"
           >
-            <OrdersListPanel />
+            <OrdersListPanel locale={locale} />
           </TabsContent>
 
           <TabsContent
             value="refund-requests"
             className="mt-0 focus-visible:outline-none"
           >
-            <RefundRequestsListPanel />
+            <RefundRequestsListPanel locale={locale} />
           </TabsContent>
         </Tabs>
       </div>

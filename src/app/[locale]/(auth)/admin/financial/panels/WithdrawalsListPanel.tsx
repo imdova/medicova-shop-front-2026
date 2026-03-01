@@ -456,11 +456,8 @@ export default function WithdrawalsListPanel() {
       </div>
 
       <DynamicFilter
-        t={t}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isRTL}
         drawerFilters={productFilters}
         showViewToggle={false}
         statusCounts={statusCounts}
@@ -517,7 +514,6 @@ export default function WithdrawalsListPanel() {
               color: "#f59e0b",
             },
           ]}
-
         />
       </div>
     </div>

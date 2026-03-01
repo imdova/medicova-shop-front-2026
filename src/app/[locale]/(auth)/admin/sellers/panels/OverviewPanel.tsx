@@ -41,25 +41,25 @@ export default function OverviewPanel({ locale }: { locale: LanguageType }) {
       className="space-y-12 pb-20"
     >
       {/* KPI Section - Row 1 */}
-      <KPICards itemVariants={itemVariants} />
+      <KPICards locale={locale} itemVariants={itemVariants} />
 
       {/* Row 2: Stats & Top Sellers */}
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <SellersStats itemVariants={itemVariants} />
+          <SellersStats locale={locale} itemVariants={itemVariants} />
         </div>
         <div className="lg:col-span-4">
-          <TopSellersList itemVariants={itemVariants} />
+          <TopSellersList locale={locale} itemVariants={itemVariants} />
         </div>
       </div>
 
       {/* Row 3: Recent Sellers & Reviews */}
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <RecentSellersGrid itemVariants={itemVariants} />
+          <RecentSellersGrid locale={locale} itemVariants={itemVariants} />
         </div>
         <div className="lg:col-span-4">
-          <SellerReviewsList itemVariants={itemVariants} />
+          <SellerReviewsList locale={locale} itemVariants={itemVariants} />
         </div>
       </div>
     </motion.div>

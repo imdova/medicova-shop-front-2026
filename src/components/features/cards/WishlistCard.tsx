@@ -14,6 +14,7 @@ interface WishlistCardProps {
   loading?: boolean;
   product: Product;
   handleDelete?: () => void;
+  locale?: LanguageType;
 }
 
 import { useLocale, useTranslations } from "next-intl";

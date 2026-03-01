@@ -53,7 +53,7 @@ export const RecentSellersGrid = ({ locale, itemVariants }: Props) => {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         {recentSellers.map((seller) => (
           <motion.div variants={itemVariants} key={seller.id}>
-            <SellerPremiumCard seller={seller} />
+            <SellerPremiumCard locale={locale} seller={seller} />
           </motion.div>
         ))}
       </div>

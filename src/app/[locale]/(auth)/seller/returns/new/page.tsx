@@ -5,7 +5,7 @@ import DynamicCheckbox from "@/components/shared/DynamicCheckbox";
 import Image from "next/image";
 import React, { useState } from "react";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { LocalizedTitle } from "@/types/locale";
+import { LocalizedTitle } from "@/types/language";
 
 type OrderItem = {
   name: string;

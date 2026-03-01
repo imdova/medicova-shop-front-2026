@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { Card, CardContent, CardHeader } from "@/components/shared/card";
 import { Button } from "@/components/shared/button";
-import { Badge } from "@/components/shared/Badge";
+import { Badge } from "@/components/shared/badge";
 import { Phone, Store, CheckCircle, XCircle, MapPin, Star } from "lucide-react";
 import Image from "next/image";
 import Loading from "@/app/[locale]/loading";

@@ -196,7 +196,6 @@ export default function CreatePage() {
                               en: "Enter page name in English",
                               ar: "أدخل اسم الصفحة بالعربية",
                             }}
-
                             required
                           />
                         </FormControl>
@@ -231,7 +230,6 @@ export default function CreatePage() {
                               en: "Enter short description in English",
                               ar: "أدخل وصف قصير بالعربية",
                             }}
-
                             type="textarea"
                           />
                         </FormControl>
@@ -254,7 +252,6 @@ export default function CreatePage() {
                         <BilingualTextEditor
                           value={field.value}
                           onChange={field.onChange}
-
                           required
                           forPage={true}
                         />
@@ -273,7 +270,7 @@ export default function CreatePage() {
                 <FAQManager
                   faqs={faqs}
                   onFaqsChange={handleFaqsChange}
-
+                  language={locale}
                 />
               </Card>
 
@@ -292,7 +289,7 @@ export default function CreatePage() {
                     <SEOManager
                       seoData={seoData}
                       onSeoChange={handleSeoChange}
-
+                      language={locale}
                     />
                   </div>
                 </div>
@@ -389,7 +386,7 @@ export default function CreatePage() {
                 <ImageUpload
                   value={featuredImage ?? "/images/placholder.png"}
                   onChange={handleFeaturedImageChange}
-
+                  language={locale}
                   type="featured"
                 />
               </Card>

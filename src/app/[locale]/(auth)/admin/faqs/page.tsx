@@ -120,15 +120,8 @@ export default function FAQsPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={productFilters}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -137,7 +130,7 @@ export default function FAQsPage() {
       />
 
       <FAQFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -158,8 +151,8 @@ export default function FAQsPage() {
       </div>
 
       <FAQTableContainer
+        locale={locale}
         data={filteredFAQs}
-
         onEdit={(f) => router.push(`/${locale}/admin/faqs/edit/${f.id}`)}
         onDelete={(f) => console.log("delete", f.id)}
       />

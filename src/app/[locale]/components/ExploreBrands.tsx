@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import SectionHeader from "@/components/features/headings/SectionHeader";
 import type { Locale } from "@/i18n/routing";
-import { brands } from "@/data";
+import { getBrands } from "@/services/brandService";
 import BrandSlider from "@/components/features/sliders/BrandSlider";
 
 interface ExploreBrandsProps {
@@ -10,6 +10,7 @@ interface ExploreBrandsProps {
 
 export default async function ExploreBrands({ locale }: { locale: Locale }) {
   const t = await getTranslations("home");
+  const brands = await getBrands();
 
   return (
     <section

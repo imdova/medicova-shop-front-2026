@@ -21,6 +21,7 @@ import { LocalizedTitle } from "@/types/language";
 type ImagesSliderProps = {
   images?: string[];
   product: Product;
+  locale?: LanguageType;
 };
 
 import { useLocale, useTranslations } from "next-intl";

@@ -29,7 +29,10 @@ import { Textarea } from "@/components/shared/textarea";
 import { products } from "@/data";
 import { dummyCustomers } from "@/constants/customers";
 import { formatFullName } from "@/util";
-import { ImageUploader, UploadedImage } from "@/components/features/ImageUploader";
+import {
+  ImageUploader,
+  UploadedImage,
+} from "@/components/features/ImageUploader";
 
 // ---------------- Schema & Types ----------------
 const messages = {
@@ -348,7 +351,7 @@ export default function CreateReviewPage() {
                     onImagesChange={setCustomerImages}
                     maxFiles={1}
                     maxSize={10}
-
+                    language={locale}
                   />
                   {selectedCustomer && (
                     <p className="mt-2 text-xs text-gray-500">
@@ -480,7 +483,7 @@ export default function CreateReviewPage() {
                   onImagesChange={setUploadedImages}
                   maxFiles={10}
                   maxSize={10}
-
+                  language={locale}
                 />
               </Card>
             </div>

@@ -32,6 +32,7 @@ interface CardStatsProps {
   icon: IconType;
   color?: string; // expected format: hex or rgb
   size?: "sm" | "md" | "lg";
+  locale?: LanguageType;
 }
 
 const iconMap = {

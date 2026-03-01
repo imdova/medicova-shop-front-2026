@@ -21,6 +21,7 @@ type TapFilterProps = {
   currentFilters: Record<string, string[]>;
   onFilterToggle: (filterKey: string, filterValue: string) => void;
   onPriceRangeSubmit?: (min: string, max: string) => void;
+  locale?: LanguageType;
 };
 
 import { useLocale } from "next-intl";

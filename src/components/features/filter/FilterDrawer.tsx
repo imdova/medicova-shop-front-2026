@@ -14,12 +14,15 @@ export const Filters = ({
   isOpen,
   onClose,
   filtersData,
+  locale: propsLocale,
 }: {
   isOpen: boolean;
   onClose: () => void;
   filtersData: FilterDrawerGroup[];
+  locale?: LanguageType;
 }) => {
-  const locale = useLocale() as LanguageType;
+  const contextLocale = useLocale() as LanguageType;
+  const locale = propsLocale || contextLocale;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

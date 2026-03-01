@@ -17,6 +17,7 @@ type CreditCardModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: CreditCardFormData) => void;
+  locale?: LanguageType;
 };
 
 import { useLocale, useTranslations } from "next-intl";

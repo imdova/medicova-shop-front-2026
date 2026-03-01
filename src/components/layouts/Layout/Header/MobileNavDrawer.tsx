@@ -29,7 +29,6 @@ const MobileNavDrawer = ({
       position="left"
       isOpen={isOpen}
       onClose={onClose}
-      locale={locale}
     >
       <nav aria-label="Mobile navigation">
         <div className="flex flex-col p-2">
@@ -82,7 +81,7 @@ const MobileNavDrawer = ({
                             fontSize="sm"
                           >
                             <li>
-                              <ul>
+                              <ul className="grid grid-cols-2 gap-x-2">
                                 {gridLink.subLinks?.map(
                                   (link: linksSubHeader, index: number) => (
                                     <li key={index}>
@@ -90,6 +89,7 @@ const MobileNavDrawer = ({
                                         className="block p-2 text-xs text-gray-600 transition hover:text-primary"
                                         href={link.url}
                                         onClick={onClose}
+                                        title={link.title[locale]}
                                       >
                                         {link.title[locale]}
                                       </Link>

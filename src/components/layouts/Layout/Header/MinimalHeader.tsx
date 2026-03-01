@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Suspense, useEffect, useState } from "react";
 import { Drawer } from "@/components/layouts/Drawer";
 import Sidebar from "@/components/layouts/Layout/sidebar/Sidebar";
-import { AccountPageProps } from "@/app/(auth)/user/types/account";
+import { AccountPageProps } from "@/app/[locale]/(auth)/user/types/account";
 import LanguageSwitcher from "@/components/layouts/LanguageSwitcher";
 import { useAppLocale } from "@/hooks/useAppLocale";
 

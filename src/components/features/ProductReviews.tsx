@@ -18,6 +18,7 @@ type Review = {
 
 type ProductReviewsProps = {
   reviews: Review[];
+  locale?: LanguageType;
 };
 
 const ProductReviews: React.FC<ProductReviewsProps> = ({ reviews }) => {

@@ -22,7 +22,7 @@ export default function OverviewPanel() {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 space-y-8 duration-700">
-      <FinancialStats />
+      <FinancialStats locale={locale} />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="rounded-3xl border border-white/60 bg-white/70 p-6 shadow-xl shadow-gray-200/40 backdrop-blur-xl lg:col-span-2">

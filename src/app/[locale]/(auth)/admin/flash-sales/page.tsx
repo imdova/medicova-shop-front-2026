@@ -106,15 +106,8 @@ export default function FlashSalesPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={[]}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -123,7 +116,7 @@ export default function FlashSalesPage() {
       />
 
       <FlashSaleFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -144,8 +137,8 @@ export default function FlashSalesPage() {
       </div>
 
       <FlashSaleTableContainer
+        locale={locale}
         data={filteredFlashSales}
-
         onEdit={(s) => router.push(`/${locale}/admin/flash-sales/edit/${s.id}`)}
         onDelete={(s) => console.log("delete", s.id)}
       />

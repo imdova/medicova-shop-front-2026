@@ -99,15 +99,8 @@ export default function SpecificationTablesPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={[]}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -116,7 +109,7 @@ export default function SpecificationTablesPage() {
       />
 
       <SpecFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -140,8 +133,8 @@ export default function SpecificationTablesPage() {
       </div>
 
       <SpecTableContainer
+        locale={locale}
         data={filteredTables}
-
         onEdit={(item) =>
           router.push(`/${locale}/admin/specification-tables/edit/${item.id}`)
         }

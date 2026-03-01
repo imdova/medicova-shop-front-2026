@@ -65,4 +65,5 @@ export type DynamicTableProps<T> = {
     ar: string;
   };
   actionsColumnWidth?: string;
+  locale?: LanguageType;
 };

@@ -67,11 +67,11 @@ export default function ProductsPage() {
             value="overview"
             className="mt-0 focus-visible:outline-none"
           >
-            <OverviewPanel />
+            <OverviewPanel locale={locale} />
           </TabsContent>
 
           <TabsContent value="list" className="mt-0 focus-visible:outline-none">
-            <ProductListPanel />
+            <ProductListPanel locale={locale} />
           </TabsContent>
         </Tabs>
       </div>

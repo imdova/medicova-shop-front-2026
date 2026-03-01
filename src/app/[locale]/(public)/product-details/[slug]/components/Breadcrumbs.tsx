@@ -6,15 +6,15 @@ import { useTranslations } from "next-intl";
 
 interface BreadcrumbsProps {
   product: Product;
+  locale: "en" | "ar";
 }
 
 import { LocalizedTitle } from "@/types/language";
 
 import { useLocale } from "next-intl";
 
-const Breadcrumbs = ({ product }: BreadcrumbsProps) => {
+const Breadcrumbs = ({ product, locale }: BreadcrumbsProps) => {
   const t = useTranslations("common");
-  const locale = useLocale() as "en" | "ar";
   const Chevron =
     locale === "ar" ? (
       <ChevronLeft className="h-3 w-3 text-secondary" />

@@ -102,15 +102,8 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
     <div className="space-y-6">
       <div className="rounded-[32px] border border-white/60 bg-white p-6 shadow-2xl shadow-slate-200/50 backdrop-blur-sm">
         <DynamicFilter
-          t={{
-            filters: t("filters"),
-            reset: t("reset"),
-            showData: t("showData"),
-          }}
           isOpen={isOpen}
           onToggle={() => setIsOpen(false)}
-
-          isRTL={locale === "ar"}
           drawerFilters={productFilters}
           statusCounts={statusCounts}
           filtersOpen={filtersOpen}
@@ -119,7 +112,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
         />
 
         <SellerFilters
-
+          locale={locale}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onToggleFilters={() => setIsOpen(true)}
@@ -129,7 +122,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
 
         <div className="mt-8 border-t border-slate-50 pt-8">
           <SellersListHeader
-
+            locale={locale}
             filteredCount={filteredSellers.length}
           />
 
@@ -142,8 +135,8 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
               className="mt-6"
             >
               <SellerTableContainer
+                locale={locale}
                 data={filteredSellers}
-
                 onEdit={(s) => console.log("edit", s.id)}
                 onDelete={(s) => console.log("delete", s.id)}
               />

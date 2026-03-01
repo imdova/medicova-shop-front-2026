@@ -39,4 +39,5 @@ export interface GenericChartProps {
   chartTitle?: string;
   defaultSelected?: string;
   chartDisplayType?: "line" | "bar" | "both";
+  locale?: LanguageType;
 }

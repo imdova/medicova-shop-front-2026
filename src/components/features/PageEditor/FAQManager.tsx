@@ -127,7 +127,6 @@ export function FAQManager({
                   en: "Enter question in English",
                   ar: "أدخل السؤال بالعربية",
                 }}
-                language={language}
                 type="textarea"
                 required
               />
@@ -144,7 +143,6 @@ export function FAQManager({
                   en: "Enter answer in English",
                   ar: "أدخل الإجابة بالعربية",
                 }}
-                language={language}
                 type="textarea"
                 required
               />

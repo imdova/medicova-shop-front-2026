@@ -51,7 +51,6 @@ export default function SEOManager({
           en: "Enter meta title in English",
           ar: "أدخل العنوان التعريفي بالعربية",
         }}
-        language={language}
       />
 
       <BilingualInput
@@ -67,7 +66,6 @@ export default function SEOManager({
           en: "Enter meta description in English",
           ar: "أدخل الوصف التعريفي بالعربية",
         }}
-        language={language}
         type="textarea"
       />
 

@@ -235,11 +235,8 @@ export default function ProductOptionsListPanel() {
         <p className="max-w-lg text-sm text-gray-600">{t.description}</p>
       </div>
       <DynamicFilter
-        t={t}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isRTL}
         drawerFilters={productFilters}
         showViewToggle={false}
         statusCounts={requiredCounts}
@@ -289,7 +286,6 @@ export default function ProductOptionsListPanel() {
               icon: <TrashIcon className="h-3 w-3" />,
             },
           ]}
-
         />
       </div>
     </div>

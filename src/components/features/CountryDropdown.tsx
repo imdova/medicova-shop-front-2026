@@ -11,8 +11,10 @@ export const CountryDropdown: React.FC<{
   onSelect: (value: string) => void;
   icon?: React.ReactNode;
   className?: string;
-}> = ({ options, selected, onSelect, className }) => {
-  const locale = useLocale() as LanguageType;
+  locale?: LanguageType;
+}> = ({ options, selected, onSelect, className, locale: propsLocale }) => {
+  const contextLocale = useLocale() as LanguageType;
+  const locale = propsLocale || contextLocale;
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const t = useTranslations("common");

@@ -19,9 +19,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/shared/Tabs";
-import DynamicFilter from "@/components/features/filter/DynamicFilter";
 import TransactionTableContainer from "../components/TransactionTableContainer";
 import SearchInput from "@/components/forms/Forms/formFields/SearchInput";
+import DynamicFilter from "@/components/features/filter/DynamicFilter";
+import { productFilters } from "@/constants/drawerFilter";
+import { DynamicFilterItem } from "@/types/filters";
 
 type PaymentMethod = "visa" | "paypal" | "mastercard" | "cash";
 
@@ -74,6 +76,28 @@ export default function TransactionsListPanel() {
 
   const [activeTab, setActiveTab] = useState<string>("customers");
   const [isOpen, setIsOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const predefinedFilters: DynamicFilterItem[] = [
+    {
+      id: "status",
+      label: { en: "Status", ar: "الحالة" },
+      type: "dropdown",
+      options: [
+        { id: "paid", name: { en: "Paid", ar: "مدفوع" } },
+        { id: "pending", name: { en: "Pending", ar: "قيد الانتظار" } },
+        { id: "failed", name: { en: "Failed", ar: "فاشل" } },
+        { id: "refunded", name: { en: "Refunded", ar: "مسترجع" } },
+      ],
+      visible: true,
+    },
+    {
+      id: "dateRange",
+      label: { en: "Date Range", ar: "نطاق التاريخ" },
+      type: "date-range",
+      visible: true,
+    },
+  ];
 
   return (
     <div className="animate-in fade-in space-y-8 duration-700">
@@ -108,6 +132,16 @@ export default function TransactionsListPanel() {
         </div>
       </div>
 
+      <DynamicFilter
+        isOpen={isOpen}
+        onToggle={() => setIsOpen(false)}
+        drawerFilters={productFilters}
+        filtersOpen={filtersOpen}
+        setFiltersOpen={setFiltersOpen}
+        filters={predefinedFilters}
+        quickFiltersGridCols="grid-cols-1 md:grid-cols-2"
+      />
+
       <Tabs value={activeTab} className="w-full">
         <TabsContent
           value="customers"
@@ -116,7 +150,7 @@ export default function TransactionsListPanel() {
           <TransactionTableContainer
             data={customerTransactions}
             type="customers"
-
+            locale={locale}
           />
         </TabsContent>
         <TabsContent
@@ -126,7 +160,7 @@ export default function TransactionsListPanel() {
           <TransactionTableContainer
             data={sellerTransactions}
             type="sellers"
-
+            locale={locale}
           />
         </TabsContent>
       </Tabs>

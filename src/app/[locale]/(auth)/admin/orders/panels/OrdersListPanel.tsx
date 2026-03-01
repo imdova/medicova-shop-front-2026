@@ -141,7 +141,7 @@ export default function OrdersListPanel({
 
       {/* Main Filter Section */}
       <OrderFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onSearch={() => handleFilterChange("search", searchQuery)}
@@ -155,7 +155,7 @@ export default function OrdersListPanel({
       {/* Data Table Section */}
       <OrderTableContainer
         data={filteredOrders}
-
+        locale={locale}
         onEdit={handleEdit}
         onDelete={handleDelete}
       />

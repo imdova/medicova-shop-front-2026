@@ -16,6 +16,7 @@ interface MobileDropdownProps {
   isOpen: boolean;
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   children?: ReactNode; // Allow any custom content
+  locale?: LanguageType;
 }
 
 import { useLocale } from "next-intl";
@@ -28,8 +29,10 @@ export default function MobileDropdown({
   setIsOpen,
   isOpen,
   children,
+  locale: propsLocale,
 }: MobileDropdownProps) {
-  const locale = useLocale() as LanguageType;
+  const contextLocale = useLocale() as LanguageType;
+  const locale = propsLocale || contextLocale;
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

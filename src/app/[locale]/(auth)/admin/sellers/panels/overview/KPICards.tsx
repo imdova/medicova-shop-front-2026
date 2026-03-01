@@ -2,13 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
-import {
-  Users,
-  Package,
-  ShoppingCart,
-  DollarSign,
-  TrendingUp,
-} from "lucide-react";
+import { Users, Package, ShoppingCart, DollarSign } from "lucide-react";
 import { LanguageType } from "@/util/translations";
 
 interface Props {
@@ -39,8 +33,6 @@ const KPICard = ({
   locale,
   t,
 }: KPICardProps) => {
-  const isArabic = locale === "ar";
-
   return (
     <motion.div
       variants={itemVariants}
@@ -65,7 +57,7 @@ const KPICard = ({
         </div>
 
         <div
-          className={`flex p-2 items-center justify-center rounded-2xl ${iconBg} ${iconColor} shadow-inner transition-all duration-500 group-hover:scale-110`}
+          className={`flex items-center justify-center rounded-2xl p-2 ${iconBg} ${iconColor} shadow-inner transition-all duration-500 group-hover:scale-110`}
         >
           <Icon size={15} />
         </div>
@@ -124,7 +116,7 @@ export const KPICards = ({ locale, itemVariants }: Props) => {
           iconBg={stat.iconBg}
           iconColor={stat.iconColor}
           itemVariants={itemVariants}
-
+          locale={locale}
           t={t}
         />
       ))}

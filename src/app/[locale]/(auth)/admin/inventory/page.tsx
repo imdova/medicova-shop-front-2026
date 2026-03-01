@@ -125,15 +125,8 @@ export default function ProductInventoryPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={[]}
         statusCounts={stockCounts}
         filtersOpen={filtersOpen}
@@ -142,7 +135,7 @@ export default function ProductInventoryPage() {
       />
 
       <InventoryFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -163,8 +156,8 @@ export default function ProductInventoryPage() {
       </div>
 
       <InventoryTableContainer
+        locale={locale}
         data={filteredInventory}
-
         expandedItems={expandedItems}
         toggleExpand={toggleExpand}
         onSave={handleSave}

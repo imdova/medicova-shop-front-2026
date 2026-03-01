@@ -86,8 +86,13 @@ const DynamicTable = <T extends object>({
       className={`relative flex flex-col rounded-md ${className}`}
       dir={tableDirection}
     >
-      <div className="scroll-bar-minimal grid grid-cols-1 overflow-x-auto">
-        <table style={{ minWidth }} className="divide-y divide-gray-200">
+      <div
+        className={`grid grid-cols-1 ${minWidth > 0 ? "scroll-bar-minimal overflow-x-auto" : ""}`}
+      >
+        <table
+          style={minWidth > 0 ? { minWidth } : { width: "100%" }}
+          className="divide-y divide-gray-200"
+        >
           <thead className={headerClassName}>
             <tr>
               {selectable && (

@@ -6,6 +6,7 @@ import RecommendedProducts from "./components/RecommendedProducts";
 import ExploreBrands from "./components/ExploreBrands";
 import HomePopularSearches from "./components/HomePopularSearches";
 import { Locale } from "@/i18n/routing";
+import { getCategories } from "@/services/categoryService";
 
 export default async function Home({
   params,
@@ -15,12 +16,9 @@ export default async function Home({
   const { locale } = await params;
   const direction = locale === "ar" ? "rtl" : "ltr";
 
-  const {
-    allCategories,
-    consumableCategories,
-    lifestyleCategories,
-    equipmentCategories,
-  } = getCategoriesData();
+  const { consumableCategories, lifestyleCategories, equipmentCategories } =
+    getCategoriesData();
+  const dynamicCategories = await getCategories();
   const products = getProductsData();
   const slides = getSlidersData();
 
@@ -30,7 +28,7 @@ export default async function Home({
         locale={locale}
         direction={direction}
         slides={slides}
-        categories={allCategories}
+        categories={dynamicCategories}
       />
 
       <PromotionsGrid locale={locale} />

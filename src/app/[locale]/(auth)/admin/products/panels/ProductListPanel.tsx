@@ -57,15 +57,8 @@ export default function ProductListPanel({
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6 duration-1000">
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={locale === "ar"}
         drawerFilters={productFilters}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -74,15 +67,15 @@ export default function ProductListPanel({
       />
 
       <ProductFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
       />
 
       <ProductTableContainer
+        locale={locale}
         data={products}
-
         onEdit={(p) => console.log("edit", p.id)}
         onDelete={(p) => console.log("delete", p.id)}
       />

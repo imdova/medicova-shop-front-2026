@@ -19,6 +19,7 @@ type PhoneInputProps = {
   name: string;
   required?: boolean;
   defaultValue?: string;
+  locale?: LanguageType;
 };
 
 // Sample country data with Arabic names
@@ -179,12 +180,14 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   name,
   required = false,
   defaultValue = "",
+  locale: propsLocale,
 }) => {
   const { control, setValue, register } = useFormContext();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0]);
   const t = useTranslations("common");
-  const locale = useLocale() as LanguageType;
+  const contextLocale = useLocale() as LanguageType;
+  const locale = propsLocale || contextLocale;
   const isRTL = locale === "ar";
 
   useEffect(() => {

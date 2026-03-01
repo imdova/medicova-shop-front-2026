@@ -48,8 +48,17 @@ export default async function LocaleLayout({ children, params }: Props) {
   const fontClass = locale === "ar" ? "font-cairo" : "font-sans";
 
   // Data pre-fetching for Header and Footer to optimize hydration
-  const headerLinks = (await import("@/data/header.json")).default;
+  const staticHeaderLinks = (await import("@/data/header.json")).default;
   const footerData = (await import("@/data/footer.json")).default;
+
+  // Dynamic header links from API
+  const { getDynamicHeaderLinks } = await import("@/services/headerService");
+  let headerLinks = await getDynamicHeaderLinks();
+
+  // Fallback to static data if dynamic fetch failed or returned empty
+  if (!headerLinks || headerLinks.length === 0) {
+    headerLinks = staticHeaderLinks;
+  }
 
   return (
     <html lang={locale} dir={direction}>

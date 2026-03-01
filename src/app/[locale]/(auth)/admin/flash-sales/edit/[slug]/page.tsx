@@ -24,12 +24,12 @@ import {
 } from "@/components/shared/select";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { Card, CardContent } from "@/components/shared/card";
-import { Badge } from "@/components/shared/Badge";
+import { Badge } from "@/components/shared/badge";
 import { products } from "@/data";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { FlashSalesData } from "@/constants/flashSales";
-import { LocalizedTitle } from "@/types/locale";
+import { LocalizedTitle } from "@/types/language";
 import NotFound from "@/app/[locale]/not-found";
 import Loading from "@/app/[locale]/loading";
 
@@ -464,7 +464,7 @@ export default function EditFlashSalePage() {
 
                           {/* Discount Badge */}
                           <div className="flex items-end pb-2">
-                            <Badge variant="error">
+                            <Badge variant="destructive">
                               {product.del_price && product.price > 0
                                 ? `${Math.round((1 - product.price / product.del_price) * 100)}% OFF`
                                 : "0% OFF"}

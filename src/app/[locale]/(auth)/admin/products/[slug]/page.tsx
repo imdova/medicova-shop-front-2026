@@ -35,13 +35,13 @@ export default function SingleProductPage({
       label: t[locale].overview,
       icon: Eye,
       content: (
-        <ProductOverviewPanel foundProduct={foundProduct} />
+        <ProductOverviewPanel foundProduct={foundProduct} locale={locale} />
       ),
     },
     {
       label: t[locale].orders,
       icon: List,
-      content: <OrdersPanel />,
+      content: <OrdersPanel locale={locale} />,
     },
   ];
   return (

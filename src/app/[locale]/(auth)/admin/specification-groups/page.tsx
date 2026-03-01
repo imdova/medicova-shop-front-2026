@@ -99,15 +99,8 @@ export default function SpecificationGroupsPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={[]}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -116,7 +109,7 @@ export default function SpecificationGroupsPage() {
       />
 
       <GroupFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -140,8 +133,8 @@ export default function SpecificationGroupsPage() {
       </div>
 
       <GroupTableContainer
+        locale={locale}
         data={filteredGroups}
-
         onEdit={(item) =>
           router.push(`/${locale}/admin/specification-groups/edit/${item.id}`)
         }

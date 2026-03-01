@@ -106,15 +106,8 @@ export default function VendorsPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={[]}
         statusCounts={vendorStatusCounts}
         filtersOpen={filtersOpen}
@@ -123,7 +116,7 @@ export default function VendorsPage() {
       />
 
       <VendorFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -145,17 +138,17 @@ export default function VendorsPage() {
       </div>
 
       <VendorTableContainer
+        locale={locale}
         data={filteredVendors}
-
         onView={(v) => router.push(`/${locale}/admin/vendors/${v.id}`)}
         onEdit={(v) => router.push(`/${locale}/admin/vendors/edit/${v.id}`)}
         onDelete={(v) => console.log("delete", v.id)}
       />
 
       <AddVendorModal
+        locale={locale}
         isModalOpen={isModalOpen}
         setIsModalOpen={setIsModalOpen}
-
       />
     </div>
   );

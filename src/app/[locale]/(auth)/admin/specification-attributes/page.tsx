@@ -106,15 +106,8 @@ export default function SpecificationAttributesPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={[]}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -123,7 +116,7 @@ export default function SpecificationAttributesPage() {
       />
 
       <AttributeFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -147,8 +140,8 @@ export default function SpecificationAttributesPage() {
       </div>
 
       <AttributeTableContainer
+        locale={locale}
         data={filteredAttributes}
-
         onEdit={(item) =>
           router.push(
             `/${locale}/admin/specification-attributes/edit/${item.id}`,

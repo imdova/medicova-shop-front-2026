@@ -1,9 +1,13 @@
 import { LocalizedTitle } from "@/types/language";
+import { apiClient } from "@/lib/apiClient";
 
 export type Category = {
   id: string;
   image: string;
   name: LocalizedTitle;
+  slug: string;
+  slugAr: string;
+  description: string;
   date: string;
   products: number;
   orders: number;
@@ -12,10 +16,61 @@ export type Category = {
   isActive: boolean;
 };
 
+export async function fetchCategories(): Promise<Category[]> {
+  const res = await apiClient<any>({
+    endpoint: "/category",
+    method: "GET",
+  });
+
+  const items = res.data.categories;
+  return items.map((item: any) => ({
+    id: item._id,
+    image: item.image || "/images/placeholder.jpg",
+    name: { en: item.name, ar: item.nameAr || item.name },
+    slug: item.slug || "",
+    slugAr: item.slugAr || "",
+    description: item.description || "",
+    date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "N/A",
+    products: item.products || 0,
+    orders: item.totalOrders || 0,
+    totalSales: {
+      en: `${item.totalSales || 0} EGP`,
+      ar: `${item.totalSales || 0} ج.م`,
+    },
+    status: item.status ? "active" : "inactive",
+    isActive: !!item.status,
+  })) as Category[];
+}
+
+export async function createCategory(body: Record<string, unknown>, token?: string) {
+  return apiClient({ endpoint: "/category", method: "POST", body, token });
+}
+
+export async function fetchCategoryById(id: string, token?: string) {
+  const res = await apiClient<any>({ endpoint: `/category/${id}`, method: "GET", token });
+  return res.data;
+}
+
+export async function updateCategory(id: string, body: Record<string, unknown>, token?: string) {
+  return apiClient({ endpoint: `/category/${id}`, method: "PUT", body, token });
+}
+
+export async function toggleCategoryStatus(id: string, active: boolean, token?: string) {
+  return apiClient({ endpoint: `/category/${id}/status`, method: "PATCH", body: { active }, token });
+}
+
+export async function deleteCategory(id: string, token?: string) {
+  return apiClient({ endpoint: `/category/${id}`, method: "DELETE", token });
+}
+
 export type SubCategory = {
   id: string;
+  image: string;
   name: LocalizedTitle;
+  slug: string;
+  slugAr: string;
   parentCategory: LocalizedTitle;
+  categoryId: string;
   date: string;
   products: number;
   orders: number;
@@ -23,6 +78,59 @@ export type SubCategory = {
   status: "active" | "inactive";
   isActive: boolean;
 };
+
+export async function fetchSubCategories(): Promise<SubCategory[]> {
+  const res = await apiClient<any>({
+    endpoint: "/subcategory",
+    method: "GET",
+  });
+  const items = res.data.subCategories;
+  return items.map((item: any) => {
+    const parent = item.parentCategory || item.category;
+    return {
+      id: item._id,
+      image: item.image || "/images/placeholder.jpg",
+      name: { en: item.name, ar: item.nameAr || item.name },
+      slug: item.slug || "",
+      slugAr: item.slugAr || "",
+      parentCategory: {
+        en: parent?.name || "N/A",
+        ar: parent?.nameAr || parent?.name || "N/A",
+      },
+      categoryId: parent?._id || "",
+      date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "N/A",
+      products: item.products || 0,
+      orders: item.totalOrders || 0,
+      totalSales: {
+        en: `${item.totalSales || 0} EGP`,
+        ar: `${item.totalSales || 0} ج.م`,
+      },
+      status: (item.active || item.status) ? "active" : "inactive",
+      isActive: !!(item.active || item.status),
+    };
+  }) as SubCategory[];
+}
+
+export async function createSubCategory(body: Record<string, unknown>, token?: string) {
+  return apiClient({ endpoint: "/subcategory", method: "POST", body, token });
+}
+
+export async function fetchSubCategoryById(id: string, token?: string) {
+  const res = await apiClient<any>({ endpoint: `/subcategory/${id}`, method: "GET", token });
+  return res.data;
+}
+
+export async function updateSubCategory(id: string, body: Record<string, unknown>, token?: string) {
+  return apiClient({ endpoint: `/subcategory/${id}`, method: "PUT", body, token });
+}
+
+export async function toggleSubCategoryStatus(id: string, active: boolean, token?: string) {
+  return apiClient({ endpoint: `/subcategory/${id}/status`, method: "PATCH", body: { active }, token });
+}
+
+export async function deleteSubCategory(id: string, token?: string) {
+  return apiClient({ endpoint: `/subcategory/${id}`, method: "DELETE", token });
+}
 
 export type Brand = {
   id: string;
@@ -36,110 +144,133 @@ export type Brand = {
   isActive: boolean;
 };
 
-export const sampleCategories: Category[] = [
-  {
-    id: "1",
-    image: "/images/landau.jpg",
-    name: { en: "Electronics", ar: "إلكترونيات" },
-    date: "15/5/2025",
-    products: 450,
-    orders: 500,
-    totalSales: { en: "150K EGP", ar: "١٥٠ ألف جنيه" },
-    status: "active",
-    isActive: true,
-  },
-  {
-    id: "2",
-    image: "/images/landau.jpg",
-    name: { en: "Clothing", ar: "ملابس" },
-    date: "15/5/2025",
-    products: 450,
-    orders: 500,
-    totalSales: { en: "150K EGP", ar: "١٥٠ ألف جنيه" },
-    status: "active",
-    isActive: true,
-  },
-  {
-    id: "3",
-    image: "/images/landau.jpg",
-    name: { en: "Home & Garden", ar: "المنزل والحديقة" },
-    date: "15/5/2025",
-    products: 450,
-    orders: 500,
-    totalSales: { en: "150K EGP", ar: "١٥٠ ألف جنيه" },
-    status: "active",
-    isActive: true,
-  },
-];
+export async function fetchBrands(): Promise<Brand[]> {
+  const res = await apiClient<any>({
+    endpoint: "/brands",
+    method: "GET",
+  });
+  const items = res.data.brands;
+  return items.map((item: any) => ({
+    id: item._id,
+    logo: item.logo || item.image || "/images/placeholder.jpg",
+    name: { en: item.name, ar: item.nameAr || item.name },
+    date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "N/A",
+    products: item.products || 0,
+    orders: item.totalOrders || 0,
+    totalSales: {
+      en: `${item.totalSales || 0} EGP`,
+      ar: `${item.totalSales || 0} ج.م`,
+    },
+    status: item.status ? "active" : "inactive",
+    isActive: !!item.status,
+  })) as Brand[];
+}
 
-export const sampleSubCategories: SubCategory[] = [
-  {
-    id: "1",
-    name: { en: "Smartphones", ar: "هواتف ذكية" },
-    parentCategory: { en: "Electronics", ar: "إلكترونيات" },
-    date: "15/5/2025",
-    products: 120,
-    orders: 150,
-    totalSales: { en: "50K EGP", ar: "٥٠ ألف جنيه" },
-    status: "active",
-    isActive: true,
-  },
-  {
-    id: "2",
-    name: { en: "Laptops", ar: "أجهزة كمبيوتر محمولة" },
-    parentCategory: { en: "Electronics", ar: "إلكترونيات" },
-    date: "15/5/2025",
-    products: 80,
-    orders: 90,
-    totalSales: { en: "40K EGP", ar: "٤٠ ألف جنيه" },
-    status: "active",
-    isActive: false,
-  },
-  {
-    id: "3",
-    name: { en: "Men's Wear", ar: "ملابس رجالية" },
-    parentCategory: { en: "Clothing", ar: "ملابس" },
-    date: "15/5/2025",
-    products: 200,
-    orders: 180,
-    totalSales: { en: "60K EGP", ar: "٦٠ ألف جنيه" },
-    status: "active",
-    isActive: false,
-  },
-];
+export async function createBrand(body: Record<string, unknown>, token?: string) {
+  return apiClient({ endpoint: "/brands", method: "POST", body, token });
+}
 
-export const sampleBrands: Brand[] = [
-  {
-    id: "1",
-    logo: "/images/landau.jpg",
-    name: { en: "Landau", ar: "لانداو" },
-    date: "15/5/2025",
-    products: 450,
-    orders: 500,
-    totalSales: { en: "150K EGP", ar: "١٥٠ ألف جنيه" },
-    status: "active",
-    isActive: true,
-  },
-  {
-    id: "2",
-    logo: "/images/landau.jpg",
-    name: { en: "Nike", ar: "نايك" },
-    date: "15/5/2025",
-    products: 320,
-    orders: 400,
-    totalSales: { en: "120K EGP", ar: "١٢٠ ألف جنيه" },
-    status: "active",
-    isActive: true,
-  },
-  {
-    id: "3",
-    logo: "/images/landau.jpg",
-    name: { en: "Apple", ar: "آبل" },
-    date: "15/5/2025",
-    products: 280,
-    orders: 350,
-    totalSales: { en: "200K EGP", ar: "٢٠٠ ألف جنيه" },
-    status: "active",
-    isActive: false,
-  },
-];
+export async function fetchBrandById(id: string, token?: string) {
+  const res = await apiClient<any>({ endpoint: `/brands/${id}`, method: "GET", token });
+  return res.data;
+}
+
+export async function updateBrand(id: string, body: Record<string, unknown>, token?: string) {
+  return apiClient({ endpoint: `/brands/${id}`, method: "PUT", body, token });
+}
+
+export async function toggleBrandStatus(id: string, active: boolean, token?: string) {
+  return apiClient({ endpoint: `/brands/${id}/status`, method: "PATCH", body: { active }, token });
+}
+
+export async function deleteBrand(id: string, token?: string) {
+  return apiClient({ endpoint: `/brands/${id}`, method: "DELETE", token });
+}
+
+/* ─── SubCategoryChild ─── */
+
+export type SubCategoryChild = {
+  id: string;
+  image: string;
+  icon: string;
+  name: LocalizedTitle;
+  slug: string;
+  slugAr: string;
+  parentSubCategory: LocalizedTitle;
+  parentSubCategoryId: string;
+  description: string;
+  headline: string;
+  active: boolean;
+  metaTitle: string;
+  metaDescription: string;
+  metaKeywords: string[];
+  faqs: { question: string; answer: string }[];
+  products: number;
+  orders: number;
+  totalSales: LocalizedTitle;
+  status: "active" | "inactive";
+  isActive: boolean;
+};
+
+export async function fetchSubCategoryChildren(): Promise<SubCategoryChild[]> {
+  try {
+    const res = await apiClient<any>({
+      endpoint: "/subcategory-child",
+      method: "GET",
+    });
+
+    const items = res.data?.subcategoryChildren || [];
+
+    return items.map((item: any) => {
+      const parent = item.parentSubCategory || item.subCategory;
+      return {
+        id: item._id,
+        image: item.image || "/images/placeholder.jpg",
+        icon: item.icon || "",
+        name: { en: item.name || "Untitled", ar: item.nameAr || item.name || "بدون عنوان" },
+        slug: item.slug || "",
+        slugAr: item.slugAr || "",
+        parentSubCategory: {
+          en: parent?.name || "N/A",
+          ar: parent?.nameAr || parent?.name || "N/A",
+        },
+        parentSubCategoryId: parent?._id || "",
+        description: item.description || "",
+        active: !!(item.active || item.status),
+        products: item.products || 0,
+        orders: item.totalOrders || item.orders || 0,
+        totalSales: {
+          en: `${item.totalSales || 0} EGP`,
+          ar: `${item.totalSales || 0} ج.م`,
+        },
+        status: (item.active || item.status) ? "active" : "inactive",
+        isActive: !!(item.active || item.status),
+      };
+    }) as SubCategoryChild[];
+  } catch (error) {
+    console.error("Error in fetchSubCategoryChildren:", error);
+    return [];
+  }
+}
+
+export async function createSubCategoryChild(body: Record<string, unknown>, token?: string) {
+  return apiClient({ endpoint: "/subcategory-child", method: "POST", body, token });
+}
+
+export async function fetchSubCategoryChildById(id: string, token?: string) {
+  const res = await apiClient<any>({ endpoint: `/subcategory-child/${id}`, method: "GET", token });
+  return res.data;
+}
+
+export async function updateSubCategoryChild(id: string, body: Record<string, unknown>, token?: string) {
+  return apiClient({ endpoint: `/subcategory-child/${id}`, method: "PUT", body, token });
+}
+
+export async function toggleSubCategoryChildStatus(id: string, active: boolean, token?: string) {
+  return apiClient({ endpoint: `/subcategory-child/${id}/status`, method: "PATCH", body: { active }, token });
+}
+
+export async function deleteSubCategoryChild(id: string, token?: string) {
+  return apiClient({ endpoint: `/subcategory-child/${id}`, method: "DELETE", token });
+}
+

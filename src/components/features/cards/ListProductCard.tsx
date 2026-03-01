@@ -22,6 +22,7 @@ import { useLocale, useTranslations } from "next-intl";
 interface ListCardProps {
   loading?: boolean;
   product: Product;
+  locale?: LanguageType;
 }
 
 const ListProductCard: React.FC<ListCardProps> = ({ loading, product }) => {

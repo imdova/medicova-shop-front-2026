@@ -301,7 +301,6 @@ export default function ProductOverviewPanel({
           icon="users"
           color="#429fe6"
           size="md"
-
         />
 
         <CardStats
@@ -310,7 +309,6 @@ export default function ProductOverviewPanel({
           change="+8%"
           icon="dollar"
           size="md"
-
         />
         <CardStats
           title={t.totalViews}
@@ -319,7 +317,6 @@ export default function ProductOverviewPanel({
           icon="eye"
           color="#625df5"
           size="md"
-
         />
         <CardStats
           title={t.commission}
@@ -328,7 +325,6 @@ export default function ProductOverviewPanel({
           icon="award"
           color="#625df5"
           size="md"
-
         />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-9">
@@ -337,7 +333,6 @@ export default function ProductOverviewPanel({
             <GenericChart
               chartTitle={t.enrollmentAndViews}
               data={dummyChartSingleData}
-
             />
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
@@ -373,13 +368,12 @@ export default function ProductOverviewPanel({
                   icon: <TrashIcon className="h-4 w-4" />,
                 },
               ]}
-
             />
           </div>
         </div>
         <div className="col-span-1 xl:col-span-3">
-          <TransactionsList />
-          <CustomersList />
+          <TransactionsList locale={locale} />
+          <CustomersList locale={locale} />
         </div>
       </div>
     </div>

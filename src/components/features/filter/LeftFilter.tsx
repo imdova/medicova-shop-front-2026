@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FilterGroup, FilterOption } from "@/types";
 import { useTranslations } from "next-intl";
+import { LanguageType } from "@/util/translations";
 
 type LeftFilterProps = {
   filterGroups: FilterGroup[];

@@ -9,6 +9,7 @@ import Image from "next/image";
 
 import Modal from "@/components/shared/Modals/DynamicModal";
 import DynamicButton from "@/components/shared/Buttons/DynamicButton";
+import { LanguageType } from "@/util/translations";
 
 type BrandApprovalFormData = {
   name: string;
@@ -19,7 +20,7 @@ type BrandApprovalFormData = {
 type BrandApprovalModalProps = {
   isModalOpen: boolean;
   setIsModalOpen: (value: boolean) => void;
-  locale?: string;
+  locale?: LanguageType;
 };
 
 const BrandApprovalModal: FC<BrandApprovalModalProps> = ({

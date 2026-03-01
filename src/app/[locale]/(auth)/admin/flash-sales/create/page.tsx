@@ -24,7 +24,7 @@ import {
 } from "@/components/shared/select";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { Card, CardContent } from "@/components/shared/card";
-import { Badge } from "@/components/shared/Badge";
+import { Badge } from "@/components/shared/badge";
 import { products } from "@/data";
 import Image from "next/image";
 
@@ -397,7 +397,7 @@ export default function CreateFlashSalePage() {
 
                           {/* Discount Badge */}
                           <div className="flex items-end pb-2">
-                            <Badge variant="error">
+                            <Badge variant="destructive">
                               {product.discount_price && product.price > 0
                                 ? `${Math.round((1 - product.discount_price / product.price) * 100)}% OFF`
                                 : "0% OFF"}

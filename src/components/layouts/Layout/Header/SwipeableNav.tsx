@@ -75,7 +75,7 @@ const SwipeableNav = ({ links, locale }: SwipeableNavProps) => {
           onScroll={handleScroll}
           className="no-scrollbar flex overflow-x-auto scroll-smooth py-2"
         >
-          <nav className="flex min-w-full items-center justify-start  px-4 md:justify-center">
+          <nav className="flex min-w-full items-center justify-start px-4">
             {links.map((link, index) => (
               <div className="group shrink-0" key={index}>
                 <Link
@@ -89,15 +89,25 @@ const SwipeableNav = ({ links, locale }: SwipeableNavProps) => {
                     <ul className="col-span-1 grid w-full grid-cols-2 gap-3 sm:col-span-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7">
                       {link.gridLinks.map((gridLink, gridIndex) => (
                         <li className="p-3" key={gridIndex}>
-                          <h2 className="mb-2 text-sm font-bold">
-                            {gridLink.heading[locale]}
-                          </h2>
-                          <ul>
+                          {gridLink.url ? (
+                            <Link
+                              href={gridLink.url}
+                              className="mb-2 block text-sm font-bold transition-colors hover:text-primary hover:underline"
+                            >
+                              {gridLink.heading[locale]}
+                            </Link>
+                          ) : (
+                            <h2 className="mb-2 text-sm font-bold">
+                              {gridLink.heading[locale]}
+                            </h2>
+                          )}
+                          <ul className="grid grid-cols-2 gap-x-2">
                             {gridLink.subLinks.map((link, index) => (
                               <li key={index}>
                                 <Link
                                   className="block p-2 text-xs font-semibold text-gray-600 transition hover:text-primary hover:underline"
                                   href={link.url}
+                                  title={link.title[locale]}
                                 >
                                   {link.title[locale]}
                                 </Link>

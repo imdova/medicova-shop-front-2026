@@ -157,15 +157,8 @@ export default function OrderReturnsPage() {
       </div>
 
       <DynamicFilter
-        t={{
-          filters: t("filters"),
-          reset: t("reset"),
-          showData: t("showData"),
-        }}
         isOpen={isOpen}
         onToggle={() => setIsOpen(false)}
-
-        isRTL={isArabic}
         drawerFilters={[]}
         statusCounts={statusCounts}
         filtersOpen={filtersOpen}
@@ -174,7 +167,7 @@ export default function OrderReturnsPage() {
       />
 
       <ReturnFilters
-
+        locale={locale}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleFilters={() => setIsOpen(true)}
@@ -196,8 +189,8 @@ export default function OrderReturnsPage() {
       </div>
 
       <ReturnTableContainer
+        locale={locale}
         data={filteredReturns}
-
         onView={(item) => router.push(`/${locale}/admin/returns/${item.id}`)}
         onDelete={(item) => console.log("delete", item.id)}
       />

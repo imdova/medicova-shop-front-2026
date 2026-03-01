@@ -16,6 +16,7 @@ interface DropdownProps {
   onSelect: (value: string | number) => void;
   className?: string;
   placeholder?: string;
+  locale?: LanguageType;
 }
 
 export default function Dropdown({
@@ -26,8 +27,10 @@ export default function Dropdown({
   onSelect,
   className,
   placeholder,
+  locale: propsLocale,
 }: DropdownProps) {
-  const locale = useLocale() as LanguageType;
+  const contextLocale = useLocale() as LanguageType;
+  const locale = propsLocale || contextLocale;
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 

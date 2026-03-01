@@ -6,7 +6,7 @@ import { useAppLocale } from "@/hooks/useAppLocale";
 import { Card, CardContent, CardHeader } from "@/components/shared/card";
 import { Button } from "@/components/shared/button";
 import { Textarea } from "@/components/shared/textarea";
-import { Badge } from "@/components/shared/Badge";
+import { Badge } from "@/components/shared/badge";
 import {
   Star,
   Calendar,
