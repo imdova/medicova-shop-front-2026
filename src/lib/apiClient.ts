@@ -24,11 +24,16 @@ function getBaseUrl(): string {
 }
 
 function handleTlsBypass(): void {
-  if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0") {
-    // This is already handled by the environment variable
+  if (
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0" ||
+    process.env.NEXT_PUBLIC_NODE_TLS_REJECT_UNAUTHORIZED === "0"
+  ) {
+    if (process.env.NODE_TLS_REJECT_UNAUTHORIZED !== "0") {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    }
     return;
   }
-  
+
   if (process.env.NODE_ENV === "development") {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   }
@@ -44,7 +49,17 @@ export async function apiClient<T = unknown>({
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
+  console.log(`[API Request] ${method} ${url}`);
+  
   handleTlsBypass();
+
+  try {
+    // Basic URL validation
+    new URL(url);
+  } catch (e) {
+    console.error(`[API Error] Invalid URL: ${url}`);
+    throw new Error(`Invalid API URL: ${url}`);
+  }
 
   const isFormData = body instanceof FormData;
 
