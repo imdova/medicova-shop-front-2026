@@ -17,7 +17,7 @@ function getBaseUrl(): string {
       baseUrl = `${baseUrl}/api/v1`;
     }
   } else {
-    baseUrl = "https://82.112.255.49/api/v1";
+    baseUrl = "https://shop-api.medicova.net/api/v1";
   }
 
   return baseUrl.replace(/\/$/, "");
