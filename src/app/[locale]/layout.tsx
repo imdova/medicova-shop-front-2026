@@ -1,4 +1,5 @@
 import { Raleway, Cairo } from "next/font/google";
+import "../globals.css";
 import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
 import { setRequestLocale, getMessages } from "next-intl/server";
