@@ -17,18 +17,19 @@ function getBaseUrl(): string {
       baseUrl = `${baseUrl}/api/v1`;
     }
   } else {
-    baseUrl = "https://82.112.255.49/api/v1";
+    baseUrl = "https://shop-api.medicova.net/api/v1";
   }
 
   return baseUrl.replace(/\/$/, "");
 }
 
-function handleTlsBypass(url: string): void {
-  if (
-    url.startsWith("https://") &&
-    (process.env.NODE_ENV === "development" ||
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0")
-  ) {
+function handleTlsBypass(): void {
+  if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0") {
+    // This is already handled by the environment variable
+    return;
+  }
+  
+  if (process.env.NODE_ENV === "development") {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   }
 }
@@ -43,7 +44,7 @@ export async function apiClient<T = unknown>({
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
-  handleTlsBypass(url);
+  handleTlsBypass();
 
   const isFormData = body instanceof FormData;
 
