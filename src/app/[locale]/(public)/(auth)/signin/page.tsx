@@ -2,8 +2,7 @@
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { useRouter } from "@/i18n/navigation";
-
+import { useRouter } from "next/navigation";
 import { Input, PasswordInput } from "@/components/shared/input";
 import { Label } from "@/components/shared/label";
 import { Button } from "@/components/shared/button";
@@ -110,7 +109,6 @@ const SignInPage: React.FC = () => {
           } else {
             router.push("/");
           }
-          // Note: router from @/i18n/navigation automatically handles locale prefixing
           router.refresh();
         }, 100);
       }
