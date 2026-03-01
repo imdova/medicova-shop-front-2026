@@ -44,9 +44,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             const fullName = `${user.firstName} ${user.lastName}`.trim();
 
             let role: "user" | "seller" | "admin" = "user";
-            if (user.role === "admin") {
+            const roleStr = user.role?.toLowerCase();
+            if (roleStr === "admin") {
               role = "admin";
-            } else if (user.role === "seller" || user.role === "vendor") {
+            } else if (roleStr === "seller" || roleStr === "vendor") {
               role = "seller";
             }
 

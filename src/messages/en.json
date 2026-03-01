@@ -97,6 +97,8 @@
     "noResults": "No results found",
     "error": "Something went wrong",
     "retry": "Retry",
+    "forbiddenTitle": "Access Forbidden",
+    "forbiddenDescription": "You do not have permission to access this page.",
     "currency": "EGP",
     "free": "Free",
     "or": "or",

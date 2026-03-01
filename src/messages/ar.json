@@ -97,6 +97,8 @@
     "noResults": "لا توجد نتائج",
     "error": "حدث خطأ ما",
     "retry": "إعادة المحاولة",
+    "forbiddenTitle": "الوصول محظور",
+    "forbiddenDescription": "ليس لديك صلاحية للوصول إلى هذه الصفحة.",
     "currency": "جنيه",
     "free": "مجاني",
     "or": "أو",
