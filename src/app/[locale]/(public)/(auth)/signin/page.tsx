@@ -11,7 +11,7 @@ import Link from "next/link";
 // UI text translations
 const translations = {
   title: {
-    en: "Login to your account",
+    en: "Login to your account 2",
     ar: "تسجيل الدخول إلى حسابك",
   },
   subtitle: {
