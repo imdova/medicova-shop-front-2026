@@ -24,6 +24,7 @@ export default async function Home({
 
   return (
     <div className="relative">
+      
       <HeroSection
         locale={locale}
         direction={direction}

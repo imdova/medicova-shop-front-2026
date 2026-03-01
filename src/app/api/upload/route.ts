@@ -21,14 +21,7 @@ export async function POST(req: NextRequest) {
       baseUrl = `${baseUrl}/api/v1`;
     }
 
-    // TLS bypass for self-signed certs in development
-    if (
-      baseUrl.startsWith("https://") &&
-      (process.env.NODE_ENV === "development" ||
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0")
-    ) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-    }
+
 
     // Forward the file to the backend upload endpoint
     const backendFormData = new FormData();

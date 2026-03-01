@@ -23,15 +23,7 @@ function getBaseUrl(): string {
   return baseUrl.replace(/\/$/, "");
 }
 
-function handleTlsBypass(url: string): void {
-  if (
-    url.startsWith("https://") &&
-    (process.env.NODE_ENV === "development" ||
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0")
-  ) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-  }
-}
+
 
 export async function apiClient<T = unknown>({
   endpoint,
@@ -43,7 +35,7 @@ export async function apiClient<T = unknown>({
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
-  handleTlsBypass(url);
+
 
   const isFormData = body instanceof FormData;
 
