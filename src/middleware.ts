@@ -66,7 +66,11 @@ export default auth((req: NextRequest & { auth: any }) => {
 
     const userType = (req.auth?.user as any)?.role || "user";
     if (!doesRoleHaveAccessToURL(userType, barePath)) {
-      return NextResponse.rewrite(new URL("/403", req.url));
+      // Get the locale from the request to build the correct localized 403 URL
+      const localeMatch = pathname.match(/^\/([^\/]+)/);
+      const locale = localeMatch ? localeMatch[1] : routing.defaultLocale;
+      const target = `/${locale}/403`;
+      return NextResponse.rewrite(new URL(target, req.url));
     }
   }
 

@@ -2,7 +2,7 @@
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Input, PasswordInput } from "@/components/shared/input";
 import { Label } from "@/components/shared/label";
 import { Button } from "@/components/shared/button";
@@ -11,7 +11,7 @@ import Link from "next/link";
 // UI text translations
 const translations = {
   title: {
-    en: "Login to your account 2",
+    en: "Login to your account 3",
     ar: "تسجيل الدخول إلى حسابك",
   },
   subtitle: {
@@ -94,17 +94,17 @@ const SignInPage: React.FC = () => {
           const session = await response.json();
 
           if (session?.user?.role) {
-            switch (session.user.role) {
+            const role = session.user.role.toLowerCase();
+            switch (role) {
               case "admin":
                 router.push("/admin");
                 break;
               case "seller":
+              case "vendor":
                 router.push("/seller");
                 break;
-              case "user":
               default:
                 router.push("/");
-                break;
             }
           } else {
             router.push("/");
