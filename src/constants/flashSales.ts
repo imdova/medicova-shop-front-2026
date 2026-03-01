@@ -1,5 +1,5 @@
 import { FlashSale } from "@/types/product";
-import { products } from "./products";
+import { products } from "@/data";
 
 // Dummy data for flash sales
 export const FlashSalesData: FlashSale[] = [

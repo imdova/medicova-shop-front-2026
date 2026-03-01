@@ -47,8 +47,12 @@ export const getTimeAgo = (dateString: Date | string) => {
 export const isCurrentPage = (pathname: string, href: string): boolean => {
   if (!pathname || !href) return false;
 
-  const normalize = (path: string) =>
-    path === "/" ? "/" : path.replace(/\/$/, "");
+  const normalize = (path: string) => {
+    let p = path === "/" ? "/" : path.replace(/\/$/, "");
+    // Remove locale prefix (e.g., /ar, /en) if present
+    return p.replace(/^\/(ar|en)(\/|$)/, "/").replace(/\/$/, "") || "/";
+  };
+
   const normalizedPathname = normalize(pathname);
   const normalizedHref = normalize(href);
 
@@ -57,12 +61,11 @@ export const isCurrentPage = (pathname: string, href: string): boolean => {
 
   // Special handling for admin dashboard - only match exact path
   if (normalizedHref === "/admin") {
-    return normalizedPathname === "/admin"; // Remove the startsWith condition
+    return normalizedPathname === "/admin";
   }
 
   // For other nested routes, match only direct children
   if (normalizedPathname.startsWith(normalizedHref + "/")) {
-    // Additional check to ensure proper segment matching
     const remainingPath = normalizedPathname.slice(normalizedHref.length);
     return remainingPath.startsWith("/") && !remainingPath.includes("/../");
   }

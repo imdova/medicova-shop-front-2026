@@ -1,0 +1,74 @@
+{
+  "moreReasons": [
+    {
+      "id": "1",
+      "title": { "en": "Local finds", "ar": "منتجات محلية" },
+      "details": { "en": "Hand-picked brands, locally", "ar": "علامات تجارية مختارة محليًا" },
+      "image": "/images/clothes.jpg",
+      "url": "#"
+    },
+    {
+      "id": "2",
+      "title": { "en": "Bestsellers", "ar": "الأكثر مبيعًا" },
+      "details": { "en": "Fill your basket", "ar": "املأ سلتك" },
+      "image": "/images/electronics.avif",
+      "url": "#"
+    },
+    {
+      "id": "3",
+      "title": { "en": "Top-rated Products", "ar": "المنتجات الأعلى تقييماً" },
+      "details": { "en": "Stay in trend", "ar": "ابق على الموضة" },
+      "image": "/images/watchss.jpg",
+      "url": "#"
+    },
+    {
+      "id": "4",
+      "title": { "en": "New arrivals", "ar": "وصل حديثًا" },
+      "details": { "en": "Fresh takes you need", "ar": "أحدث المنتجات التي تحتاجها" },
+      "image": "/images/medical.jpg",
+      "url": "#"
+    }
+  ],
+  "megaDeals": [
+    {
+      "category": { "en": "Fashion deals", "ar": "عروض الموضة" },
+      "title": { "en": "Summer outfits", "ar": "ملابس صيفية" },
+      "discountText": { "en": "Up to 70% off", "ar": "خصم حتى 70%" },
+      "imageUrl": "/images/clothes.jpg",
+      "price": null,
+      "originalPrice": null,
+      "url": "#"
+    },
+    {
+      "category": { "en": "Accessories deals", "ar": "عروض الإكسسوارات" },
+      "title": { "en": "Anker 5000 mAh Anker 621 Magnetic Battery (MagGo)...", "ar": "بطارية أنكر 621 مغناطيسية 5000 مللي أمبير..." },
+      "discountText": { "en": "899 EGP", "ar": "٨٩٩ جنيه" },
+      "imageUrl": "/images/clothes.jpg",
+      "price": "899 EGP",
+      "originalPrice": "1799 EGP",
+      "url": "#"
+    },
+    {
+      "category": { "en": "Beauty deals", "ar": "عروض الجمال" },
+      "title": { "en": "Trending perfumes", "ar": "عطور رائجة" },
+      "discountText": { "en": "Starting from 108...", "ar": "ابتداءً من ١٠٨..." },
+      "imageUrl": "/images/clothes.jpg",
+      "price": "108 EGP",
+      "originalPrice": null,
+      "url": "#"
+    },
+    {
+      "category": { "en": "Book deals", "ar": "عروض الكتب" },
+      "title": { "en": "Top deals", "ar": "أفضل العروض" },
+      "discountText": { "en": "Up to 20% off", "ar": "خصم حتى 20%" },
+      "imageUrl": "/images/clothes.jpg",
+      "price": null,
+      "originalPrice": null,
+      "url": "#"
+    }
+  ],
+  "inFocus": [
+    { "id": "1", "imageUrl": "/images/focus-1.avif", "url": "#" },
+    { "id": "2", "imageUrl": "/images/focus-2.avif", "url": "#" }
+  ]
+}

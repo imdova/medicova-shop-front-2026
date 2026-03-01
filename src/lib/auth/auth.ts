@@ -1,5 +1,5 @@
-import { AuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import { callLoginApi } from "./loginApi";
 import { callRefreshTokenApi } from "./refreshApi";
 
@@ -20,9 +20,9 @@ interface ApiLoginResponse {
   message: string;
 }
 
-export const authOptions: AuthOptions = {
+export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    CredentialsProvider({
+    Credentials({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -35,19 +35,14 @@ export const authOptions: AuthOptions = {
             return null;
           }
 
-          // Use the shared login API function
-          // This will use BASE_URL environment variable or fallback to the default API URL
           console.log("Attempting login for email:", credentials.email);
           
-          const data = await callLoginApi(credentials.email, credentials.password) as ApiLoginResponse;
+          const data = await callLoginApi(credentials.email as string, credentials.password as string) as ApiLoginResponse;
 
           if (data.status === "success" && data.data) {
             const { user, accessToken, refreshToken } = data.data;
-
-            // Combine firstName and lastName for the name field
             const fullName = `${user.firstName} ${user.lastName}`.trim();
 
-            // Map API role to our userType
             let role: "user" | "seller" | "admin" = "user";
             if (user.role === "admin") {
               role = "admin";
@@ -57,9 +52,8 @@ export const authOptions: AuthOptions = {
 
             console.log("Login successful for user:", user.email, "role:", role);
 
-            // Calculate token expiration (55 minutes from now)
-            const tokenIssuedAt = Math.floor(Date.now() / 1000); // Current time in seconds
-            const accessTokenExpires = tokenIssuedAt + 55 * 60; // 55 minutes in seconds
+            const tokenIssuedAt = Math.floor(Date.now() / 1000);
+            const accessTokenExpires = tokenIssuedAt + 55 * 60;
 
             return {
               id: user.id,
@@ -78,70 +72,55 @@ export const authOptions: AuthOptions = {
           return null;
         } catch (error) {
           console.error("Authorize error:", error);
-          if (error instanceof Error) {
-            console.error("Error message:", error.message);
-            console.error("Error stack:", error.stack);
-          }
           return null;
         }
       },
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
-  // NEXTAUTH_URL is automatically used by NextAuth for callback URL generation
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60,
   },
   callbacks: {
-    async jwt({ token, user }) {
-      // Initial sign in
+    async jwt({ token, user, trigger, session }) {
       if (user) {
-        token.id = user.id;
-        token.name = user.name;
-        token.email = user.email;
-        token.role = user.role;
-        // Store tokens in the token object
-        token.accessToken = user.accessToken;
-        token.refreshToken = user.refreshToken;
-        token.language = user.language;
-        // Store token expiration times
-        token.accessTokenExpires = user.accessTokenExpires;
-        token.tokenIssuedAt = user.tokenIssuedAt;
-        return token;
+        return {
+          ...token,
+          id: user.id,
+          role: (user as any).role,
+          accessToken: (user as any).accessToken,
+          refreshToken: (user as any).refreshToken,
+          language: (user as any).language,
+          accessTokenExpires: (user as any).accessTokenExpires,
+          tokenIssuedAt: (user as any).tokenIssuedAt,
+        };
       }
 
-      // Check if token needs to be refreshed (after 55 minutes)
-      const now = Math.floor(Date.now() / 1000); // Current time in seconds
-      const tokenIssuedAt = token.tokenIssuedAt || 0;
+      // Token rotation logic
+      const now = Math.floor(Date.now() / 1000);
+      const tokenIssuedAt = (token.tokenIssuedAt as number) || 0;
       const timeSinceIssued = now - tokenIssuedAt;
-      const refreshInterval = 55 * 60; // 55 minutes in seconds
+      const refreshInterval = 55 * 60;
 
-      // If token was issued more than 55 minutes ago, refresh it
       if (timeSinceIssued >= refreshInterval && token.refreshToken && token.id) {
         try {
           console.log("Token expired, refreshing...");
-          const refreshData = await callRefreshTokenApi(token.refreshToken, token.id);
+          const refreshData = await callRefreshTokenApi(token.refreshToken as string, token.id as string);
 
           if (refreshData.status === "success" && refreshData.data) {
             const { accessToken, refreshToken: newRefreshToken } = refreshData.data;
-
-            // Update tokens
-            token.accessToken = accessToken;
-            token.refreshToken = newRefreshToken;
             
-            // Update expiration times
-            token.tokenIssuedAt = Math.floor(Date.now() / 1000);
-            token.accessTokenExpires = token.tokenIssuedAt + 55 * 60;
-
-            console.log("Token refreshed successfully");
-          } else {
-            console.error("Token refresh failed: Invalid response format");
+            return {
+              ...token,
+              accessToken,
+              refreshToken: newRefreshToken,
+              tokenIssuedAt: Math.floor(Date.now() / 1000),
+              accessTokenExpires: Math.floor(Date.now() / 1000) + 55 * 60,
+            };
           }
         } catch (error) {
           console.error("Token refresh error:", error);
-          // If refresh fails, the token will be invalid and user will need to re-login
-          // You could also throw an error here to force re-authentication
         }
       }
 
@@ -149,22 +128,16 @@ export const authOptions: AuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string;
-        session.user.name = token.name as string;
-        session.user.email = token.email as string;
-        session.user.role = token.role;
-        // Add tokens to session if needed
-        if (token.accessToken) {
-          (session as { accessToken?: string }).accessToken = token.accessToken;
-        }
-        if (token.refreshToken) {
-          (session as { refreshToken?: string }).refreshToken = token.refreshToken;
-        }
+        (session.user as any).id = token.id as string;
+        (session.user as any).role = token.role;
+        (session as any).accessToken = token.accessToken;
+        (session as any).refreshToken = token.refreshToken;
       }
       return session;
     },
   },
   pages: {
-    signIn: "/auth/signin",
+    signIn: "/signin",
   },
-};
+});
+

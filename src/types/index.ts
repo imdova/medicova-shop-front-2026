@@ -67,6 +67,7 @@ export type link = {
 };
 export type gridLink = {
   heading: LocalizedTitle;
+  url?: string;
   subLinks: link[];
 };
 export type linksHeader = {
@@ -135,6 +136,7 @@ export type Slide = {
 export interface CategoryType {
   id: string;
   slug: string;
+  slugAr?: string;
   title: LocalizedTitle;
   image: string;
   isSale?: boolean;
@@ -149,6 +151,8 @@ export interface CategoryType {
 export interface Brand {
   id: string;
   name: LocalizedTitle;
+  slug: string;
+  slugAr?: string;
   url?: string;
   image: string;
   hasStore?: boolean;
