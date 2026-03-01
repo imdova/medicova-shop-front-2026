@@ -41,10 +41,6 @@ const translations = {
       en: "The credentials provided were incorrect or your account is not authorized.",
       ar: "بيانات الاعتماد المقدمة غير صحيحة أو حسابك غير مصرح له.",
     },
-    OAuthSignin: {
-      en: "Error occurred while signing in with OAuth provider.",
-      ar: "حدث خطأ أثناء تسجيل الدخول باستخدام موفر الخدمة.",
-    },
     Default: {
       en: "An unexpected authentication error occurred. Please try again later.",
       ar: "حدث خطأ غير متوقع في المصادقة. يرجى المحاولة مرة أخرى لاحقاً.",
@@ -76,6 +72,7 @@ const AuthErrorPage = () => {
       dir={direction}
       className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 py-12"
     >
+      {/* Green top border decoration */}
       <div className="absolute left-0 right-0 top-0 z-10 h-1 bg-green-600" />
 
       <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-xl md:p-12">
@@ -118,6 +115,10 @@ const AuthErrorPage = () => {
           </p>
         </div>
       </div>
+
+      {/* Decorative background tokens */}
+      <div className="pointer-events-none fixed -bottom-24 -left-24 h-64 w-64 rounded-full bg-green-100/50 blur-3xl" />
+      <div className="pointer-events-none fixed -right-24 -top-24 h-64 w-64 rounded-full bg-green-100/50 blur-3xl" />
     </div>
   );
 };

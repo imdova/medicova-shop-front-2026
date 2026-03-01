@@ -23,18 +23,12 @@ function getBaseUrl(): string {
   return baseUrl.replace(/\/$/, "");
 }
 
-function handleTlsBypass(): void {
+function handleTlsBypass(url: string): void {
   if (
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0" ||
-    process.env.NEXT_PUBLIC_NODE_TLS_REJECT_UNAUTHORIZED === "0"
+    url.startsWith("https://") &&
+    (process.env.NODE_ENV === "development" ||
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0")
   ) {
-    if (process.env.NODE_TLS_REJECT_UNAUTHORIZED !== "0") {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-    }
-    return;
-  }
-
-  if (process.env.NODE_ENV === "development") {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   }
 }
@@ -49,17 +43,7 @@ export async function apiClient<T = unknown>({
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
-  console.log(`[API Request] ${method} ${url}`);
-  
-  handleTlsBypass();
-
-  try {
-    // Basic URL validation
-    new URL(url);
-  } catch (e) {
-    console.error(`[API Error] Invalid URL: ${url}`);
-    throw new Error(`Invalid API URL: ${url}`);
-  }
+  handleTlsBypass(url);
 
   const isFormData = body instanceof FormData;
 
