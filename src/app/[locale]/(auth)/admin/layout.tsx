@@ -11,13 +11,12 @@ interface AccountLayoutProps {
 const AccountLayout: React.FC<AccountLayoutProps> = ({ children }) => {
   const { data: session } = useSession();
 
-
   const safeUser = {
     id: session?.user?.id || "",
-    name: session?.user?.name || "",
-    email: session?.user?.email || "",
+    name: session?.user?.name || "Admin",
+    email: session?.user?.email || "admin@medicova.net",
     image: session?.user?.image || "",
-    role: session?.user?.role || "user",
+    role: (session?.user?.role as any) || "admin",
   };
 
   return (
@@ -33,7 +32,6 @@ const AccountLayout: React.FC<AccountLayoutProps> = ({ children }) => {
           </main>
         </div>
       </div>
-
 
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div className="bg-primary/5 absolute -left-[10%] -top-[10%] h-[40%] w-[40%] rounded-full blur-[120px]"></div>
