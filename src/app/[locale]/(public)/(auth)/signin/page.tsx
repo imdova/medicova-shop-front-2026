@@ -2,7 +2,8 @@
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+
 import { Input, PasswordInput } from "@/components/shared/input";
 import { Label } from "@/components/shared/label";
 import { Button } from "@/components/shared/button";
@@ -92,7 +93,7 @@ const SignInPage: React.FC = () => {
           // Fetch session to get user role
           const response = await fetch("/api/auth/session");
           const session = await response.json();
-          
+
           if (session?.user?.role) {
             switch (session.user.role) {
               case "admin":
@@ -109,6 +110,7 @@ const SignInPage: React.FC = () => {
           } else {
             router.push("/");
           }
+          // Note: router from @/i18n/navigation automatically handles locale prefixing
           router.refresh();
         }, 100);
       }
@@ -124,19 +126,17 @@ const SignInPage: React.FC = () => {
   };
 
   return (
-    <div dir={direction} className="min-h-screen flex">
+    <div dir={direction} className="flex min-h-screen">
       {/* Green top border */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-green-600 z-10" />
-      
+      <div className="absolute left-0 right-0 top-0 z-10 h-1 bg-green-600" />
+
       {/* Left side - Login Form */}
-      <div className="flex-1 flex items-center justify-center bg-white px-8 py-12">
+      <div className="flex flex-1 items-center justify-center bg-white px-8 py-12">
         <div className="w-full max-w-md">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+          <h1 className="mb-2 text-3xl font-bold text-gray-800">
             {t("title")}
           </h1>
-          <p className="text-gray-500 mb-8">
-            {t("subtitle")}
-          </p>
+          <p className="mb-8 text-gray-500">{t("subtitle")}</p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Field */}
@@ -175,7 +175,7 @@ const SignInPage: React.FC = () => {
             </div>
 
             {error && (
-              <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+              <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
                 {error}
               </div>
             )}
@@ -184,7 +184,7 @@ const SignInPage: React.FC = () => {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-green-600 hover:bg-green-700 text-white h-11 text-base font-medium"
+              className="h-11 w-full bg-green-600 text-base font-medium text-white hover:bg-green-700"
             >
               {isLoading ? t("loggingIn") : t("login")}
             </Button>
@@ -207,10 +207,10 @@ const SignInPage: React.FC = () => {
             type="button"
             variant="outline"
             onClick={handleGoogleLogin}
-            className="w-full h-11 border-gray-300 bg-white hover:bg-gray-50"
+            className="h-11 w-full border-gray-300 bg-white hover:bg-gray-50"
           >
             <svg
-              className="w-5 h-5 mr-2"
+              className="mr-2 h-5 w-5"
               viewBox="0 0 24 24"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -240,7 +240,7 @@ const SignInPage: React.FC = () => {
             <span className="text-gray-600">{t("noAccount")} </span>
             <Link
               href="/signup"
-              className="text-green-600 hover:text-green-700 underline font-medium"
+              className="font-medium text-green-600 underline hover:text-green-700"
             >
               {t("signUp")}
             </Link>
@@ -249,7 +249,7 @@ const SignInPage: React.FC = () => {
       </div>
 
       {/* Right side - Illustration */}
-      <div className="hidden lg:flex flex-1 bg-green-50 relative overflow-hidden">
+      <div className="relative hidden flex-1 overflow-hidden bg-green-50 lg:flex">
         {/* Background pattern */}
         <div
           className="absolute inset-0 opacity-30"
@@ -260,10 +260,10 @@ const SignInPage: React.FC = () => {
         />
 
         {/* Illustration SVG */}
-        <div className="relative w-full h-full flex items-center justify-center p-12">
+        <div className="relative flex h-full w-full items-center justify-center p-12">
           <svg
             viewBox="0 0 600 600"
-            className="w-full h-full max-w-2xl"
+            className="h-full w-full max-w-2xl"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
           >
@@ -276,19 +276,30 @@ const SignInPage: React.FC = () => {
               strokeLinejoin="round"
               fill="none"
             />
-            <path
-              d="M 480 60 L 450 50 L 480 40 Z"
-              fill="#16a34a"
-            />
+            <path d="M 480 60 L 450 50 L 480 40 Z" fill="#16a34a" />
 
             {/* Woman figure on the left */}
             <g transform="translate(150, 440)">
               {/* Head */}
               <circle cx="30" cy="15" r="18" fill="#fbbf24" />
               {/* Body - green top */}
-              <rect x="15" y="33" width="30" height="45" fill="#16a34a" rx="3" />
+              <rect
+                x="15"
+                y="33"
+                width="30"
+                height="45"
+                fill="#16a34a"
+                rx="3"
+              />
               {/* Pants - dark gray */}
-              <rect x="15" y="78" width="30" height="35" fill="#374151" rx="2" />
+              <rect
+                x="15"
+                y="78"
+                width="30"
+                height="35"
+                fill="#374151"
+                rx="2"
+              />
               {/* Right arm extended for handshake */}
               <rect x="42" y="40" width="8" height="25" fill="#fbbf24" rx="4" />
               <circle cx="46" cy="65" r="6" fill="#fbbf24" />
@@ -302,23 +313,63 @@ const SignInPage: React.FC = () => {
               {/* Head */}
               <circle cx="30" cy="15" r="18" fill="#fbbf24" />
               {/* Body - green shirt with collar */}
-              <rect x="15" y="33" width="30" height="45" fill="#16a34a" rx="3" />
+              <rect
+                x="15"
+                y="33"
+                width="30"
+                height="45"
+                fill="#16a34a"
+                rx="3"
+              />
               {/* Collar */}
-              <path d="M 20 33 L 30 38 L 40 33" stroke="#374151" strokeWidth="2" fill="none" />
+              <path
+                d="M 20 33 L 30 38 L 40 33"
+                stroke="#374151"
+                strokeWidth="2"
+                fill="none"
+              />
               {/* Tie */}
               <path d="M 28 38 L 30 55 L 32 38" fill="#374151" />
               {/* Pants - dark gray */}
-              <rect x="15" y="78" width="30" height="35" fill="#374151" rx="2" />
+              <rect
+                x="15"
+                y="78"
+                width="30"
+                height="35"
+                fill="#374151"
+                rx="2"
+              />
               {/* Left arm extended for handshake */}
               <rect x="5" y="40" width="8" height="25" fill="#fbbf24" rx="4" />
               <circle cx="9" cy="65" r="6" fill="#fbbf24" />
               {/* Briefcase in left hand */}
-              <rect x="-5" y="50" width="18" height="12" fill="#16a34a" rx="2" />
+              <rect
+                x="-5"
+                y="50"
+                width="18"
+                height="12"
+                fill="#16a34a"
+                rx="2"
+              />
               <rect x="-5" y="50" width="18" height="2" fill="#0d4f1c" />
               <rect x="1" y="52" width="6" height="1" fill="#0d4f1c" />
               {/* Shoes */}
-              <rect x="18" y="113" width="10" height="6" fill="#374151" rx="1" />
-              <rect x="32" y="113" width="10" height="6" fill="#374151" rx="1" />
+              <rect
+                x="18"
+                y="113"
+                width="10"
+                height="6"
+                fill="#374151"
+                rx="1"
+              />
+              <rect
+                x="32"
+                y="113"
+                width="10"
+                height="6"
+                fill="#374151"
+                rx="1"
+              />
             </g>
 
             {/* Handshake connection */}
@@ -329,12 +380,16 @@ const SignInPage: React.FC = () => {
               {/* Flag pole */}
               <rect x="0" y="0" width="6" height="50" fill="#374151" />
               {/* Flag base */}
-              <rect x="-8" y="50" width="22" height="10" fill="#374151" rx="2" />
-              {/* Flag */}
-              <path
-                d="M 6 0 L 6 30 L 40 15 Z"
-                fill="#16a34a"
+              <rect
+                x="-8"
+                y="50"
+                width="22"
+                height="10"
+                fill="#374151"
+                rx="2"
               />
+              {/* Flag */}
+              <path d="M 6 0 L 6 30 L 40 15 Z" fill="#16a34a" />
             </g>
           </svg>
         </div>

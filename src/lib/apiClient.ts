@@ -9,35 +9,30 @@ interface ApiRequestConfig {
 }
 
 function getBaseUrl(): string {
-  let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL;
 
   if (baseUrl) {
-    baseUrl = baseUrl.replace(/\/$/, "");
-    if (!baseUrl.includes("/api/v1")) {
-      baseUrl = `${baseUrl}/api/v1`;
-    }
-  } else {
-    baseUrl = "https://shop-api.medicova.net/api/v1";
+    const cleanUrl = baseUrl.replace(/\/$/, "");
+    return cleanUrl.includes("/api/v1") ? cleanUrl : `${cleanUrl}/api/v1`;
   }
 
-  return baseUrl.replace(/\/$/, "");
+  // Final fallback (typically for cloud production if ENV is missing)
+  return "https://shop-api.medicova.net/api/v1";
 }
 
+
 function handleTlsBypass(): void {
-  if (
+  const bypassRequested =
     process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0" ||
-    process.env.NEXT_PUBLIC_NODE_TLS_REJECT_UNAUTHORIZED === "0"
-  ) {
+    process.env.NEXT_PUBLIC_NODE_TLS_REJECT_UNAUTHORIZED === "0";
+
+  if (bypassRequested || process.env.NODE_ENV === "development") {
     if (process.env.NODE_TLS_REJECT_UNAUTHORIZED !== "0") {
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
     }
-    return;
-  }
-
-  if (process.env.NODE_ENV === "development") {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   }
 }
+
 
 export async function apiClient<T = unknown>({
   endpoint,
