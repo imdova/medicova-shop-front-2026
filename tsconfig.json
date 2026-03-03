@@ -34,7 +34,6 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "postcss.config.mjs",
-    "src/components/Layout/Header/MinimalHeader.tsx",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
