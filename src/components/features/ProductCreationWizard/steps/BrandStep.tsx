@@ -1,151 +1,124 @@
+"use client";
+
+import { Search, Check, X } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Search, X } from "lucide-react";
-import { useAppLocale } from "@/hooks/useAppLocale";
+import Image from "next/image";
 import { ProductFormData } from "@/lib/validations/product-schema";
-import { brands } from "@/data";
+import { getBrandsData } from "@/data";
 import { Brand } from "@/types";
+
+const brands = getBrandsData();
 
 interface BrandStepProps {
   product: ProductFormData;
-  errors: Record<string, string>;
   onUpdate: (updates: Partial<ProductFormData>) => void;
-  onValidate: () => void;
-  onBack: () => void;
+  locale: string;
 }
 
-const translations = {
-  en: {
-    selectBrand: "Select Brand",
-    searchBrand: "Search brand",
-    noBrandsFound: "No brands found",
-    selected: "Selected",
-    back: "Back",
-    nextIdentity: "Next: Identity",
-    clearSearch: "Clear search",
-  },
-  ar: {
-    selectBrand: "اختر العلامة التجارية",
-    searchBrand: "ابحث عن علامة تجارية",
-    noBrandsFound: "لا توجد علامات تجارية",
-    selected: "محدد",
-    back: "رجوع",
-    nextIdentity: "التالي: الهوية",
-    clearSearch: "مسح البحث",
-  },
-};
-
-export const BrandStep = ({
-  product,
-  errors,
-  onUpdate,
-  onValidate,
-  onBack,
-}: BrandStepProps) => {
-  const locale = useAppLocale();
+export const BrandStep = ({ product, onUpdate, locale }: BrandStepProps) => {
+  const t = useTranslations("create_product.brand");
   const [searchTerm, setSearchTerm] = useState("");
-  const t = translations[locale];
+  const selectedBrand = product.brand;
 
-  const filteredBrands = brands.filter((brand) =>
-    brand.name[locale].toLowerCase().includes(searchTerm.toLowerCase()),
+  const displayedBrands = (brands as unknown as Brand[]).filter((brand) =>
+    brand.name[locale as "en" | "ar"]
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase()),
   );
 
-  const handleBrandSelect = (brand: Brand) => {
-    onUpdate({ brand });
-    setSearchTerm("");
-  };
-
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
-      <h2 className="mb-4 text-xl font-semibold">{t.selectBrand}</h2>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
+      <div className="flex flex-col gap-4">
+        <h2 className="text-xl font-black text-gray-900">{t("title")}</h2>
 
-      {errors.brand && (
-        <div className="mb-4 rounded-md bg-red-50 p-2 text-sm text-red-600">
-          {errors.brand}
-        </div>
-      )}
-
-      {/* Search */}
-      <div className="mb-6">
         <div className="relative">
-          <div
-            className={`pointer-events-none absolute inset-y-0 ${
-              locale === "ar" ? "right-0 pr-3" : "left-0 pl-3"
-            } flex items-center`}
-          >
-            <Search className="text-gray-400" size={18} />
-          </div>
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            className={`w-full rounded-md border border-gray-300 py-2 ${
-              locale === "ar" ? "pl-4 pr-10" : "pl-10 pr-4"
-            } focus:outline-none`}
-            placeholder={t.searchBrand}
+            placeholder={t("searchPlaceholder")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            dir={locale === "ar" ? "rtl" : "ltr"}
+            className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 py-4 pl-12 pr-4 font-bold outline-none transition-all focus:border-gray-900 focus:bg-white focus:ring-4 focus:ring-gray-900/5"
           />
           {searchTerm && (
             <button
-              type="button"
-              className={`absolute inset-y-0 ${
-                locale === "ar" ? "left-0 pl-3" : "right-0 pr-3"
-              } flex items-center text-gray-500 hover:text-gray-700`}
               onClick={() => setSearchTerm("")}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-900"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           )}
         </div>
       </div>
 
-      {/* Brands List */}
-      <div className="mb-6 max-h-[250px] space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-2">
-        {filteredBrands.length > 0 ? (
-          filteredBrands.map((brand) => (
-            <button
-              type="button"
-              key={brand.id}
-              className={`w-full cursor-pointer rounded-md border p-3 text-left ${
-                product.brand?.id === brand.id
-                  ? "border-green-500 bg-green-50"
-                  : "border-white hover:bg-gray-100"
-              }`}
-              onClick={() => handleBrandSelect(brand)}
-            >
-              {brand.name[locale]}
-            </button>
-          ))
-        ) : (
-          <div className="p-3 text-center text-gray-500">{t.noBrandsFound}</div>
-        )}
-      </div>
+      <div className="grid max-h-[450px] grid-cols-2 gap-4 overflow-y-auto p-1 sm:grid-cols-3 md:grid-cols-4">
+        <AnimatePresence mode="popLayout">
+          {displayedBrands.length > 0 ? (
+            displayedBrands.map((brand) => (
+              <motion.button
+                key={brand.id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onUpdate({ brand })}
+                className={`relative flex flex-col items-center gap-4 rounded-[2rem] border-2 p-6 transition-all ${
+                  selectedBrand?.id === brand.id
+                    ? "border-gray-900 bg-white shadow-2xl shadow-gray-200"
+                    : "border-transparent bg-white/40 shadow-sm backdrop-blur-sm hover:border-gray-200"
+                }`}
+              >
+                <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-3xl bg-gray-50/50 p-2 transition-colors group-hover:bg-white">
+                  {brand.image ? (
+                    <Image
+                      src={brand.image}
+                      alt={brand.name[locale as "en" | "ar"]}
+                      fill
+                      className="object-contain p-3"
+                    />
+                  ) : (
+                    <span className="text-3xl font-black uppercase text-gray-200">
+                      {brand.name[locale as "en" | "ar"][0]}
+                    </span>
+                  )}
+                </div>
 
-      {/* Selected Brand */}
-      {product.brand && (
-        <div className="mb-6 rounded-md border border-green-200 bg-green-50 p-3">
-          <div className="font-medium">{product.brand.name[locale]}</div>
-          <div className="text-sm text-green-600">{t.selected}</div>
-        </div>
-      )}
+                <span
+                  className={`text-center text-sm font-black ${
+                    selectedBrand?.id === brand.id
+                      ? "text-gray-900"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {brand.name[locale as "en" | "ar"]}
+                </span>
 
-      {/* Navigation */}
-      <div className="mt-6 flex justify-between">
-        <button
-          type="button"
-          className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-          onClick={onBack}
-        >
-          {t.back}
-        </button>
-        <button
-          type="button"
-          className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-          disabled={!product.brand}
-          onClick={onValidate}
-        >
-          {t.nextIdentity}
-        </button>
+                {selectedBrand?.id === brand.id && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-2xl bg-gray-900 text-white shadow-xl"
+                  >
+                    <Check size={16} strokeWidth={4} />
+                  </motion.div>
+                )}
+              </motion.button>
+            ))
+          ) : (
+            <div className="col-span-full p-20 text-center font-bold text-gray-400">
+              {t("noResults")}
+            </div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 };

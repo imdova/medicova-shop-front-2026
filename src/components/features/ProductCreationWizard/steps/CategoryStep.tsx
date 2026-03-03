@@ -1,166 +1,162 @@
-import { useState } from "react";
-import { ChevronLeft, Search, X } from "lucide-react";
-import { useAppLocale } from "@/hooks/useAppLocale";
-import { ProductFormData } from "@/lib/validations/product-schema";
+"use client";
 
-import { CategoryType } from "@/types";
-import { getCategoriesData } from "@/data";
-const { allCategories } = getCategoriesData();
-import { CategoryItem } from "../CategoryItem";
+import { CategoryType, Brand, MultiCategory } from "@/types";
+import { useTranslations } from "next-intl";
+import { motion } from "framer-motion";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { ProductFormData } from "@/lib/validations/product-schema";
+import {
+  getCategories,
+  getSubCategories,
+  getSubCategoryChildren,
+} from "@/services/categoryService";
+import { getBrands } from "@/services/brandService";
+
+// Sub-components extracted for better maintainability and to stay under 200 lines
+import { CategorySearch } from "./CategoryStepComponents/CategorySearch";
+import { CategoryBreadcrumbs } from "./CategoryStepComponents/CategoryBreadcrumbs";
+import { CategorySelectionGrid } from "./CategoryStepComponents/CategorySelectionGrid";
+import { SelectionFeedback } from "./CategoryStepComponents/SelectionFeedback";
 
 interface CategoryStepProps {
   product: ProductFormData;
-  errors: Record<string, string>;
   onUpdate: (updates: Partial<ProductFormData>) => void;
-  onValidate: () => void;
-  onBack: () => void;
+  locale: string;
 }
-
-const translations = {
-  en: {
-    selectProductCategory: "Select Product Category",
-    searchCategories: "Search categories",
-    searchSubcategories: "Search subcategories",
-    noCategoriesFound: "No categories found",
-    selected: "Selected",
-    nextBrand: "Next: Brand",
-    clearSearch: "Clear search",
-  },
-  ar: {
-    selectProductCategory: "اختر فئة المنتج",
-    searchCategories: "ابحث في الفئات",
-    searchSubcategories: "ابحث في الفئات الفرعية",
-    noCategoriesFound: "لا توجد فئات",
-    selected: "محدد",
-    nextBrand: "التالي: العلامة التجارية",
-    clearSearch: "مسح البحث",
-  },
-};
 
 export const CategoryStep = ({
   product,
-  errors,
   onUpdate,
-  onValidate,
+  locale,
 }: CategoryStepProps) => {
-  const locale = useAppLocale();
+  const t = useTranslations("create_product.category");
+  const brandT = useTranslations("create_product.brand");
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentParentCategory, setCurrentParentCategory] =
-    useState<CategoryType | null>(null);
-  const t = translations[locale];
+  const [history, setHistory] = useState<MultiCategory[]>([]);
+  const [items, setItems] = useState<(MultiCategory | Brand)[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAtBrandLevel, setIsAtBrandLevel] = useState(false);
 
-  const filteredCategories = allCategories.filter((cat) =>
-    cat.title?.[locale].toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const isArabic = locale === "ar";
+  const selectedCategory = product.category;
+  const selectedBrand = product.brand;
 
-  const handleCategorySelect = (category: CategoryType) => {
-    onUpdate({ category });
+  const fetchLevel = useCallback(async (level: number, parentId?: string) => {
+    setLoading(true);
+    try {
+      let data: (MultiCategory | Brand)[] = [];
+      if (level === 0) {
+        data = await getCategories();
+        setIsAtBrandLevel(false);
+      } else if (level === 1 && parentId) {
+        data = await getSubCategories(parentId);
+        setIsAtBrandLevel(false);
+        if (data.length === 0) {
+          data = await getBrands();
+          setIsAtBrandLevel(true);
+        }
+      } else if (level === 2 && parentId) {
+        data = await getSubCategoryChildren(parentId);
+        setIsAtBrandLevel(false);
+        if (data.length === 0) {
+          data = await getBrands();
+          setIsAtBrandLevel(true);
+        }
+      } else {
+        data = await getBrands();
+        setIsAtBrandLevel(true);
+      }
+      setItems(data);
+    } catch (error) {
+      console.error("Failed to fetch classification data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLevel(0);
+  }, [fetchLevel]);
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const name =
+        "title" in item
+          ? item.title[locale as "en" | "ar"]
+          : item.name[locale as "en" | "ar"];
+      return name.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+  }, [items, searchTerm, locale]);
+
+  const handleSelect = async (item: MultiCategory | Brand) => {
     setSearchTerm("");
+    if ("title" in item) {
+      const newHistory = [...history, item];
+      setHistory(newHistory);
+      onUpdate({ category: item });
+      await fetchLevel(newHistory.length, item.id);
+    } else {
+      onUpdate({ brand: item });
+    }
+  };
+
+  const handleNavigateIdx = (idx: number, cat: MultiCategory) => {
+    const newHistory = history.slice(0, idx + 1);
+    setHistory(newHistory);
+    onUpdate({ category: cat, brand: undefined });
+    fetchLevel(idx + 1, cat.id);
+  };
+
+  const handleReset = () => {
+    setHistory([]);
+    onUpdate({ category: undefined, brand: undefined });
+    fetchLevel(0);
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
-      {/* Header */}
-      <div className="mb-4 flex items-center">
-        {currentParentCategory && (
-          <button
-            type="button"
-            className={`flex items-center text-gray-600 hover:text-gray-800 ${locale === "ar" ? "ml-2" : "mr-2"}`}
-            onClick={() => setCurrentParentCategory(null)}
-          >
-            <ChevronLeft size={20} />
-          </button>
-        )}
-        <h2 className="text-xl font-semibold">
-          {currentParentCategory
-            ? currentParentCategory.title[locale]
-            : t.selectProductCategory}
-        </h2>
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
+      <CategorySearch
+        isAtBrandLevel={isAtBrandLevel}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        brandTitle={brandT("title")}
+        categoryTitle={t("title")}
+        searchPlaceholder={
+          isAtBrandLevel ? brandT("searchPlaceholder") : t("searchPlaceholder")
+        }
+      />
+
+      <div className="flex flex-col gap-4 rounded-[2rem] border border-white/60 bg-white/40 p-2 shadow-xl backdrop-blur-xl">
+        <CategoryBreadcrumbs
+          history={history}
+          isAtBrandLevel={isAtBrandLevel}
+          onReset={handleReset}
+          onNavigateIdx={handleNavigateIdx}
+          locale={locale}
+          brandTitle={brandT("title")}
+        />
+
+        <CategorySelectionGrid
+          loading={loading}
+          isAtBrandLevel={isAtBrandLevel}
+          filteredItems={filteredItems}
+          onSelect={handleSelect}
+          selectedBrandId={selectedBrand?.id}
+          locale={locale}
+          isArabic={isArabic}
+        />
       </div>
 
-      {/* Error Display */}
-      {errors.category && (
-        <div className="mb-4 rounded-md bg-red-50 p-2 text-sm text-red-600">
-          {errors.category}
-        </div>
-      )}
-
-      {/* Search */}
-      <div className="mb-6">
-        <div className="relative">
-          <div
-            className={`pointer-events-none absolute inset-y-0 ${
-              locale === "ar" ? "right-0 pr-3" : "left-0 pl-3"
-            } flex items-center`}
-          >
-            <Search className="text-gray-400" size={18} />
-          </div>
-          <input
-            type="text"
-            className={`w-full rounded-md border border-gray-300 py-2 ${
-              locale === "ar" ? "pl-4 pr-10" : "pl-10 pr-4"
-            } focus:outline-none`}
-            placeholder={
-              currentParentCategory ? t.searchSubcategories : t.searchCategories
-            }
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            dir={locale === "ar" ? "rtl" : "ltr"}
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              className={`absolute inset-y-0 ${
-                locale === "ar" ? "left-0 pl-3" : "right-0 pr-3"
-              } flex items-center text-gray-500 hover:text-gray-700`}
-              onClick={() => setSearchTerm("")}
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Category List */}
-      <div className="mb-2 max-h-[250px] space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-2">
-        {(searchTerm
-          ? filteredCategories
-          : (currentParentCategory?.subCategories ?? allCategories)
-        ).map((category, index) => (
-          <CategoryItem
-            key={index}
-            category={category}
-            onSelect={handleCategorySelect}
-            onNavigate={setCurrentParentCategory}
-          />
-        ))}
-
-        {searchTerm && filteredCategories.length === 0 && (
-          <div className="p-3 text-center text-gray-500">
-            {t.noCategoriesFound}
-          </div>
-        )}
-      </div>
-
-      {/* Selected Category */}
-      {product.category && (
-        <div className="mb-6 rounded-md border border-green-200 bg-green-50 p-3">
-          <div className="font-medium">{product.category.title[locale]}</div>
-          <div className="text-sm text-green-600">{t.selected}</div>
-        </div>
-      )}
-
-      {/* Navigation */}
-      <div className="mt-6 flex justify-end">
-        <button
-          type="button"
-          className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-          disabled={!product.category}
-          onClick={onValidate}
-        >
-          {t.nextBrand}
-        </button>
-      </div>
-    </div>
+      <SelectionFeedback
+        selectedCategory={selectedCategory}
+        selectedBrand={selectedBrand}
+        locale={locale}
+      />
+    </motion.div>  
   );
 };

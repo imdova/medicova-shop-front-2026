@@ -1,319 +1,170 @@
-// components/product/HealthStatusSidebar.tsx
-import { Check, AlertTriangle, Info, Circle } from "lucide-react";
-import { useAppLocale } from "@/hooks/useAppLocale";
+import { Check, AlertTriangle, Info } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { ProductFormData } from "@/lib/validations/product-schema";
-
-// shadcn/ui imports
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/shared/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/shared/card";
 import { Badge } from "@/components/shared/badge";
 import { Separator } from "@/components/shared/separator";
+import { Progress } from "@/components/shared/progress";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/shared/Tooltip";
-import { Progress } from "@/components/shared/progress";
 
-interface HealthStatusSidebarProps {
+interface HealthStatusProps {
   product: ProductFormData;
-  errors?: Record<string, string>;
   className?: string;
 }
 
 export const HealthStatus = ({
   product,
   className = "",
-}: HealthStatusSidebarProps) => {
-  const locale = useAppLocale();
+}: HealthStatusProps) => {
+  const t = useTranslations("create_product.health");
+  const commonT = useTranslations("create_product.actions");
 
-  const t = {
-    health: { en: "Health Status", ar: "حالة المنتج" },
-    overall: { en: "Overall Health", ar: "الصحة العامة" },
-    checks: { en: "Checks", ar: "فحوصات" },
-    passed: { en: "Passed", ar: "ناجح" },
-    failed: { en: "Failed", ar: "فشل" },
-    issue: { en: "Issue", ar: "مشكلة" },
-    issues: { en: "Issues", ar: "مشاكل" },
-    details: { en: "View Details", ar: "عرض التفاصيل" },
-    ready: { en: "Ready to Publish", ar: "جاهز للنشر" },
-    notReady: { en: "Needs Fixing", ar: "يحتاج إصلاح" },
-    titleMissing: { en: "Title Missing", ar: "العنوان مفقود" },
-    priceMissing: { en: "Price Missing", ar: "السعر مفقود" },
-    skuMissing: { en: "SKU Missing", ar: "الرمز مفقود" },
-    stockMissing: { en: "Stock Missing", ar: "المخزون مفقود" },
-    detailsIncomplete: { en: "Details Incomplete", ar: "التفاصيل غير مكتملة" },
-  };
+  const checks = [
+    {
+      key: "categorybrand",
+      value: !!product.category && !!product.brand,
+      label: t("categorybrand"),
+    },
+    {
+      key: "identity",
+      value:
+        !!product.sku &&
+        product.sku.length >= 3 &&
+        !!product.slug?.en &&
+        !!product.slug?.ar,
+      label: t("identity"),
+    },
+    {
+      key: "details",
+      value:
+        !!product.title?.en &&
+        !!product.title?.ar &&
+        !!product.description?.en &&
+        !!product.description?.ar &&
+        !!product.deliveryTime &&
+        (product.highlights?.en?.length ?? 0) > 0 &&
+        (product.highlights?.ar?.length ?? 0) > 0,
+      label: t("details"),
+    },
+    {
+      key: "pricingstock",
+      value:
+        !!product.del_price &&
+        product.del_price > 0 &&
+        !!product.stock &&
+        product.stock > 0,
+      label: t("pricingstock"),
+    },
+    {
+      key: "media",
+      value: product.images && product.images.length > 0,
+      label: t("media"),
+    },
+    {
+      key: "settings",
+      value: (product.features?.en?.length ?? 0) > 0,
+      label: t("settings"),
+    },
+  ];
 
-  const checks = {
-    title: {
-      value: !!product.title?.en && !!product.title?.ar,
-      label: { en: "Title", ar: "العنوان" },
-      error: t.titleMissing[locale],
-    },
-    price: {
-      value: !!product.del_price && product.del_price >= 0,
-      label: { en: "Price", ar: "السعر" },
-      error: t.priceMissing[locale],
-    },
-    sku: {
-      value: !!product.sku && product.sku.length >= 3,
-      label: { en: "SKU", ar: "الرمز" },
-      error: t.skuMissing[locale],
-    },
-    stock: {
-      value: !!product.stock && product.stock > 0,
-      label: { en: "Stock", ar: "المخزون" },
-      error: t.stockMissing[locale],
-    },
-    details: {
-      value: !!product.description?.en && !!product.description?.ar,
-      label: { en: "Details", ar: "التفاصيل" },
-      error: t.detailsIncomplete[locale],
-    },
-  };
-
-  const allValid = Object.values(checks).every((check) => check.value);
-  const issuesCount = Object.values(checks).filter(
-    (check) => !check.value,
-  ).length;
   const healthScore = Math.round(
-    (Object.values(checks).filter((check) => check.value).length /
-      Object.keys(checks).length) *
-      100,
+    (checks.filter((c) => c.value).length / checks.length) * 100,
   );
+  const allValid = healthScore === 100;
 
   return (
-    <Card className={`h-fit ${className}`}>
-      <CardHeader className="pb-3">
+    <Card
+      className={`overflow-hidden rounded-3xl border-none bg-white/40 shadow-2xl backdrop-blur-xl ${className}`}
+    >
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">
-            {t.health[locale]}
+          <CardTitle className="text-sm font-black uppercase tracking-widest text-gray-500">
+            {t("title")}
           </CardTitle>
-          <Badge
-            variant={allValid ? "default" : "destructive"}
-            className="text-xs"
-          >
-            {allValid ? t.ready[locale] : t.notReady[locale]}
-          </Badge>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Health Score Progress */}
-        <div className="space-y-2">
+      <CardContent className="space-y-6">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">
-              {t.overall[locale]}
+            <span className="text-xs font-bold uppercase tracking-tighter text-gray-400">
+              Score
             </span>
-            <span className="text-sm font-bold">{healthScore}%</span>
+            <span className="text-xl font-black text-gray-900">
+              {healthScore}%
+            </span>
           </div>
-          <Progress value={healthScore} className="h-2" />
+          <Progress
+            value={healthScore}
+            className="h-2 bg-gray-100 [&>div]:bg-gray-900"
+          />
         </div>
 
-        <Separator />
+        <Separator className="bg-gray-100/50" />
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="space-y-1 text-center">
-            <div className="text-lg font-bold">
-              {Object.keys(checks).length}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {t.checks[locale]}
-            </div>
-          </div>
-          <div className="space-y-1 text-center">
-            <div className="text-lg font-bold text-green-600">
-              {Object.values(checks).filter((c) => c.value).length}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {t.passed[locale]}
-            </div>
-          </div>
-          <div className="space-y-1 text-center">
-            <div className="text-lg font-bold text-red-600">{issuesCount}</div>
-            <div className="text-xs text-muted-foreground">
-              {issuesCount === 1 ? t.issue[locale] : t.issues[locale]}
-            </div>
-          </div>
-        </div>
-
-        {/* Issues List */}
-        {issuesCount > 0 && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <h4 className="text-xs font-medium text-muted-foreground">
-                {t.issues[locale]}
-              </h4>
-              <ul className="space-y-1.5">
-                {Object.entries(checks)
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                  .filter(([_, check]) => !check.value)
-                  .map(([key, check]) => (
-                    <li key={key} className="flex items-center gap-2">
-                      <AlertTriangle className="h-3 w-3 text-red-500" />
-                      <span className="text-xs">{check.error}</span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button className="ml-auto">
-                              <Info className="h-3 w-3 text-muted-foreground" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">
-                              {check.label[locale]}{" "}
-                              {t.issue[locale].toLowerCase()}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          </>
-        )}
-
-        {/* Check Items */}
-        <Separator />
-        <div className="space-y-2">
-          <h4 className="text-xs font-medium text-muted-foreground">
-            {t.checks[locale]}
-          </h4>
-          <div className="space-y-1.5">
-            {Object.entries(checks).map(([key, check]) => (
-              <div
-                key={key}
-                className="flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  {check.value ? (
-                    <Check className="h-3 w-3 text-green-500" />
-                  ) : (
-                    <Circle className="h-3 w-3 text-red-500" />
-                  )}
-                  <span>{check.label[locale]}</span>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={`text-xs ${check.value ? "border-green-200 text-green-700" : "border-red-200 text-red-700"}`}
+        <div className="space-y-4">
+          {checks.map((check) => (
+            <div
+              key={check.key}
+              className="group flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-6 w-6 items-center justify-center rounded-lg transition-all ${check.value ? "bg-emerald-50 text-emerald-500" : "bg-rose-50 text-rose-500"}`}
                 >
-                  {check.value ? t.passed[locale] : t.failed[locale]}
-                </Badge>
+                  {check.value ? (
+                    <Check size={14} strokeWidth={3} />
+                  ) : (
+                    <AlertTriangle size={14} strokeWidth={3} />
+                  )}
+                </div>
+                <span
+                  className={`text-sm font-semibold transition-colors ${check.value ? "text-gray-600" : "text-gray-400"}`}
+                >
+                  {check.label}
+                </span>
               </div>
-            ))}
-          </div>
+              {!check.value && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="text-gray-300 transition-colors hover:text-gray-600">
+                        <Info size={14} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="rounded-xl border-none bg-gray-900 text-xs text-white">
+                      {t("failed")}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          ))}
         </div>
 
-        {/* SKU Display */}
-        <Separator />
-        <div className="space-y-1.5">
-          <h4 className="text-xs font-medium text-muted-foreground">
-            {t.skuMissing[locale].split(" ")[0]}
-          </h4>
-          <div className="rounded bg-muted px-2 py-1.5">
-            <code className="font-mono text-xs">{product.sku || "No SKU"}</code>
+        {product.sku && (
+          <div className="pt-2">
+            <div className="rounded-2xl border border-gray-100/50 bg-gray-50/50 p-4">
+              <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">
+                Active SKU
+              </span>
+              <code className="text-sm font-black text-gray-900">
+                {product.sku}
+              </code>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
-  );
-};
-
-// Mini version for even smaller sidebar
-export const HealthStatusMini = ({
-  product,
-  className = "",
-}: {
-  product: ProductFormData;
-  className?: string;
-}) => {
-  const locale = useAppLocale();
-
-  const checks = {
-    title: !!product.title?.en && !!product.title?.ar,
-    price: !!product.del_price && product.del_price >= 0,
-    sku: !!product.sku && product.sku.length >= 3,
-    stock: !!product.stock && product.stock > 0,
-    details: !!product.description?.en && !!product.description?.ar,
-  };
-
-  const allValid = Object.values(checks).every(Boolean);
-  const issuesCount = Object.values(checks).filter((check) => !check).length;
-
-  return (
-    <div className={`rounded-lg border p-3 ${className}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {allValid ? (
-            <Check className="h-4 w-4 text-green-500" />
-          ) : (
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
-          )}
-          <span className="text-sm font-medium">
-            {locale === "en" ? "Health" : "الحالة"}
-          </span>
-        </div>
-        <Badge
-          variant={allValid ? "default" : "outline"}
-          className={`text-xs ${allValid ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"}`}
-        >
-          {allValid
-            ? locale === "en"
-              ? "Ready"
-              : "جاهز"
-            : `${issuesCount} ${locale === "en" ? "issue" : "مشكلة"}`}
-        </Badge>
-      </div>
-    </div>
-  );
-};
-
-// Compact Progress Bar version
-export const HealthStatusProgress = ({
-  product,
-  className = "",
-}: {
-  product: ProductFormData;
-  className?: string;
-}) => {
-  const locale = useAppLocale();
-
-  const checks = {
-    title: !!product.title?.en && !!product.title?.ar,
-    price: !!product.del_price && product.del_price >= 0,
-    sku: !!product.sku && product.sku.length >= 3,
-    stock: !!product.stock && product.stock > 0,
-    details: !!product.description?.en && !!product.description?.ar,
-  };
-
-  const passedCount = Object.values(checks).filter(Boolean).length;
-  const totalCount = Object.keys(checks).length;
-  const progress = (passedCount / totalCount) * 100;
-
-  return (
-    <div className={`space-y-1.5 ${className}`}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium">
-          {locale === "en" ? "Product Health" : "صحة المنتج"}
-        </span>
-        <span className="text-xs font-bold">{Math.round(progress)}%</span>
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-muted">
-        <div
-          className="h-1.5 rounded-full bg-green-500 transition-all duration-300"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{locale === "en" ? "Checks:" : "فحوصات:"}</span>
-        <span>
-          {passedCount}/{totalCount}
-        </span>
-      </div>
-    </div>
   );
 };

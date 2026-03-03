@@ -44,11 +44,12 @@ export function mapCategory(item: any): MultiCategory {
   };
 }
 
-export async function getCategories(): Promise<MultiCategory[]> {
+export async function getCategories(token?: string): Promise<MultiCategory[]> {
   try {
     const res = await apiClient<any>({
       endpoint: "/category",
       method: "GET",
+      token,
     });
 
     const items = res.data?.categories || [];
@@ -60,11 +61,12 @@ export async function getCategories(): Promise<MultiCategory[]> {
 }
 
 
-export async function getSubCategoryChildren(parentSubCategoryId: string): Promise<MultiCategory[]> {
+export async function getSubCategoryChildren(parentSubCategoryId: string, token?: string): Promise<MultiCategory[]> {
   try {
     const res = await apiClient<any>({
       endpoint: `/subcategory-child?subCategory=${parentSubCategoryId}`,
       method: "GET",
+      token,
     });
 
     const items = res.data?.subcategoryChildren || [];
@@ -75,11 +77,12 @@ export async function getSubCategoryChildren(parentSubCategoryId: string): Promi
   }
 }
 
-export async function getSubCategories(): Promise<MultiCategory[]> {
+export async function getSubCategories(categoryId?: string, token?: string): Promise<MultiCategory[]> {
   try {
     const res = await apiClient<any>({
-      endpoint: "/subcategory",
+      endpoint: categoryId ? `/subcategory?category=${categoryId}` : "/subcategory",
       method: "GET",
+      token,
     });
 
     const items = res.data?.subCategories || [];

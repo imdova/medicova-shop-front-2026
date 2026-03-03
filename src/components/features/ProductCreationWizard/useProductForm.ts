@@ -2,10 +2,15 @@ import { useState, useCallback } from "react";
 import { ProductFormData } from "@/lib/validations/product-schema";
 import { detailsStepSchema } from "@/lib/validations/product-schema";
 
-export type Step = "setup" | "details";
+export type Step =
+  | "category"
+  | "identity"
+  | "details"
+  | "pricing"
+  | "media";
 
 export const useProductForm = () => {
-  const [currentStep, setCurrentStep] = useState<Step>("setup");
+  const [currentStep, setCurrentStep] = useState<Step>("category");
   const [product, setProduct] = useState<ProductFormData>({
     pricingMethod: "manual",
     features: { en: [], ar: [] },
@@ -16,10 +21,14 @@ export const useProductForm = () => {
     specifications: [],
     title: { en: "", ar: "" },
     description: { en: "", ar: "" },
+    sku: "",
+    slug: { en: "", ar: "" },
     productType: "physical",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmedProduct, setConfirmedProduct] =
+    useState<ProductFormData>(product);
 
   const updateProduct = useCallback((updates: Partial<ProductFormData>) => {
     setProduct((prev) => {
@@ -45,25 +54,31 @@ export const useProductForm = () => {
   }, []);
 
   const validateStep = useCallback(async (): Promise<boolean> => {
-    // Only validate on the details step (final submission)
-    if (currentStep !== "details") {
+    // Determine next step
+    const steps: Step[] = [
+      "category",
+      "identity",
+      "details",
+      "pricing",
+      "media",
+    ];
+    const currentIndex = steps.indexOf(currentStep);
+
+    // Only validate on the media step (final submission)
+    if (currentStep !== "media") {
       console.log(
-        "🔄 Skipping validation for step:",
+        "🔄 Moving to next step from:",
         currentStep,
         "- just navigating",
       );
 
-      // Simple navigation without validation for non-details steps
-      const nextSteps: Record<Step, Step | null> = {
-        setup: "details",
-        details: null,
-      };
-
-      const nextStep = nextSteps[currentStep];
-      if (nextStep) {
+      if (currentIndex < steps.length - 1) {
+        const nextStep = steps[currentIndex + 1];
         console.log("➡️ Moving to next step:", nextStep);
+        setConfirmedProduct(product); // Confirm current data for health score
         setCurrentStep(nextStep);
         setErrors({}); // Clear errors when navigating
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
       return true;
     }
@@ -101,7 +116,7 @@ export const useProductForm = () => {
           description: { en: "", ar: "" },
           productType: "physical",
         });
-        setCurrentStep("setup");
+        setCurrentStep("category");
 
         setIsSubmitting(false);
         return true;
@@ -156,6 +171,7 @@ export const useProductForm = () => {
 
   return {
     product,
+    confirmedProduct,
     errors,
     currentStep,
     isSubmitting,
