@@ -612,13 +612,15 @@
       "title": "هوية المنتج",
       "manualSku": "إدخال SKU يدويًا",
       "skuPlaceholder": "أدخل رمز SKU الخاص بك",
+      "slugEn": "رابط المنتج (إنجليزي)",
+      "slugAr": "رابط المنتج (عربي)",
       "autoSku": "إنشاء رمز SKU تلقائيًا",
       "skuGenerated": "تم إنشاء رمز SKU"
     },
     "details": {
       "title": "تفاصيل المنتج",
-      "productTitle": "عنوان المنتج",
-      "titlePlaceholder": "أدخل عنوان المنتج",
+      "productTitle": "اسم المنتج",
+      "titlePlaceholder": "أدخل اسم المنتج",
       "description": "الوصف",
       "descPlaceholder": "أدخل وصفاً مفصلاً للمنتج...",
       "keyFeatures": "الميزات الرئيسية",
@@ -646,17 +648,23 @@
       "title": "وسائط المنتج",
       "uploadText": "انقر أو اسحب لتحميل الصور",
       "uploadSubtext": "10 صور كحد أقصى • JPG, PNG, WebP",
-      "mainImage": "الصورة الرئيسية"
+      "mainImage": "الصورة الرئيسية",
+      "otherImages": "صور المعرض",
+      "videoUrl": "رابط الفيديو",
+      "videoPlaceholder": "ضع رابط يوتيوب أو فيميو هنا...",
+      "videoOptional": "(اختياري)"
     },
     "health": {
       "title": "حالة العرض في المتجر",
       "passed": "تم اجتياز جميع الفحوصات",
       "failed": "متطلبات مفقودة",
       "invoicing": "الفوترة",
-      "price": "السعر محدد",
-      "psku": "الرمز نشط",
-      "stock": "متوفر بالمخزون",
-      "product": "التفاصيل مكتملة",
+      "categorybrand": "الفئة والعلامة التجارية",
+      "identity": "هوية المنتج",
+      "details": "تفاصيل المنتج",
+      "pricingstock": "التسعير والمخزون",
+      "media": "وسائط المنتج",
+      "settings": "إعدادات المنتج",
       "learnMore": "اعرف المزيد"
     },
     "actions": {

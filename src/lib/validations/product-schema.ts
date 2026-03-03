@@ -38,7 +38,12 @@ export const productSchema = z.object({
 
   // Identity
   sku: z.string().optional(),
-  slug: z.string().optional(),
+  slug: z
+    .object({
+      en: z.string().optional(),
+      ar: z.string().optional(),
+    })
+    .optional(),
   productType: z.enum(["physical", "digital"]).default("physical"),
 
   // Pricing
@@ -81,7 +86,6 @@ export const productSchema = z.object({
     .default({ en: [], ar: [] }),
 
   // Inventory
-  weightKg: z.number().min(0, "Weight must be positive").optional(),
   stock: z.number().min(0, "Stock must be positive").optional(),
 
   // Variants
@@ -91,11 +95,12 @@ export const productSchema = z.object({
   // Bilingual specifications
   specifications: z.array(bilingualSpecificationSchema).default([]),
 
-  //  Images
+  //  Media
   images: z
     .array(z.union([z.string(), z.instanceof(File)]))
     .max(10, "Maximum 10 images allowed")
     .default([]),
+  videoUrl: z.string().optional(),
 });
 
 // Step-specific validation schemas with proper required fields
@@ -129,38 +134,32 @@ export const identityStepSchema = z.object({
     .refine((val) => val !== undefined && val.length >= 3, {
       message: "SKU is required and must be at least 3 characters",
     }),
+  slug: z.object({
+    en: z.string().min(3, "English slug must be at least 3 characters"),
+    ar: z.string().min(3, "Arabic slug must be at least 3 characters"),
+  }),
 });
 
 // Relaxed details step schema for testing
-export const detailsStepSchema = z
-  .object({
-    // Make title optional for now to test submission
-    title: z
-      .object({
-        en: z
-          .string()
-          .min(3, "English title must be at least 3 characters")
-          .optional(),
-        ar: z
-          .string()
-          .min(3, "Arabic title must be at least 3 characters")
-          .optional(),
-      })
-      .optional(),
+export const detailsStepSchema = z.object({
+  title: z.object({
+    en: z.string().min(3, "English title must be at least 3 characters"),
+    ar: z.string().min(3, "Arabic title must be at least 3 characters"),
+  }),
+  description: z.object({
+    en: z.string().min(10, "English description must be at least 10 characters"),
+    ar: z.string().min(10, "Arabic description must be at least 10 characters"),
+  }),
+  highlights: z.object({
+    en: z.array(z.string()).min(1, "At least one English highlight is required"),
+    ar: z.array(z.string()).min(1, "At least one Arabic highlight is required"),
+  }),
+  deliveryTime: z.string().min(1, "Delivery time is required"),
+});
 
-    // Make description optional for now to test submission
-    description: z
-      .object({
-        en: z
-          .string()
-          .min(20, "English description must be at least 20 characters")
-          .optional(),
-        ar: z
-          .string()
-          .min(20, "Arabic description must be at least 20 characters")
-          .optional(),
-      })
-      .optional(),
+// Full schema for draft/final submission (relaxed)
+export const fullProductSchema = z
+  .object({
 
     // Only require price for now
     del_price: z
@@ -178,8 +177,6 @@ export const detailsStepSchema = z
 
     saleStart: z.string().optional(),
     saleEnd: z.string().optional(),
-
-    weightKg: z.number().min(0, "Weight must be positive").optional(),
 
     stock: z.number().min(0, "Stock must be positive").optional(),
   })

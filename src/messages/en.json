@@ -611,6 +611,8 @@
       "title": "Product Identity",
       "manualSku": "Manual SKU Entry",
       "skuPlaceholder": "Enter your SKU",
+      "slugEn": "Product Slug (English)",
+      "slugAr": "Product Slug (Arabic)",
       "autoSku": "Generate SKU Automatically",
       "skuGenerated": "SKU Generated"
     },
@@ -645,17 +647,23 @@
       "title": "Product Media",
       "uploadText": "Click or drag to upload",
       "uploadSubtext": "Max 10 images • JPG, PNG, WebP",
-      "mainImage": "Main"
+      "mainImage": "Main Image",
+      "otherImages": "Gallery Images",
+      "videoUrl": "Video Link",
+      "videoPlaceholder": "Paste YouTube or Vimeo link...",
+      "videoOptional": "(Optional)"
     },
     "health": {
       "title": "Storefront Health",
       "passed": "Passed All Checks",
       "failed": "Requirements Missing",
       "invoicing": "Invoicing",
-      "price": "Price set",
-      "psku": "SKU active",
-      "stock": "In stock",
-      "product": "Details complete",
+      "categorybrand": "Category & Brand",
+      "identity": "Product Identity",
+      "details": "Product Details",
+      "pricingstock": "Pricing & Stock",
+      "media": "Product Media",
+      "settings": "Product Settings",
       "learnMore": "Learn more"
     },
     "actions": {

@@ -1,11 +1,12 @@
 import { apiClient } from "@/lib/apiClient";
 import { Brand } from "@/types";
 
-export async function getBrands(): Promise<Brand[]> {
+export async function getBrands(token?: string): Promise<Brand[]> {
   try {
     const res = await apiClient<any>({
       endpoint: "/brands",
       method: "GET",
+      token,
     });
 
     const items = res.data?.brands || [];
