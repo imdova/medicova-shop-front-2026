@@ -2,41 +2,65 @@
 
 import React, { useState } from "react";
 import { useTranslations } from "next-intl";
-import { useAppLocale } from "@/hooks/useAppLocale";
 import {
   Settings,
+  LayoutGrid,
   Layers,
+  FolderTree,
+  Award,
   Tag,
   Box,
-  Grid,
   ShieldCheck,
-  Activity,
 } from "lucide-react";
 
-// Existing Panels
-import ProductOptionsListPanel from "../product-options/page";
-import AttributesListPanel from "../product-attributes/page";
+import CategoryPanelWrapper from "./components/CategoryPanelWrapper";
 import TagsListPanel from "../products-tags/page";
-import CategoryBrandSetup from "../categories/page";
+import ProductOptionsListPanel from "../product-options/page";
 
-type TabType = "options" | "attributes" | "tags" | "categories";
+type TabType =
+  | "categories"
+  | "subCategories"
+  | "childCategory"
+  | "brands"
+  | "tags"
+  | "variants";
+
+const categoryTabs = [
+  "categories",
+  "subCategories",
+  "childCategory",
+  "brands",
+] as const;
+type CategoryTab = (typeof categoryTabs)[number];
+
+function isCategoryTab(tab: TabType): tab is CategoryTab {
+  return (categoryTabs as readonly string[]).includes(tab);
+}
 
 export default function ProductSettingsPage() {
   const t = useTranslations("admin");
-  const locale = useAppLocale();
-  const isArabic = locale === "ar";
-  const [activeTab, setActiveTab] = useState<TabType>("options");
+  const [activeTab, setActiveTab] = useState<TabType>("categories");
 
-  const tabs = [
-    { id: "options", label: t("productOptions"), icon: <Layers size={18} /> },
+  const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     {
-      id: "attributes",
-      label: t("productAttributes"),
-      icon: <Grid size={18} />,
+      id: "categories",
+      label: t("categories"),
+      icon: <LayoutGrid size={16} />,
     },
-    { id: "tags", label: t("productTags"), icon: <Tag size={18} /> },
-    { id: "categories", label: t("categories"), icon: <Box size={18} /> },
-  ] as const;
+    {
+      id: "subCategories",
+      label: t("subCategories"),
+      icon: <Layers size={16} />,
+    },
+    {
+      id: "childCategory",
+      label: t("childCategory"),
+      icon: <FolderTree size={16} />,
+    },
+    { id: "brands", label: t("brands"), icon: <Award size={16} /> },
+    { id: "tags", label: t("productTags"), icon: <Tag size={16} /> },
+    { id: "variants", label: t("productVariants"), icon: <Box size={16} /> },
+  ];
 
   return (
     <div className="animate-in fade-in space-y-8 duration-700">
@@ -69,16 +93,16 @@ export default function ProductSettingsPage() {
         </div>
       </div>
 
-      {/* Prestige Tabbed Navigation */}
+      {/* Tabbed Navigation */}
       <div className="flex flex-col gap-6">
-        <div className="flex w-fit items-center gap-2 rounded-2xl border border-white/60 bg-gray-100/50 p-1.5 backdrop-blur-sm">
+        <div className="flex w-full items-center gap-1.5 overflow-x-auto rounded-2xl border border-white/60 bg-gray-100/50 p-1.5 backdrop-blur-sm lg:w-fit">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 rounded-xl px-6 py-2.5 text-xs font-black transition-all duration-300 ${
+              className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-black transition-all duration-300 ${
                 activeTab === tab.id
-                  ? "shadow-primary/5 scale-105 bg-white text-primary shadow-lg ring-1 ring-gray-100"
+                  ? "shadow-primary/5 scale-[1.02] bg-white text-primary shadow-lg ring-1 ring-gray-100"
                   : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
               }`}
             >
@@ -90,10 +114,11 @@ export default function ProductSettingsPage() {
 
         {/* Dynamic Panel Content */}
         <div className="animate-in slide-in-from-bottom-4 duration-500">
-          {activeTab === "options" && <ProductOptionsListPanel />}
-          {activeTab === "attributes" && <AttributesListPanel />}
+          {isCategoryTab(activeTab) && (
+            <CategoryPanelWrapper activeTab={activeTab} />
+          )}
           {activeTab === "tags" && <TagsListPanel />}
-          {activeTab === "categories" && <CategoryBrandSetup />}
+          {activeTab === "variants" && <ProductOptionsListPanel />}
         </div>
       </div>
     </div>

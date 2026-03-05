@@ -885,6 +885,8 @@
     "productOptions": "خيارات المنتج",
     "productAttributes": "خصائص المنتج",
     "productTags": "علامات المنتج",
+    "productVariants": "متغيرات المنتج",
+    "childCategory": "فئة فرعية (مستوى 3)",
     "sellersSubtitle": "إدارة شركاء البيع ومراقبة أدائهم في المتجر.",
     "overview": "نظرة عامة",
     "sellersList": "قائمة البائعين",
