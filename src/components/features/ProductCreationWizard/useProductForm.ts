@@ -89,47 +89,76 @@ export const useProductForm = (productId?: string) => {
   useEffect(() => {
     if (!productId || !token) return;
     setIsLoading(true);
-    getProductById(productId, token).then((data) => {
+    getProductById(productId, token).then((data: any) => {
       if (data) {
+        // Log full response so we can see every field the API returns
+        console.log("DEBUG: Full product data for edit:", JSON.stringify(data, null, 2));
+
+        const d = data; // shorthand
+
         setProduct((prev) => ({
           ...prev,
-          title: { en: data.nameEn || "", ar: data.nameAr || "" },
-          slugEn: data.slugEn || "",
-          slugAr: data.slugAr || "",
+          title: { en: d.nameEn || "", ar: d.nameAr || "" },
+          slugEn: d.slugEn || "",
+          slugAr: d.slugAr || "",
+
+          // Descriptions — handle nested or flat
           descriptions: {
-            descriptionEn: (data as any).descriptions?.descriptionEn || "",
-            descriptionAr: (data as any).descriptions?.descriptionAr || "",
+            descriptionEn: d.descriptions?.descriptionEn || d.descriptionEn || "",
+            descriptionAr: d.descriptions?.descriptionAr || d.descriptionAr || "",
           },
+
+          // Identity — handle nested or flat
           identity: {
-            sku: (data as any).identity?.sku || "",
-            skuMode: (data as any).identity?.skuMode || "manual",
+            sku: d.identity?.sku || d.sku || "",
+            skuMode: d.identity?.skuMode || d.skuMode || "manual",
           },
+
+          // Classification — handle nested object or direct IDs
           classification: {
-            category: data.classification?.category || "",
-            subcategory: data.classification?.subcategory || "",
-            childCategory: (data as any).classification?.childCategory || "",
-            brand: data.classification?.brand || "",
-            productType: (data as any).classification?.productType || "Physical Product",
+            category: d.classification?.category?._id || d.classification?.category || d.categoryId || d.category || "",
+            subcategory: d.classification?.subcategory?._id || d.classification?.subcategory || d.subcategoryId || d.subcategory || "",
+            childCategory: d.classification?.childCategory?._id || d.classification?.childCategory || d.childCategoryId || d.childCategory || "",
+            brand: d.classification?.brand?._id || d.classification?.brand || d.brandId || d.brand || "",
+            productType: d.classification?.productType || d.productType || "Physical Product",
           },
+
+          // Pricing — handle nested or flat
           pricing: {
-            originalPrice: data.pricing?.originalPrice || 0,
-            salePrice: data.pricing?.salePrice || 0,
-            startDate: (data as any).pricing?.startDate || null,
-            endDate: (data as any).pricing?.endDate || null,
+            originalPrice: d.pricing?.originalPrice ?? d.originalPrice ?? d.price ?? 0,
+            salePrice: d.pricing?.salePrice ?? d.salePrice ?? d.sale_price ?? 0,
+            startDate: d.pricing?.startDate || d.startDate || null,
+            endDate: d.pricing?.endDate || d.endDate || null,
           },
-          inventory: (data as any).inventory || { trackStock: true, stockQuantity: 0, stockStatus: "in_stock" },
-          highlightsEn: (data as any).highlightsEn || [],
-          highlightsAr: (data as any).highlightsAr || [],
-          specifications: (data as any).specifications || [],
-          images: data.media?.galleryImages || (data.media?.featuredImages ? [data.media.featuredImages] : []),
+
+          // Inventory — handle nested or flat
+          inventory: d.inventory || {
+            trackStock: d.trackStock ?? true,
+            stockQuantity: d.stockQuantity ?? d.stock ?? 0,
+            stockStatus: d.stockStatus || "in_stock",
+          },
+
+          highlightsEn: d.highlightsEn || [],
+          highlightsAr: d.highlightsAr || [],
+          specifications: d.specifications || [],
+
+          // Images — handle both media-wrapped and flat
+          images: d.media?.galleryImages || d.galleryImages || (d.media?.featuredImages ? [d.media.featuredImages] : d.featuredImages ? [d.featuredImages] : []),
           media: {
-            galleryImages: data.media?.galleryImages || [],
-            productVideo: (data as any).media?.productVideo,
+            galleryImages: d.media?.galleryImages || d.galleryImages || [],
+            productVideo: d.media?.productVideo || d.productVideo,
           },
-          approved: data.approved ?? false,
-          store: data.store || (typeof data.seller === "string" ? data.seller : (data.seller as any)?._id || ""),
-          createdBy: (data.createdBy as any) || "seller",
-          rate: (data as any).rate || 0,
+
+          approved: d.approved ?? false,
+          store: d.store?._id || d.store || (typeof d.seller === "string" ? d.seller : d.seller?._id || ""),
+          createdBy: d.createdBy || "seller",
+          rate: d.rate || 0,
+
+          // Variants — pre-fill productVariants if they exist
+          productVariants: (d.variants || []).map((v: any) => 
+            typeof v === "string" ? { id: v } : { id: v._id || v.id, ...v }
+          ),
+          tags: d.tags || [],
         }));
       }
     }).finally(() => setIsLoading(false));
@@ -204,17 +233,21 @@ export const useProductForm = (productId?: string) => {
           },
           inventory: product.inventory,
           variants: product.productVariants.map(v => v.id).filter(Boolean) as string[],
-          specifications: product.specifications,
+          // Strip _id from specifications (MongoDB adds them but API rejects them)
+          specifications: product.specifications.map(({ _id, ...rest }: any) => rest),
           store: product.store || (user as any)?.storeId || "",
           createdBy: user?.role === "admin" ? "admin" : "seller",
           media: {
             featuredImages: imageUrls[0] || "",
             galleryImages: imageUrls,
+            // Strip _id from productVideo (MongoDB adds it but API rejects it)
             productVideo: product.media?.productVideo 
+              ? (({ _id, ...rest }: any) => rest)(product.media.productVideo)
+              : undefined,
           },
           approved: false,
           rate: product.rate || 0,
-        };
+        } as any;
 
         let response;
         if (isEditMode && productId) {

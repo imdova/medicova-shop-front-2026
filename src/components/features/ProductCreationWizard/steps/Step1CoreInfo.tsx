@@ -102,7 +102,7 @@ const SearchableSelect = ({
         <div className="flex items-center gap-1.5 truncate">
           {Icon && <Icon size={11} className="text-gray-400" />}
           <span
-            className={`${COLORS.text} ${selectedOpt ? "" : "text-gray-300"} truncate`}
+            className={`${selectedOpt ? COLORS.text : "text-xs font-normal text-gray-300"} truncate`}
           >
             {selectedOpt
               ? selectedOpt.title?.[locale] ||
