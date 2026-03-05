@@ -66,12 +66,17 @@ export const PricingStep = ({
                 </div>
                 <Input
                   type="number"
-                  value={product.del_price || ""}
+                  value={product.pricing.originalPrice || ""}
                   onChange={(e) =>
-                    onUpdate({ del_price: parseFloat(e.target.value) })
+                    onUpdate({
+                      pricing: {
+                        ...product.pricing,
+                        originalPrice: parseFloat(e.target.value) || 0,
+                      },
+                    })
                   }
                   placeholder="0.00"
-                  className={`h-20 rounded-3xl border-2 border-gray-100/50 bg-white/50 pl-14 pr-8 text-2xl font-black shadow-sm transition-all focus:border-gray-900 focus:bg-white ${errors.del_price ? "border-red-500" : ""}`}
+                  className={`h-20 rounded-3xl border-2 border-gray-100/50 bg-white/50 pl-14 pr-8 text-2xl font-black shadow-sm transition-all focus:border-gray-900 focus:bg-white ${errors["pricing.originalPrice"] ? "border-red-500" : ""}`}
                 />
               </div>
             </div>
@@ -90,19 +95,24 @@ export const PricingStep = ({
                 </div>
                 <Input
                   type="number"
-                  value={product.price || ""}
+                  value={product.pricing.salePrice || ""}
                   onChange={(e) =>
-                    onUpdate({ price: parseFloat(e.target.value) })
+                    onUpdate({
+                      pricing: {
+                        ...product.pricing,
+                        salePrice: parseFloat(e.target.value) || 0,
+                      },
+                    })
                   }
                   placeholder="Optional"
-                  className={`h-20 rounded-3xl border-2 border-emerald-50/50 bg-emerald-50/30 pl-14 pr-8 text-2xl font-black text-emerald-600 shadow-sm transition-all placeholder:text-emerald-200 focus:border-emerald-500 focus:bg-white ${errors.price ? "border-red-500" : ""}`}
+                  className={`h-20 rounded-3xl border-2 border-emerald-50/50 bg-emerald-50/30 pl-14 pr-8 text-2xl font-black text-emerald-600 shadow-sm transition-all placeholder:text-emerald-200 focus:border-emerald-500 focus:bg-white ${errors["pricing.salePrice"] ? "border-red-500" : ""}`}
                 />
               </div>
             </div>
           </div>
 
           <AnimatePresence>
-            {product.price && (
+            {product.pricing.salePrice > 0 && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -116,8 +126,15 @@ export const PricingStep = ({
                     </Label>
                     <Input
                       type="date"
-                      value={product.saleStart || ""}
-                      onChange={(e) => onUpdate({ saleStart: e.target.value })}
+                      value={product.pricing.startDate || ""}
+                      onChange={(e) =>
+                        onUpdate({
+                          pricing: {
+                            ...product.pricing,
+                            startDate: e.target.value,
+                          },
+                        })
+                      }
                       className="h-14 rounded-2xl border-2 border-gray-100/50 bg-white/60 px-6 font-bold transition-all focus:border-gray-900"
                     />
                   </div>
@@ -127,8 +144,15 @@ export const PricingStep = ({
                     </Label>
                     <Input
                       type="date"
-                      value={product.saleEnd || ""}
-                      onChange={(e) => onUpdate({ saleEnd: e.target.value })}
+                      value={product.pricing.endDate || ""}
+                      onChange={(e) =>
+                        onUpdate({
+                          pricing: {
+                            ...product.pricing,
+                            endDate: e.target.value,
+                          },
+                        })
+                      }
                       className="h-14 rounded-2xl border-2 border-gray-100/50 bg-white/60 px-6 font-bold transition-all focus:border-gray-900"
                     />
                   </div>
@@ -169,10 +193,17 @@ export const PricingStep = ({
               </div>
               <Input
                 type="number"
-                value={product.stock || ""}
-                onChange={(e) => onUpdate({ stock: parseInt(e.target.value) })}
+                value={product.inventory.stockQuantity || ""}
+                onChange={(e) =>
+                  onUpdate({
+                    inventory: {
+                      ...product.inventory,
+                      stockQuantity: parseInt(e.target.value) || 0,
+                    },
+                  })
+                }
                 placeholder="0"
-                className={`h-20 rounded-3xl border-2 border-gray-100/50 bg-white/50 pl-14 pr-8 text-2xl font-black shadow-sm transition-all focus:border-amber-500 focus:bg-white ${errors.stock ? "border-red-500" : ""}`}
+                className={`h-20 rounded-3xl border-2 border-gray-100/50 bg-white/50 pl-14 pr-8 text-2xl font-black shadow-sm transition-all focus:border-amber-500 focus:bg-white ${errors["inventory.stockQuantity"] ? "border-red-500" : ""}`}
               />
             </div>
             <p className="text-[10px] font-medium italic text-gray-400">

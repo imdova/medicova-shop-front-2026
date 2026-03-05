@@ -32,16 +32,17 @@ export const HealthStatus = ({
   const checks = [
     {
       key: "categorybrand",
-      value: !!product.category && !!product.brand,
+      value:
+        !!product.classification.category && !!product.classification.brand,
       label: t("categorybrand"),
     },
     {
       key: "identity",
       value:
-        !!product.sku &&
-        product.sku.length >= 3 &&
-        !!product.slug?.en &&
-        !!product.slug?.ar,
+        !!product.identity.sku &&
+        product.identity.sku.length >= 3 &&
+        !!product.slugEn &&
+        !!product.slugAr,
       label: t("identity"),
     },
     {
@@ -49,20 +50,19 @@ export const HealthStatus = ({
       value:
         !!product.title?.en &&
         !!product.title?.ar &&
-        !!product.description?.en &&
-        !!product.description?.ar &&
-        !!product.deliveryTime &&
-        (product.highlights?.en?.length ?? 0) > 0 &&
-        (product.highlights?.ar?.length ?? 0) > 0,
+        !!product.descriptions?.descriptionEn &&
+        !!product.descriptions?.descriptionAr &&
+        (product.highlightsEn?.length ?? 0) > 0 &&
+        (product.highlightsAr?.length ?? 0) > 0,
       label: t("details"),
     },
     {
       key: "pricingstock",
       value:
-        !!product.del_price &&
-        product.del_price > 0 &&
-        !!product.stock &&
-        product.stock > 0,
+        !!product.pricing.originalPrice &&
+        product.pricing.originalPrice > 0 &&
+        !!product.inventory.stockQuantity &&
+        product.inventory.stockQuantity > 0,
       label: t("pricingstock"),
     },
     {
@@ -72,7 +72,7 @@ export const HealthStatus = ({
     },
     {
       key: "settings",
-      value: (product.features?.en?.length ?? 0) > 0,
+      value: (product.specifications?.length ?? 0) > 0,
       label: t("settings"),
     },
   ];
@@ -152,14 +152,14 @@ export const HealthStatus = ({
           ))}
         </div>
 
-        {product.sku && (
+        {product.identity.sku && (
           <div className="pt-2">
             <div className="rounded-2xl border border-gray-100/50 bg-gray-50/50 p-4">
               <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">
                 Active SKU
               </span>
               <code className="text-sm font-black text-gray-900">
-                {product.sku}
+                {product.identity.sku}
               </code>
             </div>
           </div>
