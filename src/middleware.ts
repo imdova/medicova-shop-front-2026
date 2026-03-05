@@ -10,6 +10,7 @@ const protectedPatterns = [
   "/checkout",
   "/user",
   "/seller",
+  "/admin",
   "/wishlist",
 ];
 

@@ -119,7 +119,7 @@ const Sidebar: React.FC<AccountPageProps> = ({ user }) => {
                         </Link>
                       )}
 
-                      {/* Render sub-items only if they exist and the parent item is open */}
+                
                       {hasSubItems && isOpen && (
                         <ul className="ml-4 mt-1 space-y-1 border-l border-gray-100 pl-3">
                           {item.subItems?.map((subItem, subIndex) => {

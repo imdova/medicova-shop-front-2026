@@ -1,282 +1,174 @@
 "use client";
-import Link from "next/link";
-import { PencilIcon, Plus, TrashIcon } from "lucide-react";
-import DynamicTable from "@/components/features/tables/DTable";
-import { useState } from "react";
-import { ProductTag } from "@/types/product";
-import { productFilters } from "@/constants/drawerFilter";
-import { LanguageType } from "@/util/translations";
-import DynamicFilter from "@/components/features/filter/DynamicFilter";
-import SearchInput from "@/components/forms/Forms/formFields/SearchInput";
-import { DynamicFilterItem } from "@/types/filters";
-import { ProductTags } from "@/constants/productTags";
+
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { Tag, Plus, PencilIcon, TrashIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { useRouter } from "next/navigation";
-
-type Status = "active" | "pending" | "draft";
-
-// Translation dictionary
-const translations = {
-  en: {
-    title: "Product Tags",
-    description:
-      "Tags help categorize products and make them easier for customers to find You can add keywords such as Medical Wear",
-    id: "ID",
-    name: "Name",
-    createdAt: "Created At",
-    status: "Status",
-    operations: "Operations",
-    productName: "Product Name",
-    date: "Date",
-    sku: "SKU",
-    seller: "Seller",
-    category: "Category",
-    subCategory: "Sub Category",
-    brand: "Brand",
-    unitPrice: "Unit Price",
-    totalPurchase: "Total Purchase",
-    searchPlaceholder: "Search",
-    search: "Search",
-    moreFilters: "More Filters",
-    download: "Download",
-    allStatuses: "All Statuses",
-    active: "Active",
-    pending: "Pending",
-    draft: "Draft",
-    allStock: "All Stock",
-    inStock: "In Stock",
-    outOfStock: "Out of Stock",
-    selectCategory: "Select Category",
-    medicalWear: "Medical Wear",
-    selectSubCategory: "Select Sub Category",
-    scrubs: "Scrubs",
-    allBrand: "All brand",
-    landeu: "Landeu",
-    allSellers: "All Sellers",
-    reset: "Reset",
-    showData: "Show Data",
-    unknown: "Unknown",
-    delete: "Delete",
-    edit: "Edit",
-    quickFilters: "Quick Filters",
-    addFilter: "Add Filter",
-    hideFilters: "Hide Filters",
-    showFilters: "Show Filters",
-    filters: "Filters",
-    create: "Create",
-  },
-  ar: {
-    title: "علامات المنتج",
-    description:
-      "تساعد العلامات على تصنيف المنتجات وتسهيل العثور عليها على العملاء.",
-    id: "المعرف",
-    name: "الاسم",
-    createdAt: "تاريخ الإنشاء",
-    status: "الحالة",
-    operations: "العمليات",
-    productName: "اسم المنتج",
-    date: "التاريخ",
-    sku: "SKU",
-    seller: "البائع",
-    category: "الفئة",
-    subCategory: "الفئة الفرعية",
-    brand: "العلامة التجارية",
-    unitPrice: "سعر الوحدة",
-    totalPurchase: "إجمالي المشتريات",
-    searchPlaceholder: "بحث",
-    search: "بحث",
-    moreFilters: "المزيد من الفلاتر",
-    download: "تحميل",
-    allStatuses: "كل الحالات",
-    active: "نشط",
-    pending: "قيد الانتظار",
-    draft: "مسودة",
-    allStock: "كل المخزون",
-    inStock: "متوفر",
-    outOfStock: "غير متوفر",
-    selectCategory: "اختر الفئة",
-    medicalWear: "ملابس طبية",
-    selectSubCategory: "اختر الفئة الفرعية",
-    scrubs: "سكراب",
-    allBrand: "كل العلامات",
-    landeu: "لاندو",
-    allSellers: "كل البائعين",
-    reset: "إعادة تعيين",
-    showData: "عرض البيانات",
-    unknown: "غير معروف",
-    delete: "حذف",
-    edit: "تعديل",
-    quickFilters: "الفلاتر السريعة",
-    addFilter: "إضافة فلتر",
-    hideFilters: "إخفاء الفلاتر",
-    showFilters: "عرض الفلاتر",
-    filters: "فلاتر",
-    create: "انشاء",
-  },
-};
+import { ProductTag } from "@/types/product";
+import { MultiCategory } from "@/types";
+import { getCategories } from "@/services/categoryService";
+import { ProductTags } from "@/constants/productTags";
+import ConfirmDialog from "./components/ConfirmDialog";
+import Link from "next/link";
+import toast from "react-hot-toast";
 
 export default function TagsListPanel() {
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
   const locale = useAppLocale();
-  const t = translations[locale];
+  const t = useTranslations("admin.productTagsPage");
   const isRTL = locale === "ar";
-  const ITEMS_PER_PAGE = 6;
-  const router = useRouter();
-  const toggle = () => setIsOpen((prev) => !prev);
 
-  const getColumns = (locale: LanguageType) => [
-    {
-      key: "id",
-      header: translations[locale].id,
-      sortable: true,
-      render: (item: ProductTag) => (
-        <span className="font-mono text-sm">#{item.id}</span>
-      ),
+  const [categories, setCategories] = useState<MultiCategory[]>([]);
+  const [tags, setTags] = useState<ProductTag[]>(ProductTags);
+  const [deletingTag, setDeletingTag] = useState<ProductTag | null>(null);
+
+  useEffect(() => {
+    getCategories().then(setCategories).catch(console.error);
+  }, []);
+
+  const getCategoryName = useCallback(
+    (tag: ProductTag) => {
+      if (categories.length === 0) return "—";
+      const idx = tags.indexOf(tag) % categories.length;
+      return categories[idx]?.title[locale] ?? "—";
     },
-    {
-      key: "name",
-      header: translations[locale].name,
-      sortable: true,
-      render: (item: ProductTag) => (
+    [categories, tags, locale],
+  );
+
+  const handleDelete = useCallback(() => {
+    if (!deletingTag) return;
+    setTags((prev) => prev.filter((t) => t.id !== deletingTag.id));
+    toast.success(locale === "ar" ? "تم الحذف بنجاح" : "Tag deleted!");
+    setDeletingTag(null);
+  }, [deletingTag, locale]);
+
+  return (
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm">
+            <Tag size={24} className="text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-gray-900">
+              {t("title")}
+            </h1>
+            <p className="mt-0.5 text-sm text-gray-400">{t("description")}</p>
+          </div>
+        </div>
+
         <Link
-          className="font-medium text-primary hover:underline"
-          href={`/admin/products-tags/edit/${item.id}`}
+          href="/admin/products-tags/create"
+          className="flex items-center gap-2 self-start rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:shadow-md sm:self-auto"
         >
-          {item.name[locale]}
+          <Plus size={16} />
+          {t("addTag")}
         </Link>
-      ),
-    },
-    {
-      key: "createdAt",
-      header: translations[locale].createdAt,
-      sortable: true,
-      render: (item: ProductTag) => {
-        const date = new Date(item.createdAt);
-        return (
-          <span className="text-sm text-gray-600">
-            {date.toLocaleDateString(locale === "en" ? "en-US" : "ar-EG")}
-          </span>
-        );
-      },
-    },
-    {
-      key: "status",
-      header: translations[locale].status,
-      render: (item: ProductTag) => {
-        const statusColor =
-          item.status?.en === "published"
-            ? "bg-green-100 text-green-800"
-            : "bg-gray-100 text-gray-600";
+      </div>
 
-        const statusText =
-          item.status?.[locale] || translations[locale].unknown;
-        const displayStatus =
-          statusText.charAt(0).toUpperCase() + statusText.slice(1);
+      {/* Table */}
+      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/80">
+                <th className="px-5 py-3.5 text-start text-xs font-bold uppercase tracking-wider text-gray-500">
+                  {t("tagName")}
+                </th>
+                <th className="hidden px-5 py-3.5 text-start text-xs font-bold uppercase tracking-wider text-gray-500 md:table-cell">
+                  {t("category")}
+                </th>
+                <th className="hidden px-5 py-3.5 text-start text-xs font-bold uppercase tracking-wider text-gray-500 lg:table-cell">
+                  {t("createdAt")}
+                </th>
+                <th className="px-5 py-3.5 text-end text-xs font-bold uppercase tracking-wider text-gray-500">
+                  {t("actions")}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {tags.map((tag) => (
+                <TagRow
+                  key={tag.id}
+                  tag={tag}
+                  locale={locale}
+                  categoryName={getCategoryName(tag)}
+                  onDelete={() => setDeletingTag(tag)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-        return (
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${statusColor}`}
-          >
-            {displayStatus}
-          </span>
-        );
-      },
-      sortable: true,
-    },
-  ];
+      <ConfirmDialog
+        open={!!deletingTag}
+        onConfirm={handleDelete}
+        onCancel={() => setDeletingTag(null)}
+      />
+    </div>
+  );
+}
 
-  const predefinedFilters: DynamicFilterItem[] = [
-    {
-      id: "status",
-      label: { en: "Status", ar: "الحالة" },
-      type: "dropdown",
-      options: [
-        { id: "published", name: { en: "Active", ar: "نشر" } },
-        { id: "draft", name: { en: "Draft", ar: "مسودة" } },
-      ],
-      visible: true,
-    },
-    {
-      id: "dateRange",
-      label: { en: "Date Range", ar: "نطاق التاريخ" },
-      type: "date-range",
-      visible: true,
-    },
-  ];
-
-  // Count tags by status for the summary cards
-  const statusCounts = ProductTags.reduce(
-    (acc: Record<Status, number>, tag) => {
-      if (tag.status?.en === "published" || tag.status?.en === "draft") {
-        const statusKey = tag.status.en as Status;
-        acc[statusKey] += 1;
-      }
-      return acc;
-    },
-    { active: 0, pending: 0, draft: 0 },
+/* ── Table Row ──────────────────────────────────────────── */
+function TagRow({
+  tag,
+  locale,
+  categoryName,
+  onDelete,
+}: {
+  tag: ProductTag;
+  locale: "en" | "ar";
+  categoryName: string;
+  onDelete: () => void;
+}) {
+  const formattedDate = new Date(tag.createdAt).toLocaleDateString(
+    locale === "en" ? "en-US" : "ar-EG",
+    { year: "numeric", month: "short", day: "numeric" },
   );
 
   return (
-    <div className="relative space-y-6 p-4" dir={isRTL ? "rtl" : "ltr"}>
-      <div>
-        <h2 className="mb-1 text-2xl font-bold">{t.title}</h2>
-        <p className="max-w-lg text-sm text-gray-600">{t.description}</p>
-      </div>
-      <DynamicFilter
-        isOpen={isOpen}
-        onToggle={() => setIsOpen(false)}
-        drawerFilters={productFilters}
-        showViewToggle={false}
-        statusCounts={statusCounts}
-        filtersOpen={filtersOpen}
-        setFiltersOpen={setFiltersOpen}
-        filters={predefinedFilters}
-        quickFiltersGridCols="grid-cols-1 md:grid-cols-2 "
-      />
-
-      {/* Tags Table */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+    <tr className="group transition-colors hover:bg-gray-50/60">
+      <td className="px-5 py-3.5">
+        <div>
+          <span className="font-semibold text-gray-900">
+            {tag.name[locale]}
+          </span>
+          <p
+            className="mt-0.5 text-xs text-gray-400"
+            dir={locale === "en" ? "rtl" : "ltr"}
+          >
+            {locale === "en" ? tag.name.ar : tag.name.en}
+          </p>
+        </div>
+      </td>
+      <td className="hidden px-5 py-3.5 md:table-cell">
+        <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+          {categoryName}
+        </span>
+      </td>
+      <td className="hidden px-5 py-3.5 lg:table-cell">
+        <span className="text-xs text-gray-500">{formattedDate}</span>
+      </td>
+      <td className="px-5 py-3.5">
+        <div className="flex items-center justify-end gap-1">
+          <Link
+            href={`/admin/products-tags/edit/${tag.id}`}
+            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-blue-50 hover:text-blue-600"
+            aria-label="Edit"
+          >
+            <PencilIcon size={14} />
+          </Link>
           <button
             type="button"
-            onClick={toggle}
-            className="rounded-md border border-gray-200 px-3 py-2 text-sm shadow-sm"
+            onClick={onDelete}
+            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-600"
+            aria-label="Delete"
           >
-            {t.filters}
+            <TrashIcon size={14} />
           </button>
-          <SearchInput />
-          <Link
-            href={`/admin/products-tags/create`}
-            className="flex items-center justify-center gap-1 rounded-md border border-gray-200 bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm sm:ml-auto"
-          >
-            <Plus size={15} /> {t.create}
-          </Link>
         </div>
-        <DynamicTable
-          data={ProductTags}
-          columns={getColumns(locale)}
-          pagination={true}
-          itemsPerPage={ITEMS_PER_PAGE}
-          selectable={true}
-          defaultSort={{ key: "name", direction: "asc" }}
-          solidActions={[
-            {
-              label: "Edit",
-              onClick: (item) =>
-                router.push(`/admin/products-tags/edit/${item.id}`),
-              icon: <PencilIcon className="h-3 w-3" />,
-              color: "#2563eb",
-            },
-            {
-              label: "Delete",
-              onClick: () => console.log("Deleted"),
-              color: "#dc2626",
-              icon: <TrashIcon className="h-3 w-3" />,
-            },
-          ]}
-        />
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 }
