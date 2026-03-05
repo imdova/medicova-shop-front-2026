@@ -39,6 +39,8 @@ export async function apiClient<T = unknown>({
 
   const isFormData = body instanceof FormData;
 
+  console.log(`DEBUG: Making ${method} request to ${url} | Token present: ${!!token}`);
+
   const fetchOptions: RequestInit = {
     method,
     headers: {

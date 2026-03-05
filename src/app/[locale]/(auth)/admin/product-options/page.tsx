@@ -1,20 +1,58 @@
 "use client";
 import Link from "next/link";
-import { PencilIcon, Plus, TrashIcon, Box } from "lucide-react";
+import { PencilIcon, Plus, TrashIcon, Box, Loader2 } from "lucide-react";
 import DynamicTable from "@/components/features/tables/DTable";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { ProductOption } from "@/types/product";
-import { ProductOptions } from "@/constants/productOptions";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/shared/input";
+import { getVariants, deleteVariant } from "@/services/variantService";
+import { useSession } from "next-auth/react";
 
 export default function ProductOptionsListPanel() {
   const t = useTranslations("admin.productVariantsPage");
   const locale = useAppLocale();
   const router = useRouter();
+  const { data: session } = useSession();
+
+  const [variants, setVariants] = useState<ProductOption[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const fetchVariants = async () => {
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      const data = await getVariants(token);
+      setVariants(data);
+    } catch (error) {
+      console.error("Failed to fetch variants:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const token = (session as any)?.accessToken;
+    if (token) {
+      fetchVariants();
+    }
+  }, [session]);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm(t("confirmDelete"))) return;
+    try {
+      const token = (session as any)?.accessToken;
+      await deleteVariant(id, token);
+      setVariants((prev) => prev.filter((v) => v.id !== id));
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert("Failed to delete variant");
+    }
+  };
 
   const columns = useMemo(
     () => [
@@ -60,7 +98,8 @@ export default function ProductOptionsListPanel() {
               bg: "bg-amber-50",
             },
           };
-          const type = typeMap[item.option_type || "dropdown"];
+          const type =
+            typeMap[item.option_type || "dropdown"] || typeMap.dropdown;
           return (
             <span
               className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${type.bg} ${type.color}`}
@@ -75,14 +114,14 @@ export default function ProductOptionsListPanel() {
   );
 
   const filteredData = useMemo(() => {
-    if (!searchQuery.trim()) return ProductOptions;
+    if (!searchQuery.trim()) return variants;
     const q = searchQuery.toLowerCase();
-    return ProductOptions.filter(
+    return variants.filter(
       (opt) =>
         opt.name.en.toLowerCase().includes(q) ||
         opt.name.ar.toLowerCase().includes(q),
     );
-  }, [searchQuery]);
+  }, [searchQuery, variants]);
 
   return (
     <div className="animate-in fade-in space-y-5 duration-700">
@@ -116,34 +155,36 @@ export default function ProductOptionsListPanel() {
           </div>
         </div>
 
-        <div className="p-1">
-          <DynamicTable
-            data={filteredData}
-            columns={columns}
-            pagination={true}
-            itemsPerPage={10}
-            headerClassName="bg-gray-50/50 text-gray-400 text-[10px] font-black uppercase tracking-widest"
-            rowClassName="hover:bg-gray-50/50 transition-colors duration-200 border-b border-gray-50/30 last:border-0"
-            solidActions={[
-              {
-                label: t("actions"),
-                onClick: (item) =>
-                  router.push(`/admin/product-options/edit/${item.id}`),
-                icon: <PencilIcon className="h-3.5 w-3.5" />,
-                color: "#2563eb",
-              },
-              {
-                label: "Delete",
-                onClick: () => {
-                  if (confirm(t("confirmDelete"))) {
-                    console.log("Delete triggered");
-                  }
+        <div className="min-h-[400px] p-1">
+          {isLoading ? (
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="text-primary/40 h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <DynamicTable
+              data={filteredData}
+              columns={columns}
+              pagination={true}
+              itemsPerPage={10}
+              headerClassName="bg-gray-50/50 text-gray-400 text-[10px] font-black uppercase tracking-widest"
+              rowClassName="hover:bg-gray-50/50 transition-colors duration-200 border-b border-gray-50/30 last:border-0"
+              solidActions={[
+                {
+                  label: t("actions"),
+                  onClick: (item) =>
+                    router.push(`/admin/product-options/edit/${item.id}`),
+                  icon: <PencilIcon className="h-3.5 w-3.5" />,
+                  color: "#2563eb",
                 },
-                icon: <TrashIcon className="h-3.5 w-3.5" />,
-                color: "#dc2626",
-              },
-            ]}
-          />
+                {
+                  label: "Delete",
+                  onClick: (item) => handleDelete(item.id),
+                  icon: <TrashIcon className="h-3.5 w-3.5" />,
+                  color: "#dc2626",
+                },
+              ]}
+            />
+          )}
         </div>
       </div>
     </div>

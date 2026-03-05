@@ -4,7 +4,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { Save, X, Box } from "lucide-react";
+import { Save, X, Box, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
@@ -22,6 +22,9 @@ import {
   VariantTypeSelector,
   VariantValues,
 } from "../components/VariantFormElements";
+import { createVariant, VariantData } from "@/services/variantService";
+import { useSession } from "next-auth/react";
+import { useState } from "react";
 
 const variantSchema = z
   .object({
@@ -66,6 +69,8 @@ export default function CreateVariantPage() {
   const t = useTranslations("admin.productVariantsPage");
   const locale = useAppLocale();
   const router = useRouter();
+  const { data: session } = useSession();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const methods = useForm<VariantFormData>({
     resolver: zodResolver(variantSchema),
@@ -80,12 +85,32 @@ export default function CreateVariantPage() {
   const currentType = watch("type");
 
   const onSubmit = async (data: VariantFormData) => {
+    setIsSubmitting(true);
     try {
-      console.log("Submitting Variant:", data);
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const apiData: VariantData = {
+        nameEn: data.name.en,
+        nameAr: data.name.ar,
+        type: data.type as string,
+        optionsEn: data.values.map((v) => ({
+          optionName: v.label?.en || "",
+          price: parseFloat(v.price || "0"),
+          ...(data.type === "color" ? { color: v.color } : {}),
+        })) as any,
+        optionsAr: data.values.map((v) => ({
+          optionName: v.label?.ar || "",
+          price: parseFloat(v.price || "0"),
+          ...(data.type === "color" ? { color: v.color } : {}),
+        })) as any,
+      };
+
+      const token = (session as any)?.accessToken;
+      await createVariant(apiData, token);
       router.push("/admin/product-settings");
     } catch (error) {
       console.error("Submission failed", error);
+      alert("Failed to create variant");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -109,6 +134,7 @@ export default function CreateVariantPage() {
             variant="outline"
             size="sm"
             onClick={() => router.back()}
+            disabled={isSubmitting}
             className="h-9 rounded-lg border-gray-100 px-4 text-xs font-black hover:bg-gray-50"
           >
             <X size={14} className="mr-1.5" /> {t("cancel")}
@@ -116,10 +142,15 @@ export default function CreateVariantPage() {
           <Button
             size="sm"
             onClick={handleSubmit(onSubmit)}
-            disabled={!currentType}
+            disabled={!currentType || isSubmitting}
             className="shadow-primary/20 h-9 rounded-lg bg-primary px-6 text-xs font-black shadow-lg transition-all hover:scale-[1.02] disabled:opacity-50 disabled:grayscale"
           >
-            <Save size={14} className="mr-1.5" /> {t("save")}
+            {isSubmitting ? (
+              <Loader2 size={14} className="mr-1.5 animate-spin" />
+            ) : (
+              <Save size={14} className="mr-1.5" />
+            )}
+            {t("save")}
           </Button>
         </div>
       </div>
