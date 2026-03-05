@@ -24,12 +24,9 @@ export default function TagsTable({
   const isRTL = locale === "ar";
 
   const getCategoryName = (tag: ProductTag) => {
-    // In a real app, tags would reference a category. For now show first match or "—"
-    const cat = categories.find((c) =>
-      tag.name.en
-        .toLowerCase()
-        .includes(c.title.en.toLowerCase().split(" ")[0]?.toLowerCase() ?? ""),
-    );
+    const catId = tag.categoryId;
+    if (!catId) return "—";
+    const cat = categories.find((c) => c.id === catId);
     return cat?.title[locale] ?? "—";
   };
 
@@ -47,9 +44,6 @@ export default function TagsTable({
               </th>
               <th className="hidden px-4 py-3 text-start text-xs font-bold uppercase tracking-wider text-gray-500 md:table-cell">
                 {t("category")}
-              </th>
-              <th className="hidden px-4 py-3 text-start text-xs font-bold uppercase tracking-wider text-gray-500 lg:table-cell">
-                {t("createdAt")}
               </th>
               <th className="px-4 py-3 text-end text-xs font-bold uppercase tracking-wider text-gray-500">
                 {t("actions")}
@@ -88,12 +82,6 @@ function TagRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const date = new Date(tag.createdAt);
-  const formattedDate = date.toLocaleDateString(
-    locale === "en" ? "en-US" : "ar-EG",
-    { year: "numeric", month: "short", day: "numeric" },
-  );
-
   return (
     <tr className="group transition-colors hover:bg-gray-50/60">
       {/* Tag Name */}
@@ -129,13 +117,7 @@ function TagRow({
         </span>
       </td>
 
-      {/* Date */}
-      <td className="hidden px-4 py-3 lg:table-cell">
-        <span className="text-xs text-gray-500">{formattedDate}</span>
-      </td>
-
-      {/* Actions */}
-      <td className="px-4 py-3">
+      <td className="px-4 py-3 text-end">
         <div className="flex items-center justify-end gap-1">
           <button
             type="button"

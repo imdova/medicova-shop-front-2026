@@ -53,12 +53,20 @@ export const TableActions = <T extends object>({
                 <button
                   onClick={() => action.onClick(item, index)}
                   style={{ color: action.color }}
-                  className="inline-flex items-center justify-center rounded-md border border-gray-200 p-2 text-gray-500 shadow-sm hover:bg-gray-100 focus:outline-none"
+                  className={`inline-flex items-center justify-center rounded-lg p-2 transition-all focus:outline-none ${
+                    action.color === "#dc2626" ||
+                    action.color === "red" ||
+                    (action.className && action.className.includes("rose"))
+                      ? "hover:bg-red-50"
+                      : "hover:bg-blue-50"
+                  } ${action.className || ""}`}
                   aria-label={
                     typeof action.label === "string" ? action.label : undefined
                   }
                 >
-                  {action.icon}
+                  {React.cloneElement(action.icon as any, {
+                    size: 14,
+                  })}
                 </button>
               </TooltipTrigger>
               <TooltipContent>

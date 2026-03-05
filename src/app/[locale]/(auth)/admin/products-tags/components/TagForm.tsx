@@ -1,208 +1,224 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { X, Save, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useState } from "react";
+import { Save, X, Tag } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { slugify } from "@/services/categoryService";
+import { Button } from "@/components/shared/button";
+import { Input } from "@/components/shared/input";
+import { Card } from "@/components/shared/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/shared/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shared/select";
+import { useAppLocale } from "@/hooks/useAppLocale";
+import { useRouter } from "next/navigation";
+import { TagData } from "@/services/tagService";
+import { MultiCategory } from "@/types";
 
-export interface TagFormData {
-  titleEn: string;
-  titleAr: string;
-  slugEn: string;
-  slugAr: string;
-}
+const tagSchema = z.object({
+  nameEn: z.string().min(1, "English name is required"),
+  nameAr: z.string().min(1, "Arabic name is required"),
+  slugEn: z.string().min(1, "English slug is required"),
+  slugAr: z.string().min(1, "Arabic slug is required"),
+  categoryId: z.string().min(1, "Category is required"),
+});
 
 interface TagFormProps {
-  initialData?: TagFormData;
-  isEditing: boolean;
-  onSubmit: (data: TagFormData) => void;
-  onCancel: () => void;
+  initialData?: Partial<TagData>;
+  categories: MultiCategory[];
+  onSubmit: (data: TagData) => Promise<void>;
+  isSubmitting?: boolean;
 }
 
 export default function TagForm({
   initialData,
-  isEditing,
+  categories,
   onSubmit,
-  onCancel,
+  isSubmitting,
 }: TagFormProps) {
   const t = useTranslations("admin.productTagsPage");
-  const [saving, setSaving] = useState(false);
+  const locale = useAppLocale();
+  const router = useRouter();
 
-  const [form, setForm] = useState<TagFormData>({
-    titleEn: initialData?.titleEn ?? "",
-    titleAr: initialData?.titleAr ?? "",
-    slugEn: initialData?.slugEn ?? "",
-    slugAr: initialData?.slugAr ?? "",
+  const form = useForm<TagData>({
+    resolver: zodResolver(tagSchema),
+    defaultValues: {
+      nameEn: initialData?.nameEn || "",
+      nameAr: initialData?.nameAr || "",
+      slugEn: initialData?.slugEn || "",
+      slugAr: initialData?.slugAr || "",
+      categoryId: initialData?.categoryId || "",
+    },
   });
 
-  // Reset form when initialData changes (switching to edit mode)
-  useEffect(() => {
-    if (initialData) {
-      setForm(initialData);
-    } else {
-      setForm({ titleEn: "", titleAr: "", slugEn: "", slugAr: "" });
-    }
-  }, [initialData]);
-
-  // Auto-generate slugs from titles
-  const handleTitleChange = useCallback(
-    (field: "titleEn" | "titleAr", value: string) => {
-      const slugField = field === "titleEn" ? "slugEn" : "slugAr";
-      setForm((prev) => ({
-        ...prev,
-        [field]: value,
-        [slugField]: slugify(value),
-      }));
-    },
-    [],
-  );
-
-  const handleFieldChange = useCallback(
-    (field: keyof TagFormData, value: string) => {
-      setForm((prev) => ({ ...prev, [field]: value }));
-    },
-    [],
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.titleEn.trim() || !form.titleAr.trim()) return;
-    setSaving(true);
-    try {
-      onSubmit(form);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="border-primary/20 from-primary/[0.03] rounded-2xl border bg-gradient-to-br to-transparent p-5"
-      aria-label={isEditing ? t("editTag") : t("addTag")}
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-gray-900">
-          {isEditing ? t("editTag") : t("addTag")}
-        </h3>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-          aria-label={t("cancelForm")}
-        >
-          <X size={16} />
-        </button>
+    <div className="mx-auto max-w-4xl space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-2xl">
+            <Tag size={24} className="text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-gray-900">
+              {initialData?.nameEn ? t("editTag") : t("addTag")}
+            </h1>
+            <p className="mt-0.5 text-sm text-gray-400">{t("description")}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            className="h-10 rounded-xl"
+          >
+            <X size={16} className="mr-2" />
+            {t("cancelForm")}
+          </Button>
+          <Button
+            type="button"
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={isSubmitting}
+            className="shadow-primary/20 h-10 rounded-xl bg-primary px-6 shadow-lg"
+          >
+            <Save size={16} className="mr-2" />
+            {initialData?.nameEn ? t("updateTag") : t("saveTag")}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* Title EN */}
-        <InputField
-          id="tag-title-en"
-          label={t("titleEn")}
-          value={form.titleEn}
-          placeholder={t("titleEnPlaceholder")}
-          onChange={(v) => handleTitleChange("titleEn", v)}
-          required
-        />
-        {/* Title AR */}
-        <InputField
-          id="tag-title-ar"
-          label={t("titleAr")}
-          value={form.titleAr}
-          placeholder={t("titleArPlaceholder")}
-          onChange={(v) => handleTitleChange("titleAr", v)}
-          dir="rtl"
-          required
-        />
-        {/* Slug EN */}
-        <InputField
-          id="tag-slug-en"
-          label={t("slugEn")}
-          value={form.slugEn}
-          placeholder={t("slugEnPlaceholder")}
-          onChange={(v) => handleFieldChange("slugEn", v)}
-          mono
-        />
-        {/* Slug AR */}
-        <InputField
-          id="tag-slug-ar"
-          label={t("slugAr")}
-          value={form.slugAr}
-          placeholder={t("slugArPlaceholder")}
-          onChange={(v) => handleFieldChange("slugAr", v)}
-          dir="rtl"
-          mono
-        />
-      </div>
+      <Form {...form}>
+        <form className="space-y-6">
+          <Card className="grid grid-cols-1 gap-6 p-6">
+            {/* Category Selection */}
+            <FormField
+              control={form.control}
+              name="categoryId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                    {t("category")}
+                  </FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="h-11 rounded-xl">
+                        <SelectValue placeholder={t("selectCategory")} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.title[locale]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-      {/* Actions */}
-      <div className="mt-5 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg px-4 py-2 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100"
-        >
-          {t("cancelForm")}
-        </button>
-        <button
-          type="submit"
-          disabled={saving || !form.titleEn.trim() || !form.titleAr.trim()}
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {saving ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Save size={14} />
-          )}
-          {isEditing ? t("updateTag") : t("saveTag")}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-/* ── Reusable Input ─────────────────────────────────────────── */
-function InputField({
-  id,
-  label,
-  value,
-  placeholder,
-  onChange,
-  dir,
-  mono,
-  required,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (v: string) => void;
-  dir?: "rtl" | "ltr";
-  mono?: boolean;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label
-        htmlFor={id}
-        className="mb-1.5 block text-xs font-semibold text-gray-600"
-      >
-        {label}
-        {required && <span className="ms-0.5 text-red-500">*</span>}
-      </label>
-      <input
-        id={id}
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        dir={dir}
-        required={required}
-        className={`focus:ring-primary/20 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm transition-all focus:border-primary focus:outline-none focus:ring-2 ${
-          mono ? "font-mono text-xs text-gray-500" : ""
-        }`}
-      />
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="nameEn"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      {t("titleEn")}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Electronics"
+                        {...field}
+                        className="h-11 rounded-xl"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nameAr"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      {t("titleAr")}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="إلكترونيات"
+                        dir="rtl"
+                        {...field}
+                        className="h-11 rounded-xl text-right"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="slugEn"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      {t("slugEn")}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="electronics"
+                        {...field}
+                        className="h-11 rounded-xl font-mono text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="slugAr"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      {t("slugAr")}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="إلكترونيات"
+                        dir="rtl"
+                        {...field}
+                        className="h-11 rounded-xl text-right font-mono text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </Card>
+        </form>
+      </Form>
     </div>
   );
 }

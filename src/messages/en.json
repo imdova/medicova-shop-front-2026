@@ -633,6 +633,8 @@
       "title": "Pricing & Inventory",
       "priceLabel": "Base Price ($)",
       "salePrice": "Sale Price ($)",
+      "selectColor": "Select Color",
+      "price": "Price",
       "saleStart": "Sale Start",
       "saleEnd": "Sale End",
       "stockQuantity": "Stock Quantity",
@@ -1003,6 +1005,29 @@
       "deleteConfirmMessage": "Are you sure you want to delete this tag? This action cannot be undone.",
       "tagsCount": "{count} tags",
       "slug": "Slug"
+    },
+    "productVariantsPage": {
+      "title": "Product Variants",
+      "subtitle": "Manage different variations of your products like size and color",
+      "createVariant": "Create Variant",
+      "editVariant": "Edit Variant",
+      "variantName": "Variant Name",
+      "date": "Date",
+      "actions": "Actions",
+      "variantType": "Variant Type",
+      "dropdown": "Dropdown",
+      "color": "Color",
+      "options": "Options",
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "addOption": "Add Option",
+      "optionEn": "Option (English)",
+      "optionAr": "Option (Arabic)",
+      "selectColor": "Select Color",
+      "price": "Price",
+      "save": "Save",
+      "cancel": "Cancel",
+      "confirmDelete": "Are you sure you want to delete this variant?"
     }
   },
   "search": {

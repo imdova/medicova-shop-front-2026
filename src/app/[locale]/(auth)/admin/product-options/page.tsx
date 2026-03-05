@@ -1,292 +1,150 @@
 "use client";
 import Link from "next/link";
-import { PencilIcon, Plus, TrashIcon } from "lucide-react";
+import { PencilIcon, Plus, TrashIcon, Box } from "lucide-react";
 import DynamicTable from "@/components/features/tables/DTable";
-import { useState } from "react";
-import { productFilters } from "@/constants/drawerFilter";
-import { LanguageType } from "@/util/translations";
-import DynamicFilter from "@/components/features/filter/DynamicFilter";
-import SearchInput from "@/components/forms/Forms/formFields/SearchInput";
-import { DynamicFilterItem } from "@/types/filters";
+import { useState, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { ProductOption } from "@/types/product";
 import { ProductOptions } from "@/constants/productOptions";
 import { useRouter } from "next/navigation";
-
-// Translation dictionary
-const translations = {
-  en: {
-    title: "Product Options",
-    description:
-      "Define the available choices for this product such as size, color, or material",
-    id: "ID",
-    name: "Name",
-    isRequired: "Is Required?",
-    createdAt: "Created At",
-    operations: "Operations",
-    productName: "Product Name",
-    date: "Date",
-    sku: "SKU",
-    seller: "Seller",
-    category: "Category",
-    subCategory: "Sub Category",
-    brand: "Brand",
-    unitPrice: "Unit Price",
-    totalPurchase: "Total Purchase",
-    searchPlaceholder: "Search",
-    search: "Search",
-    moreFilters: "More Filters",
-    download: "Download",
-    allStatuses: "All Statuses",
-    active: "Active",
-    pending: "Pending",
-    draft: "Draft",
-    allStock: "All Stock",
-    inStock: "In Stock",
-    outOfStock: "Out of Stock",
-    selectCategory: "Select Category",
-    medicalWear: "Medical Wear",
-    selectSubCategory: "Select Sub Category",
-    scrubs: "Scrubs",
-    allBrand: "All brand",
-    landeu: "Landeu",
-    allSellers: "All Sellers",
-    reset: "Reset",
-    showData: "Show Data",
-    unknown: "Unknown",
-    delete: "Delete",
-    edit: "Edit",
-    quickFilters: "Quick Filters",
-    addFilter: "Add Filter",
-    hideFilters: "Hide Filters",
-    showFilters: "Show Filters",
-    filters: "Filters",
-    create: "Create",
-    yes: "Yes",
-    no: "No",
-    required: "Required",
-    optional: "Optional",
-  },
-  ar: {
-    title: "خيارات المنتج",
-    description:
-      "قم بتحديد الخيارات المتاحة لهذا المنتج مثل الحجم أو اللون أو الخامة.",
-    id: "المعرف",
-    name: "الاسم",
-    isRequired: "مطلوب؟",
-    createdAt: "تاريخ الإنشاء",
-    operations: "العمليات",
-    productName: "اسم المنتج",
-    date: "التاريخ",
-    sku: "SKU",
-    seller: "البائع",
-    category: "الفئة",
-    subCategory: "الفئة الفرعية",
-    brand: "العلامة التجارية",
-    unitPrice: "سعر الوحدة",
-    totalPurchase: "إجمالي المشتريات",
-    searchPlaceholder: "بحث",
-    search: "بحث",
-    moreFilters: "المزيد من الفلاتر",
-    download: "تحميل",
-    allStatuses: "كل الحالات",
-    active: "نشط",
-    pending: "نشر",
-    draft: "مسودة",
-    allStock: "كل المخزون",
-    inStock: "متوفر",
-    outOfStock: "غير متوفر",
-    selectCategory: "اختر الفئة",
-    medicalWear: "ملابس طبية",
-    selectSubCategory: "اختر الفئة الفرعية",
-    scrubs: "سكراب",
-    allBrand: "كل العلامات",
-    landeu: "لاندو",
-    allSellers: "كل البائعين",
-    reset: "إعادة تعيين",
-    showData: "عرض البيانات",
-    unknown: "غير معروف",
-    delete: "حذف",
-    edit: "تعديل",
-    quickFilters: "الفلاتر السريعة",
-    addFilter: "إضافة فلتر",
-    hideFilters: "إخفاء الفلاتر",
-    showFilters: "عرض الفلاتر",
-    filters: "فلاتر",
-    create: "انشاء",
-    yes: "نعم",
-    no: "لا",
-    required: "مطلوب",
-    optional: "اختياري",
-  },
-};
-
-const getColumns = (locale: LanguageType) => [
-  {
-    key: "id",
-    header: translations[locale].id,
-    sortable: true,
-    render: (item: ProductOption) => (
-      <span className="font-mono text-sm">#{item.id}</span>
-    ),
-  },
-  {
-    key: "name",
-    header: translations[locale].name,
-    sortable: true,
-    render: (item: ProductOption) => (
-      <Link
-        className="font-medium text-primary hover:underline"
-        href={`/admin/product-options/edit/${item.id}`}
-      >
-        {item.name[locale]}
-      </Link>
-    ),
-  },
-  {
-    key: "isRequired",
-    header: translations[locale].isRequired,
-    sortable: true,
-    render: (item: ProductOption) => {
-      const isRequired = item.isRequired;
-      const bgColor = isRequired ? "bg-red-100" : "bg-green-100";
-      const textColor = isRequired ? "text-red-800" : "text-green-800";
-      const text = isRequired
-        ? translations[locale].yes
-        : translations[locale].no;
-      const badgeText = isRequired
-        ? translations[locale].required
-        : translations[locale].optional;
-
-      return (
-        <span
-          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${bgColor} ${textColor}`}
-        >
-          {text} ({badgeText})
-        </span>
-      );
-    },
-  },
-  {
-    key: "createdAt",
-    header: translations[locale].createdAt,
-    sortable: true,
-    render: (item: ProductOption) => {
-      const date = new Date(item.createdAt);
-      return (
-        <span className="text-sm text-gray-600">
-          {date.toLocaleDateString(locale === "en" ? "en-US" : "ar-EG", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          })}
-        </span>
-      );
-    },
-  },
-];
+import { Input } from "@/components/shared/input";
 
 export default function ProductOptionsListPanel() {
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
+  const t = useTranslations("admin.productVariantsPage");
   const locale = useAppLocale();
   const router = useRouter();
-  const t = translations[locale];
-  const isRTL = locale === "ar";
-  const ITEMS_PER_PAGE = 6;
-  const toggle = () => setIsOpen((prev) => !prev);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const predefinedFilters: DynamicFilterItem[] = [
-    {
-      id: "isRequired",
-      label: { en: "Required", ar: "مطلوب" },
-      type: "dropdown",
-      options: [
-        { id: "true", name: { en: "Required", ar: "مطلوب" } },
-        { id: "false", name: { en: "Optional", ar: "اختياري" } },
-      ],
-      visible: true,
-    },
-    {
-      id: "dateRange",
-      label: { en: "Date Range", ar: "نطاق التاريخ" },
-      type: "date-range",
-      visible: true,
-    },
-  ];
-
-  // Count options by required status for the summary cards
-  const requiredCounts = ProductOptions.reduce(
-    (acc: { required: number; optional: number }, option) => {
-      if (option.isRequired) {
-        acc.required += 1;
-      } else {
-        acc.optional += 1;
-      }
-      return acc;
-    },
-    { required: 0, optional: 0 },
+  const columns = useMemo(
+    () => [
+      {
+        key: "name",
+        header: t("variantName"),
+        sortable: true,
+        render: (item: ProductOption) => (
+          <div className="flex items-center gap-2.5">
+            <div className="bg-primary/5 border-primary/10 flex h-9 w-9 items-center justify-center rounded-lg border text-primary shadow-sm">
+              <Box size={16} />
+            </div>
+            <Link
+              className="text-sm font-black text-gray-900 transition-colors hover:text-primary"
+              href={`/admin/product-options/edit/${item.id}`}
+            >
+              {item.name[locale]}
+            </Link>
+          </div>
+        ),
+      },
+      {
+        key: "type",
+        header: t("variantType"),
+        render: (item: ProductOption) => {
+          const typeMap: Record<
+            string,
+            { label: string; color: string; bg: string }
+          > = {
+            dropdown: {
+              label: t("dropdown"),
+              color: "text-blue-600",
+              bg: "bg-blue-50",
+            },
+            color: {
+              label: t("color"),
+              color: "text-purple-600",
+              bg: "bg-purple-50",
+            },
+            options: {
+              label: t("options"),
+              color: "text-amber-600",
+              bg: "bg-amber-50",
+            },
+          };
+          const type = typeMap[item.option_type || "dropdown"];
+          return (
+            <span
+              className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${type.bg} ${type.color}`}
+            >
+              {type.label}
+            </span>
+          );
+        },
+      },
+    ],
+    [t, locale],
   );
 
-  return (
-    <div className="relative space-y-6 p-4" dir={isRTL ? "rtl" : "ltr"}>
-      <div>
-        <h2 className="mb-1 text-2xl font-bold">{t.title}</h2>
-        <p className="max-w-lg text-sm text-gray-600">{t.description}</p>
-      </div>
-      <DynamicFilter
-        isOpen={isOpen}
-        onToggle={() => setIsOpen(false)}
-        drawerFilters={productFilters}
-        showViewToggle={false}
-        statusCounts={requiredCounts}
-        filtersOpen={filtersOpen}
-        setFiltersOpen={setFiltersOpen}
-        filters={predefinedFilters}
-        quickFiltersGridCols="grid-cols-1 md:grid-cols-2  "
-      />
+  const filteredData = useMemo(() => {
+    if (!searchQuery.trim()) return ProductOptions;
+    const q = searchQuery.toLowerCase();
+    return ProductOptions.filter(
+      (opt) =>
+        opt.name.en.toLowerCase().includes(q) ||
+        opt.name.ar.toLowerCase().includes(q),
+    );
+  }, [searchQuery]);
 
-      {/* Product Options Table */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={toggle}
-            className="rounded-md border border-gray-200 px-3 py-2 text-sm shadow-sm"
-          >
-            {t.filters}
-          </button>
-          <SearchInput />
-          <Link
-            href={`/admin/product-options/create`}
-            className="flex items-center justify-center gap-1 rounded-md border border-gray-200 bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm sm:ml-auto"
-          >
-            <Plus size={15} /> {t.create}
-          </Link>
+  return (
+    <div className="animate-in fade-in space-y-5 duration-700">
+      {/* Header Section */}
+      <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-black tracking-tight text-gray-900">
+            {t("title")}
+          </h1>
+          <p className="text-xs font-medium text-gray-400">{t("subtitle")}</p>
         </div>
-        <DynamicTable
-          data={ProductOptions}
-          columns={getColumns(locale)}
-          pagination={true}
-          itemsPerPage={ITEMS_PER_PAGE}
-          selectable={true}
-          defaultSort={{ key: "name", direction: "asc" }}
-          solidActions={[
-            {
-              label: "Edit",
-              onClick: (item) =>
-                router.push(`/admin/product-options/edit/${item.id}`),
-              icon: <PencilIcon className="h-3 w-3" />,
-              color: "#2563eb",
-            },
-            {
-              label: "Delete",
-              onClick: () => console.log("Deleted"),
-              color: "#dc2626",
-              icon: <TrashIcon className="h-3 w-3" />,
-            },
-          ]}
-        />
+        <Link
+          href="/admin/product-options/create"
+          className="shadow-primary/20 flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-xs font-black text-white shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <Plus size={16} />
+          {t("createVariant")}
+        </Link>
+      </div>
+
+      {/* Content Card */}
+      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl shadow-gray-200/20">
+        <div className="border-b border-gray-50 p-4">
+          <div className="max-w-xs">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t("variantName")}
+              className="h-9 rounded-lg border-gray-100 bg-gray-50/50 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="p-1">
+          <DynamicTable
+            data={filteredData}
+            columns={columns}
+            pagination={true}
+            itemsPerPage={10}
+            headerClassName="bg-gray-50/50 text-gray-400 text-[10px] font-black uppercase tracking-widest"
+            rowClassName="hover:bg-gray-50/50 transition-colors duration-200 border-b border-gray-50/30 last:border-0"
+            solidActions={[
+              {
+                label: t("actions"),
+                onClick: (item) =>
+                  router.push(`/admin/product-options/edit/${item.id}`),
+                icon: <PencilIcon className="h-3.5 w-3.5" />,
+                color: "#2563eb",
+              },
+              {
+                label: "Delete",
+                onClick: () => {
+                  if (confirm(t("confirmDelete"))) {
+                    console.log("Delete triggered");
+                  }
+                },
+                icon: <TrashIcon className="h-3.5 w-3.5" />,
+                color: "#dc2626",
+              },
+            ]}
+          />
+        </div>
       </div>
     </div>
   );
