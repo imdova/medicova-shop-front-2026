@@ -23,36 +23,28 @@ export const DetailsStep = ({
 }: DetailsStepProps) => {
   const t = useTranslations("create_product.details");
 
+  const getHighlightsKey = (lang: "en" | "ar") =>
+    lang === "en" ? "highlightsEn" : "highlightsAr";
+
+  const getHighlights = (lang: "en" | "ar"): string[] =>
+    lang === "en" ? product.highlightsEn : product.highlightsAr;
+
   const addHighlight = (lang: "en" | "ar") => {
-    const currentHighlights = product.highlights?.[lang] || [];
-    onUpdate({
-      highlights: {
-        ...product.highlights,
-        [lang]: [...currentHighlights, ""],
-      },
-    });
+    const key = getHighlightsKey(lang);
+    onUpdate({ [key]: [...getHighlights(lang), ""] });
   };
 
   const updateHighlight = (lang: "en" | "ar", index: number, value: string) => {
-    const currentHighlights = [...(product.highlights?.[lang] || [])];
-    currentHighlights[index] = value;
-    onUpdate({
-      highlights: {
-        ...product.highlights,
-        [lang]: currentHighlights,
-      },
-    });
+    const key = getHighlightsKey(lang);
+    const current = [...getHighlights(lang)];
+    current[index] = value;
+    onUpdate({ [key]: current });
   };
 
   const removeHighlight = (lang: "en" | "ar", index: number) => {
-    const currentHighlights = (product.highlights?.[lang] || []).filter(
-      (_, i) => i !== index,
-    );
+    const key = getHighlightsKey(lang);
     onUpdate({
-      highlights: {
-        ...product.highlights,
-        [lang]: currentHighlights,
-      },
+      [key]: getHighlights(lang).filter((_: string, i: number) => i !== index),
     });
   };
 
@@ -106,14 +98,17 @@ export const DetailsStep = ({
                 {t("description")}
               </Label>
               <Textarea
-                value={product.description?.en || ""}
+                value={product.descriptions?.descriptionEn || ""}
                 onChange={(e) =>
                   onUpdate({
-                    description: { ...product.description, en: e.target.value },
+                    descriptions: {
+                      ...product.descriptions,
+                      descriptionEn: e.target.value,
+                    },
                   })
                 }
                 placeholder={t("descPlaceholder")}
-                className={`min-h-[160px] rounded-2xl border-2 border-gray-100/50 bg-white/50 p-6 font-bold shadow-sm transition-all focus:border-gray-900 focus:bg-white ${errors["description.en"] ? "border-red-500" : ""}`}
+                className={`min-h-[160px] rounded-2xl border-2 border-gray-100/50 bg-white/50 p-6 font-bold shadow-sm transition-all focus:border-gray-900 focus:bg-white ${errors["descriptions.descriptionEn"] ? "border-red-500" : ""}`}
               />
             </div>
           </div>
@@ -150,14 +145,17 @@ export const DetailsStep = ({
                 وصف المنتج
               </Label>
               <Textarea
-                value={product.description?.ar || ""}
+                value={product.descriptions?.descriptionAr || ""}
                 onChange={(e) =>
                   onUpdate({
-                    description: { ...product.description, ar: e.target.value },
+                    descriptions: {
+                      ...product.descriptions,
+                      descriptionAr: e.target.value,
+                    },
                   })
                 }
                 placeholder="أدخل وصفاً مفصلاً للمنتج..."
-                className={`min-h-[160px] rounded-2xl border-2 border-gray-100/50 bg-white/50 p-6 text-right font-bold shadow-sm transition-all focus:border-gray-900 focus:bg-white ${errors["description.ar"] ? "border-red-500" : ""}`}
+                className={`min-h-[160px] rounded-2xl border-2 border-gray-100/50 bg-white/50 p-6 text-right font-bold shadow-sm transition-all focus:border-gray-900 focus:bg-white ${errors["descriptions.descriptionAr"] ? "border-red-500" : ""}`}
               />
             </div>
           </div>
@@ -197,32 +195,34 @@ export const DetailsStep = ({
 
             <div className="space-y-4">
               <AnimatePresence>
-                {(product.highlights?.en || []).map((highlight, index) => (
-                  <motion.div
-                    key={`en-highlight-${index}`}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    className="group relative"
-                  >
-                    <Input
-                      value={highlight}
-                      onChange={(e) =>
-                        updateHighlight("en", index, e.target.value)
-                      }
-                      placeholder={t("highlightPlaceholder")}
-                      className="h-12 rounded-xl border-2 border-gray-100/50 bg-white/50 pl-4 pr-12 font-medium transition-all focus:border-gray-900"
-                    />
-                    <button
-                      onClick={() => removeHighlight("en", index)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 transition-colors hover:text-red-500"
+                {(product.highlightsEn || []).map(
+                  (highlight: string, index: number) => (
+                    <motion.div
+                      key={`en-highlight-${index}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="group relative"
                     >
-                      <X size={16} />
-                    </button>
-                  </motion.div>
-                ))}
+                      <Input
+                        value={highlight}
+                        onChange={(e) =>
+                          updateHighlight("en", index, e.target.value)
+                        }
+                        placeholder={t("highlightPlaceholder")}
+                        className="h-12 rounded-xl border-2 border-gray-100/50 bg-white/50 pl-4 pr-12 font-medium transition-all focus:border-gray-900"
+                      />
+                      <button
+                        onClick={() => removeHighlight("en", index)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 transition-colors hover:text-red-500"
+                      >
+                        <X size={16} />
+                      </button>
+                    </motion.div>
+                  ),
+                )}
               </AnimatePresence>
-              {(product.highlights?.en?.length || 0) === 0 && (
+              {(product.highlightsEn?.length || 0) === 0 && (
                 <p className="py-8 text-center text-xs font-black uppercase tracking-widest text-gray-300">
                   No highlights added yet
                 </p>
@@ -249,32 +249,34 @@ export const DetailsStep = ({
 
             <div className="space-y-4">
               <AnimatePresence>
-                {(product.highlights?.ar || []).map((highlight, index) => (
-                  <motion.div
-                    key={`ar-highlight-${index}`}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="group relative"
-                  >
-                    <Input
-                      value={highlight}
-                      onChange={(e) =>
-                        updateHighlight("ar", index, e.target.value)
-                      }
-                      placeholder={t("highlightPlaceholder")}
-                      className="h-12 rounded-xl border-2 border-gray-100/50 bg-white/50 pl-12 pr-4 text-right font-medium transition-all focus:border-gray-900"
-                    />
-                    <button
-                      onClick={() => removeHighlight("ar", index)}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 transition-colors hover:text-red-500"
+                {(product.highlightsAr || []).map(
+                  (highlight: string, index: number) => (
+                    <motion.div
+                      key={`ar-highlight-${index}`}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      className="group relative"
                     >
-                      <X size={16} />
-                    </button>
-                  </motion.div>
-                ))}
+                      <Input
+                        value={highlight}
+                        onChange={(e) =>
+                          updateHighlight("ar", index, e.target.value)
+                        }
+                        placeholder={t("highlightPlaceholder")}
+                        className="h-12 rounded-xl border-2 border-gray-100/50 bg-white/50 pl-12 pr-4 text-right font-medium transition-all focus:border-gray-900"
+                      />
+                      <button
+                        onClick={() => removeHighlight("ar", index)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 transition-colors hover:text-red-500"
+                      >
+                        <X size={16} />
+                      </button>
+                    </motion.div>
+                  ),
+                )}
               </AnimatePresence>
-              {(product.highlights?.ar?.length || 0) === 0 && (
+              {(product.highlightsAr?.length || 0) === 0 && (
                 <p className="font-arabic py-8 text-center text-xs font-black uppercase tracking-widest text-gray-300">
                   لا توجد نقاط بارزة مضافة
                 </p>
@@ -307,10 +309,8 @@ export const DetailsStep = ({
             </Label>
             <div className="relative">
               <Input
-                value={product.deliveryTime || ""}
-                onChange={(e) => onUpdate({ deliveryTime: e.target.value })}
                 placeholder="مثال: 3-5 أيام عمل | e.g. 3-5 days"
-                className={`h-14 rounded-2xl border-2 border-gray-100/50 bg-white/50 px-6 font-bold shadow-sm transition-all focus:border-gray-900 focus:bg-white ${errors.deliveryTime ? "border-red-500" : ""}`}
+                className="h-14 rounded-2xl border-2 border-gray-100/50 bg-white/50 px-6 font-bold shadow-sm transition-all focus:border-gray-900 focus:bg-white"
               />
               <div className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 text-gray-300">
                 <Globe size={18} />

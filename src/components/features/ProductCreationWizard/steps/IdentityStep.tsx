@@ -29,10 +29,10 @@ export const IdentityStep = ({
       .toString(36)
       .substring(2, 11)
       .toUpperCase();
-    onUpdate({ sku: `PX-${randomPart}` });
+    onUpdate({ identity: { ...product.identity, sku: `PX-${randomPart}` } });
     setSkuGenerated(true);
     setTimeout(() => setSkuGenerated(false), 2000);
-  }, [onUpdate]);
+  }, [onUpdate, product.identity]);
 
   const updateSlug = (lang: "en" | "ar", value: string) => {
     // Basic slugification
@@ -53,12 +53,11 @@ export const IdentityStep = ({
         .replace(/^-+|-+$/g, "");
     }
 
-    onUpdate({
-      slug: {
-        ...product.slug,
-        [lang]: slugified,
-      },
-    });
+    if (lang === "en") {
+      onUpdate({ slugEn: slugified });
+    } else {
+      onUpdate({ slugAr: slugified });
+    }
   };
 
   return (
@@ -98,10 +97,14 @@ export const IdentityStep = ({
 
               <div className="relative">
                 <Input
-                  value={product.sku || ""}
-                  onChange={(e) => onUpdate({ sku: e.target.value })}
+                  value={product.identity.sku || ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      identity: { ...product.identity, sku: e.target.value },
+                    })
+                  }
                   placeholder={t("skuPlaceholder")}
-                  className={`h-16 rounded-2xl border-2 border-gray-100/60 bg-white/50 px-6 text-lg font-black tracking-wider shadow-sm transition-all focus:border-gray-900 focus:bg-white focus:ring-4 focus:ring-gray-900/5 ${errors.sku ? "border-red-500 ring-red-500/5" : ""}`}
+                  className={`h-16 rounded-2xl border-2 border-gray-100/60 bg-white/50 px-6 text-lg font-black tracking-wider shadow-sm transition-all focus:border-gray-900 focus:bg-white focus:ring-4 focus:ring-gray-900/5 ${errors["identity.sku"] ? "border-red-500 ring-red-500/5" : ""}`}
                 />
                 <button
                   onClick={generateSku}
@@ -115,9 +118,9 @@ export const IdentityStep = ({
                 </button>
               </div>
 
-              {errors.sku && (
+              {errors["identity.sku"] && (
                 <p className="text-[10px] font-black uppercase tracking-widest text-red-500">
-                  {errors.sku}
+                  {errors["identity.sku"]}
                 </p>
               )}
 
@@ -158,10 +161,10 @@ export const IdentityStep = ({
                   </span>
                 </div>
                 <Input
-                  value={product.slug?.en || ""}
+                  value={product.slugEn || ""}
                   onChange={(e) => updateSlug("en", e.target.value)}
                   placeholder="awesome-product-name"
-                  className={`h-14 rounded-2xl border-2 border-gray-100/60 bg-white/50 px-6 font-bold transition-all focus:border-gray-900 focus:bg-white ${errors["slug.en"] ? "border-red-500 shadow-red-500/5" : ""}`}
+                  className={`h-14 rounded-2xl border-2 border-gray-100/60 bg-white/50 px-6 font-bold transition-all focus:border-gray-900 focus:bg-white ${errors.slugEn ? "border-red-500 shadow-red-500/5" : ""}`}
                 />
               </div>
 
@@ -176,10 +179,10 @@ export const IdentityStep = ({
                   </span>
                 </div>
                 <Input
-                  value={product.slug?.ar || ""}
+                  value={product.slugAr || ""}
                   onChange={(e) => updateSlug("ar", e.target.value)}
                   placeholder="اسم-المنتج-المميز"
-                  className={`h-14 rounded-2xl border-2 border-gray-100/60 bg-white/50 px-6 text-right font-bold transition-all focus:border-gray-900 focus:bg-white ${errors["slug.ar"] ? "border-red-500" : ""}`}
+                  className={`h-14 rounded-2xl border-2 border-gray-100/60 bg-white/50 px-6 text-right font-bold transition-all focus:border-gray-900 focus:bg-white ${errors.slugAr ? "border-red-500" : ""}`}
                 />
               </div>
             </div>

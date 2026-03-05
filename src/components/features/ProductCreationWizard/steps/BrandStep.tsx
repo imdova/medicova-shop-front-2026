@@ -20,7 +20,7 @@ interface BrandStepProps {
 export const BrandStep = ({ product, onUpdate, locale }: BrandStepProps) => {
   const t = useTranslations("create_product.brand");
   const [searchTerm, setSearchTerm] = useState("");
-  const selectedBrand = product.brand;
+  const selectedBrandId = product.classification.brand;
 
   const displayedBrands = (brands as unknown as Brand[]).filter((brand) =>
     brand.name[locale as "en" | "ar"]
@@ -69,9 +69,16 @@ export const BrandStep = ({ product, onUpdate, locale }: BrandStepProps) => {
                 exit={{ opacity: 0, scale: 0.9 }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onUpdate({ brand })}
+                onClick={() =>
+                  onUpdate({
+                    classification: {
+                      ...product.classification,
+                      brand: brand.id,
+                    },
+                  })
+                }
                 className={`relative flex flex-col items-center gap-4 rounded-[2rem] border-2 p-6 transition-all ${
-                  selectedBrand?.id === brand.id
+                  selectedBrandId === brand.id
                     ? "border-gray-900 bg-white shadow-2xl shadow-gray-200"
                     : "border-transparent bg-white/40 shadow-sm backdrop-blur-sm hover:border-gray-200"
                 }`}
@@ -93,7 +100,7 @@ export const BrandStep = ({ product, onUpdate, locale }: BrandStepProps) => {
 
                 <span
                   className={`text-center text-sm font-black ${
-                    selectedBrand?.id === brand.id
+                    selectedBrandId === brand.id
                       ? "text-gray-900"
                       : "text-gray-500"
                   }`}
@@ -101,7 +108,7 @@ export const BrandStep = ({ product, onUpdate, locale }: BrandStepProps) => {
                   {brand.name[locale as "en" | "ar"]}
                 </span>
 
-                {selectedBrand?.id === brand.id && (
+                {selectedBrandId === brand.id && (
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}

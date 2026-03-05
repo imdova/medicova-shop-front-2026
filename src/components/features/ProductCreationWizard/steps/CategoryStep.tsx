@@ -38,9 +38,13 @@ export const CategoryStep = ({
   const [loading, setLoading] = useState(true);
   const [isAtBrandLevel, setIsAtBrandLevel] = useState(false);
 
+  // Local state to hold full objects for display (SelectionFeedback, grid highlight, etc.)
+  const [selectedCategory, setSelectedCategory] = useState<
+    MultiCategory | undefined
+  >();
+  const [selectedBrand, setSelectedBrand] = useState<Brand | undefined>();
+
   const isArabic = locale === "ar";
-  const selectedCategory = product.category;
-  const selectedBrand = product.brand;
 
   const fetchLevel = useCallback(async (level: number, parentId?: string) => {
     setLoading(true);
@@ -92,25 +96,70 @@ export const CategoryStep = ({
   const handleSelect = async (item: MultiCategory | Brand) => {
     setSearchTerm("");
     if ("title" in item) {
+      // It's a category
       const newHistory = [...history, item];
       setHistory(newHistory);
-      onUpdate({ category: item });
+      setSelectedCategory(item);
+
+      // Store string IDs in the form based on depth
+      const classificationUpdate = { ...product.classification };
+      if (newHistory.length === 1) {
+        classificationUpdate.category = item.id;
+        classificationUpdate.subcategory = "";
+        classificationUpdate.childCategory = "";
+      } else if (newHistory.length === 2) {
+        classificationUpdate.subcategory = item.id;
+        classificationUpdate.childCategory = "";
+      } else if (newHistory.length === 3) {
+        classificationUpdate.childCategory = item.id;
+      }
+      onUpdate({ classification: classificationUpdate });
+
       await fetchLevel(newHistory.length, item.id);
     } else {
-      onUpdate({ brand: item });
+      // It's a brand
+      setSelectedBrand(item);
+      onUpdate({
+        classification: {
+          ...product.classification,
+          brand: item.id,
+        },
+      });
     }
   };
 
   const handleNavigateIdx = (idx: number, cat: MultiCategory) => {
     const newHistory = history.slice(0, idx + 1);
     setHistory(newHistory);
-    onUpdate({ category: cat, brand: undefined });
+    setSelectedCategory(cat);
+    setSelectedBrand(undefined);
+
+    // Reset classification IDs for levels deeper than the navigated index
+    const classificationUpdate = { ...product.classification, brand: "" };
+    if (idx < 1) {
+      classificationUpdate.subcategory = "";
+      classificationUpdate.childCategory = "";
+    } else if (idx < 2) {
+      classificationUpdate.childCategory = "";
+    }
+    onUpdate({ classification: classificationUpdate });
+
     fetchLevel(idx + 1, cat.id);
   };
 
   const handleReset = () => {
     setHistory([]);
-    onUpdate({ category: undefined, brand: undefined });
+    setSelectedCategory(undefined);
+    setSelectedBrand(undefined);
+    onUpdate({
+      classification: {
+        ...product.classification,
+        category: "",
+        subcategory: "",
+        childCategory: "",
+        brand: "",
+      },
+    });
     fetchLevel(0);
   };
 
@@ -157,6 +206,6 @@ export const CategoryStep = ({
         selectedBrand={selectedBrand}
         locale={locale}
       />
-    </motion.div>  
+    </motion.div>
   );
 };
