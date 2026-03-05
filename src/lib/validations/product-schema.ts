@@ -8,203 +8,145 @@ export const localizedTextSchema = z.object({
 
 // Bilingual specification schema
 export const bilingualSpecificationSchema = z.object({
-  key: z.object({
-    en: z.string().min(1, "English key is required"),
-    ar: z.string().min(1, "Arabic key is required"),
-  }),
-  value: z.object({
-    en: z.string().min(1, "English value is required"),
-    ar: z.string().min(1, "Arabic value is required"),
-  }),
+  keyEn: z.string().optional(),
+  keyAr: z.string().optional(),
+  valueEn: z.string().optional(),
+  valueAr: z.string().optional(),
 });
 
 // Base product schema with all optional fields for form state
 export const productSchema = z.object({
-  // Category & Brand
-  category: z
-    .object({
-      id: z.string(),
-      title: localizedTextSchema,
-      slug: z.string().optional(),
-    })
-    .optional(),
-
-  brand: z
-    .object({
-      id: z.string(),
-      name: localizedTextSchema,
-    })
-    .optional(),
-
+  // Highlights (Array of strings now)
+  highlightsEn: z.array(z.string()).default([]),
+  highlightsAr: z.array(z.string()).default([]),
+  
+  // Titles & Slugs
+  title: localizedTextSchema,
+  slugEn: z.string().optional(),
+  slugAr: z.string().optional(),
+  
   // Identity
-  sku: z.string().optional(),
-  slug: z
-    .object({
-      en: z.string().optional(),
-      ar: z.string().optional(),
-    })
-    .optional(),
-  productType: z.enum(["physical", "digital"]).default("physical"),
+  identity: z.object({
+    sku: z.string().optional(),
+    skuMode: z.enum(["manual", "auto"]).default("manual"),
+  }).default({ sku: "", skuMode: "manual" }),
+
+  // Classification
+  classification: z.object({
+    category: z.string().optional(),
+    subcategory: z.string().optional(),
+    childCategory: z.string().optional(),
+    brand: z.string().optional(),
+    productType: z.enum(["Physical Product", "Digital Product"]).default("Physical Product"),
+  }).default({ productType: "Physical Product" }),
+
+  // Descriptions
+  descriptions: z.object({
+    descriptionEn: z.string().min(1, "Description is required"),
+    descriptionAr: z.string().min(1, "الوصف مطلوب"),
+  }).default({ descriptionEn: "", descriptionAr: "" }),
 
   // Pricing
-  pricingMethod: z.enum(["manual", "auto"]).default("manual"),
-  del_price: z.number().min(0, "Price must be positive").optional(),
-  price: z.number().min(0, "Sale price must be positive").optional(),
-  saleStart: z.string().optional(),
-  saleEnd: z.string().optional(),
-
-  // Bilingual content
-  title: z
-    .object({
-      en: z.string().optional(),
-      ar: z.string().optional(),
-    })
-    .optional(),
-
-  description: z
-    .object({
-      en: z.string().optional(),
-      ar: z.string().optional(),
-    })
-    .optional(),
-
-  deliveryTime: z.string().optional(),
-
-  // Bilingual arrays
-  features: z
-    .object({
-      en: z.array(z.string()).default([]),
-      ar: z.array(z.string()).default([]),
-    })
-    .default({ en: [], ar: [] }),
-
-  highlights: z
-    .object({
-      en: z.array(z.string()).default([]),
-      ar: z.array(z.string()).default([]),
-    })
-    .default({ en: [], ar: [] }),
+  pricing: z.object({
+    originalPrice: z.number().min(0).default(0),
+    salePrice: z.number().min(0).default(0),
+    startDate: z.string().optional().nullable(),
+    endDate: z.string().optional().nullable(),
+  }).default({ originalPrice: 0, salePrice: 0 }),
 
   // Inventory
-  stock: z.number().min(0, "Stock must be positive").optional(),
+  inventory: z.object({
+    trackStock: z.boolean().default(true),
+    stockQuantity: z.number().min(0).default(0),
+    stockStatus: z.enum(["in_stock", "out_of_stock", "on_backorder"]).default("in_stock"),
+  }).default({ trackStock: true, stockQuantity: 0, stockStatus: "in_stock" }),
 
-  // Variants
-  sizes: z.array(z.string()).default([]),
-  colors: z.array(z.string()).default([]),
+  // Meta info
+  createdBy: z.enum(["admin", "seller"]).default("seller"),
+  store: z.string().optional(),
+  approved: z.boolean().default(true),
+  rate: z.number().min(0).max(5).default(0),
+
+  // Media
+  media: z.object({
+    featuredImages: z.string().optional(), // Main image URL
+    galleryImages: z.array(z.string()).default([]),
+    productVideo: z.object({
+      vedioUrl: z.string().optional(),
+      imageUrl: z.string().optional(),
+    }).optional(),
+  }).default({ galleryImages: [] }),
+
+  // Tags
+  tags: z.array(z.string()).default([]),
+
+  // Variants (Complex)
+  productVariants: z.array(z.object({
+    id: z.string().optional(),
+    nameEn: z.string(),
+    nameAr: z.string(),
+    type: z.string(),
+    optionsEn: z.array(z.object({
+      optionName: z.string(),
+      price: z.number(),
+      stock: z.number(),
+      color: z.string().optional(),
+    })),
+    optionsAr: z.array(z.object({
+      optionName: z.string(),
+      price: z.number(),
+      stock: z.number(),
+      color: z.string().optional(),
+    })),
+    createdBy: z.enum(["admin", "seller"]).optional(),
+    storeId: z.string().optional(),
+  })).default([]),
 
   // Bilingual specifications
   specifications: z.array(bilingualSpecificationSchema).default([]),
 
-  //  Media
+  // Actual Files for upload (Step 2)
   images: z
     .array(z.union([z.string(), z.instanceof(File)]))
     .max(10, "Maximum 10 images allowed")
     .default([]),
-  videoUrl: z.string().optional(),
 });
 
-// Step-specific validation schemas with proper required fields
-export const categoryStepSchema = z.object({
-  category: z
-    .object({
-      id: z.string(),
-      title: localizedTextSchema,
-      slug: z.string().optional(),
-    })
-    .refine((val) => val !== undefined && val.id !== undefined, {
-      message: "Category is required",
-    }),
-});
-
-export const brandStepSchema = z.object({
-  brand: z
-    .object({
-      id: z.string(),
-      name: localizedTextSchema,
-    })
-    .refine((val) => val !== undefined && val.id !== undefined, {
-      message: "Brand is required",
-    }),
-});
-
-export const identityStepSchema = z.object({
-  sku: z
-    .string()
-    .min(3, "SKU must be at least 3 characters")
-    .refine((val) => val !== undefined && val.length >= 3, {
-      message: "SKU is required and must be at least 3 characters",
-    }),
-  slug: z.object({
-    en: z.string().min(3, "English slug must be at least 3 characters"),
-    ar: z.string().min(3, "Arabic slug must be at least 3 characters"),
+// Step-specific validation schemas
+export const step1CoreSchema = z.object({
+  classification: z.object({
+    category: z.string().min(1, "Category is required"),
+    subcategory: z.string().min(1, "Subcategory is required"),
+    brand: z.string().min(1, "Brand is required"),
+  }),
+  identity: z.object({
+    sku: z.string().min(3, "SKU must be at least 3 characters"),
+  }),
+  title: localizedTextSchema,
+  slugEn: z.string().min(1, "English slug is required"),
+  slugAr: z.string().min(1, "Arabic slug is required"),
+  descriptions: z.object({
+    descriptionEn: z.string().min(1, "Description (EN) is required"),
+    descriptionAr: z.string().min(1, "الوصف مطلوب"),
+  }),
+  pricing: z.object({
+    originalPrice: z.number().min(1, "Original price must be greater than 0"),
+  }),
+  inventory: z.object({
+    stockQuantity: z.number().min(0, "Stock cannot be negative"),
   }),
 });
 
-// Relaxed details step schema for testing
-export const detailsStepSchema = z.object({
-  title: z.object({
-    en: z.string().min(3, "English title must be at least 3 characters"),
-    ar: z.string().min(3, "Arabic title must be at least 3 characters"),
-  }),
-  description: z.object({
-    en: z.string().min(10, "English description must be at least 10 characters"),
-    ar: z.string().min(10, "Arabic description must be at least 10 characters"),
-  }),
-  highlights: z.object({
-    en: z.array(z.string()).min(1, "At least one English highlight is required"),
-    ar: z.array(z.string()).min(1, "At least one Arabic highlight is required"),
-  }),
-  deliveryTime: z.string().min(1, "Delivery time is required"),
+export const step2MediaSchema = z.object({
+  images: z.array(z.any()).min(1, "At least one image is required"),
 });
 
-// Full schema for draft/final submission (relaxed)
-export const fullProductSchema = z
-  .object({
-
-    // Only require price for now
-    del_price: z
-      .number()
-      .min(0, "Price must be a positive number")
-      .refine((val) => val !== undefined && val >= 0, {
-        message: "Price is required",
-      }),
-    images: z
-      .array(z.union([z.string(), z.instanceof(File)]))
-      .min(1, "At least one product image is required")
-      .max(10, "Maximum 10 images allowed"),
-
-    price: z.number().min(0, "Sale price must be positive").optional(),
-
-    saleStart: z.string().optional(),
-    saleEnd: z.string().optional(),
-
-    stock: z.number().min(0, "Stock must be positive").optional(),
-  })
-  .refine(
-    (data) => {
-      // Only validate sale dates if they are provided
-      if (data.saleStart || data.saleEnd) {
-        if (data.saleStart && !data.saleEnd) {
-          return false;
-        }
-        if (data.saleEnd && !data.saleStart) {
-          return false;
-        }
-        if (data.saleStart && data.saleEnd && data.saleStart > data.saleEnd) {
-          return false;
-        }
-        if (data.price && data.price >= (data.del_price || 0)) {
-          return false;
-        }
-      }
-      return true;
-    },
-    {
-      message:
-        "Sale end date must be after start date and sale price must be less than regular price",
-      path: ["saleEnd"],
-    },
-  );
+export const step3SettingsSchema = z.object({
+  // Step 3 (Variants/Tags) is technically optional for the product itself 
+  // but we can add validation here if we want to enforce specific fields if present.
+  productVariants: z.array(z.any()).optional(),
+  tags: z.array(z.string()).optional(),
+});
 
 export type ProductFormData = z.infer<typeof productSchema>;
 export type Specification = z.infer<typeof bilingualSpecificationSchema>;

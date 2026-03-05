@@ -42,6 +42,7 @@ const variantSchema = z
           }),
           color: z.string().optional(),
           price: z.string().optional(),
+          stock: z.string().optional(),
         }),
       )
       .min(1, "At least one option is required"),
@@ -77,7 +78,9 @@ export default function CreateVariantPage() {
     defaultValues: {
       type: undefined,
       name: { en: "", ar: "" },
-      values: [{ label: { en: "", ar: "" }, color: "#000000", price: "" }],
+      values: [
+        { label: { en: "", ar: "" }, color: "#000000", price: "", stock: "0" },
+      ],
     },
   });
 
@@ -91,16 +94,19 @@ export default function CreateVariantPage() {
         nameEn: data.name.en,
         nameAr: data.name.ar,
         type: data.type as string,
+        createdBy: "admin",
         optionsEn: data.values.map((v) => ({
           optionName: v.label?.en || "",
           price: parseFloat(v.price || "0"),
+          stock: parseInt(v.stock || "0"),
           ...(data.type === "color" ? { color: v.color } : {}),
-        })) as any,
+        })),
         optionsAr: data.values.map((v) => ({
           optionName: v.label?.ar || "",
           price: parseFloat(v.price || "0"),
+          stock: parseInt(v.stock || "0"),
           ...(data.type === "color" ? { color: v.color } : {}),
-        })) as any,
+        })),
       };
 
       const token = (session as any)?.accessToken;

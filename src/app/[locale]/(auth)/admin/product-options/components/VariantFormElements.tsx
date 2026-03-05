@@ -100,6 +100,17 @@ export function VariantValues({
                   className="h-9 rounded-lg px-3 py-1 text-sm"
                 />
               </div>
+              <div className="space-y-1">
+                <label className="block text-[9px] font-black uppercase tracking-wider text-gray-400">
+                  Stock
+                </label>
+                <Input
+                  type="number"
+                  {...register(`values.${index}.stock`)}
+                  placeholder="0"
+                  className="h-9 rounded-lg px-3 py-1 font-mono text-sm"
+                />
+              </div>
             </div>
 
             <Button

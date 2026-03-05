@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { PencilIcon, Plus, TrashIcon, Box, Loader2 } from "lucide-react";
 import DynamicTable from "@/components/features/tables/DTable";
 import { useState, useMemo, useEffect } from "react";

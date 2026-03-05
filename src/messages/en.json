@@ -762,6 +762,7 @@
     "ordersSold": "Orders Sold",
     "netSales": "Net Sales",
     "productName": "Product Name",
+    "category": "Category",
     "sku": "SKU",
     "subCategory": "Sub Category",
     "totalPurchase": "Total Purchase",

@@ -57,27 +57,22 @@ const Sidebar: React.FC<AccountPageProps> = ({ user }) => {
               <ul className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  // Check if the item has sub-items
                   const hasSubItems = item.subItems && item.subItems.length > 0;
-                  // Determine if any of its sub-items are currently the active page
+             
                   const isAnySubItemCurrentPage =
                     hasSubItems &&
                     item.subItems?.some((subItem) =>
                       isCurrentPage(pathname, subItem.href),
                     );
-                  // Determine if the item should be open (either explicitly opened, or if a sub-item is active)
+  
                   const isOpen =
                     openItems[item.href] || isAnySubItemCurrentPage;
-                  // This item is only a direct link if it DOES NOT have sub-items.
+   
                   const isDirectLink = !hasSubItems;
 
                   return (
                     <li key={item.href}>
-                      {/*
-                        Conditional rendering:
-                        If it has sub-items, it's a button to toggle collapse.
-                        Otherwise (if no sub-items), it's a direct link.
-                      */}
+  
                       {!isDirectLink ? (
                         <button
                           onClick={() => toggleItem(item.href)}
