@@ -112,18 +112,18 @@ const BrandTabContent: React.FC<BrandTabContentProps> = ({
         itemsPerPage={5}
         headerClassName="bg-gray-50/50 text-gray-400 text-[11px] font-black uppercase tracking-wider"
         rowClassName="hover:bg-gray-50/80 transition-colors duration-300 border-b border-gray-50/50"
-        actions={[
+        solidActions={[
           {
             label: t("edit"),
             onClick: (item) => onEdit(item as Brand),
-            icon: <PencilIcon className="h-4 w-4" />,
-            className: "text-blue-600 font-bold",
+            icon: <PencilIcon />,
+            color: "#2563eb",
           },
           {
             label: t("delete"),
             onClick: (item) => onDelete(item as Brand),
-            icon: <TrashIcon className="h-4 w-4" />,
-            className: "text-rose-600 font-bold",
+            icon: <TrashIcon />,
+            color: "#dc2626",
           },
         ]}
       />

@@ -7,12 +7,12 @@ import {
   X,
   UploadCloud,
   Eye,
-  Plus,
   Video,
   Info,
   Layers,
   Layout,
   PlayCircle,
+  AlertCircle,
 } from "lucide-react";
 import Image from "next/image";
 import { useCallback } from "react";
@@ -54,28 +54,20 @@ export const MediaStep = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mx-auto max-w-4xl space-y-16 pb-20"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="mx-auto max-w-4xl space-y-8 px-1 py-1"
     >
-      {/* 1. Upload & Gallery Section */}
-      <div className="space-y-8">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 shadow-inner ring-1 ring-rose-100/50">
-            <ImageIcon size={24} />
-          </div>
-          <div>
-            <h2 className="mb-1 text-2xl font-black leading-none text-gray-900">
-              {t("title")}
-            </h2>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">
-              Manage your product visual identity
-            </p>
-          </div>
+      {errors.images && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50/50 p-3 text-red-600">
+          <AlertCircle size={16} />
+          <p className="text-xs font-bold">{errors.images}</p>
         </div>
-
-        {/* Master Upload Zone */}
-        <div className="group relative cursor-pointer overflow-hidden rounded-[3rem] border-2 border-dashed border-gray-100 bg-white/40 p-1 backdrop-blur-xl transition-all hover:border-gray-900/20 hover:bg-white/60">
+      )}
+      {/* 1. Upload & Gallery Section */}
+      <div className="space-y-4">
+        {/* Compact Upload Zone */}
+        <div className="group relative cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed border-gray-100 bg-gray-50/30 p-1 transition-all hover:border-teal-500/30 hover:bg-teal-50/5">
           <input
             type="file"
             multiple
@@ -83,34 +75,37 @@ export const MediaStep = ({
             onChange={(e) => handleUpload(e.target.files)}
             className="absolute inset-0 z-10 cursor-pointer opacity-0"
           />
-          <div className="flex flex-col items-center justify-center rounded-[2.8rem] border-2 border-dashed border-transparent px-6 py-12 transition-all group-hover:bg-white/40">
-            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[2rem] bg-gray-900 text-white shadow-2xl transition-transform group-hover:rotate-6 group-hover:scale-110">
-              <UploadCloud size={32} />
+          <div className="flex flex-col items-center justify-center py-6 transition-all">
+            <div
+              style={{ backgroundColor: "lab(58.4941% -47.8529 35.5714)" }}
+              className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg transition-transform group-hover:scale-110"
+            >
+              <UploadCloud size={20} />
             </div>
-            <p className="mb-2 text-xl font-black text-gray-900">
-              {t("uploadText")}
+            <p className="mb-1 text-sm font-bold text-gray-900">
+              Click or drag images here
             </p>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">
-              {t("uploadSubtext")}
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              PNG, JPG, WEBP (Max 10 images)
             </p>
           </div>
         </div>
 
         {/* Media Grid */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-50 pb-2">
             <div className="flex items-center gap-2">
               <Layout size={14} className="text-gray-400" />
-              <span className="text-[10px] font-black uppercase tracking-[0.1em] text-gray-400">
-                {t("otherImages")}
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                Gallery Overview
               </span>
             </div>
-            <span className="text-[10px] font-black text-gray-300">
-              {images.length} / 10 Images
+            <span className="text-[10px] font-bold text-gray-300">
+              {images.length} / 10
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 md:grid-cols-5">
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
             <AnimatePresence mode="popLayout">
               {images.map((file, index) => {
                 const url =
@@ -121,45 +116,37 @@ export const MediaStep = ({
                   <motion.div
                     layout
                     key={index}
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className={`group relative aspect-square overflow-hidden rounded-3xl border-4 transition-all ${
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className={`group relative aspect-square overflow-hidden rounded-xl border-2 transition-all ${
                       isMain
-                        ? "z-10 border-rose-500 shadow-xl ring-4 ring-rose-500/20"
-                        : "border-white bg-white shadow-sm hover:shadow-lg"
+                        ? "border-teal-500 shadow-md ring-2 ring-teal-500/10"
+                        : "border-white bg-white shadow-sm"
                     }`}
                   >
                     <Image
                       src={url}
                       alt={`Product ${index}`}
                       fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-110"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
 
                     {/* Overlay Controls */}
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-gray-900/60 opacity-0 backdrop-blur-[2px] transition-opacity group-hover:opacity-100">
-                      <button className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-gray-900 shadow-xl transition-transform hover:scale-110 active:scale-95">
-                        <Eye size={16} />
-                      </button>
+                    <div className="absolute inset-0 flex items-center justify-center gap-1 bg-gray-900/40 opacity-0 backdrop-blur-[1px] transition-opacity group-hover:opacity-100">
                       <button
                         onClick={() => handleRemove(index)}
-                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500 text-white shadow-xl transition-transform hover:scale-110 active:scale-95"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-500 text-white shadow-lg transition-transform hover:scale-110 active:scale-95"
                       >
-                        <X size={16} />
+                        <X size={14} />
                       </button>
                     </div>
 
-                    {/* Labels */}
                     {isMain && (
-                      <div className="absolute left-2 top-2 rounded-full bg-rose-500 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-white shadow-lg">
-                        {t("mainImage")}
+                      <div className="absolute left-1 top-1 rounded-md bg-teal-500 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-widest text-white shadow-sm">
+                        Primary
                       </div>
                     )}
-
-                    <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-[10px] font-black text-gray-900 shadow-sm backdrop-blur-md">
-                      {index + 1}
-                    </div>
                   </motion.div>
                 );
               })}
@@ -168,85 +155,47 @@ export const MediaStep = ({
         </div>
       </div>
 
-      {/* 2. Optional Video & Help */}
-      <div className="space-y-8">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 shadow-inner ring-1 ring-indigo-100/50">
-            <Video size={24} />
+      {/* 2. Optional Video Section */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="mb-2 flex items-center gap-2">
+            <Video size={16} className="text-gray-400" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-900">
+              Video Showcase
+            </span>
           </div>
-          <div>
-            <h2 className="mb-1 text-xl font-black leading-none text-gray-900">
-              Video Link
-            </h2>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">
-              Optional Showcase
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300">
+              <PlayCircle size={16} />
+            </div>
+            <Input
+              value={product.media?.productVideo?.vedioUrl || ""}
+              onChange={(e) =>
+                onUpdate({
+                  media: {
+                    ...product.media,
+                    productVideo: {
+                      ...product.media?.productVideo,
+                      vedioUrl: e.target.value,
+                    },
+                  },
+                })
+              }
+              placeholder="YouTube or Vimeo URL..."
+              className="h-9 rounded-lg border-gray-200 pl-10 text-xs font-semibold focus:border-teal-500"
+            />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-teal-50 bg-teal-50/20 p-4">
+          <div className="flex gap-3">
+            <Info size={16} className="shrink-0 text-teal-500" />
+            <p className="text-[11px] font-medium leading-relaxed text-teal-700/70">
+              Videos increase conversion rates by 30%. Paste links from YouTube,
+              Vimeo, or a direct S3 link.
             </p>
           </div>
         </div>
-
-        <div className="space-y-6 rounded-[2.5rem] border border-white/60 bg-indigo-50/10 p-10 shadow-sm backdrop-blur-xl">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-gray-400">
-                URL Reference
-              </Label>
-              <span className="rounded-full bg-indigo-50 px-3 py-1 text-[8px] font-black uppercase tracking-tighter text-indigo-500">
-                Optional
-              </span>
-            </div>
-            <div className="group relative">
-              <div className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 transition-colors group-focus-within:text-indigo-600">
-                <PlayCircle size={20} />
-              </div>
-              <Input
-                value={product.videoUrl || ""}
-                onChange={(e) => onUpdate({ videoUrl: e.target.value })}
-                placeholder={t("videoPlaceholder")}
-                className="h-16 rounded-2xl border-2 border-gray-100/50 bg-white/50 pl-14 pr-8 text-sm font-bold shadow-sm transition-all focus:border-indigo-500"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-indigo-100/50 bg-indigo-50/40 p-8">
-            <div className="flex gap-4">
-              <Info size={20} className="mt-0.5 text-indigo-400" />
-              <div>
-                <p className="mb-1 text-sm font-bold text-indigo-600">
-                  Visual Preview Tips
-                </p>
-                <p className="text-xs font-medium leading-relaxed text-indigo-400">
-                  Adding a high-quality video walkthrough increases conversion
-                  rates by up to 30%. Paste links from YouTube, Vimeo, or a
-                  direct S3 link.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Stats/Info */}
-      <div className="rounded-[3rem] border border-white/60 bg-emerald-50/10 p-10 shadow-sm backdrop-blur-xl">
-        <div className="mb-6 flex items-center gap-4">
-          <Layers size={22} className="text-emerald-500" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">
-            Pro Tip
-          </span>
-        </div>
-        <p className="mb-6 text-sm font-medium leading-relaxed text-gray-500">
-          The first image in your gallery will be used as the **Primary
-          Thumbnail** across search and listing pages.
-        </p>
-        <div className="h-3 w-full overflow-hidden rounded-full bg-gray-100/50">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${(images.length / 10) * 100}%` }}
-            className="h-full bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
-          />
-        </div>
-        <p className="mt-3 text-right text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          {images.length} / 10 Capacity used
-        </p>
       </div>
     </motion.div>
   );

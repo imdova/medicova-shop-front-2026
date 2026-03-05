@@ -21,6 +21,7 @@ interface DynamicButtonProps {
   fullWidth?: boolean;
   onClick?: () => void;
   type?: string;
+  style?: React.CSSProperties;
 }
 
 const DynamicButton: React.FC<DynamicButtonProps> = ({
@@ -34,6 +35,7 @@ const DynamicButton: React.FC<DynamicButtonProps> = ({
   disabled = false,
   fullWidth = false,
   onClick,
+  style,
 }) => {
   // Base styles
   const baseStyles =
@@ -109,6 +111,7 @@ const DynamicButton: React.FC<DynamicButtonProps> = ({
     <Link
       href={href ?? ""}
       className={combinedClasses.trim()}
+      style={style}
       onClick={(e) => {
         if (disabled) {
           e.preventDefault();

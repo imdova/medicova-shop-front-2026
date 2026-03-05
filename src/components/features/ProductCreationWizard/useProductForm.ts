@@ -1,42 +1,74 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { ProductFormData } from "@/lib/validations/product-schema";
-import { detailsStepSchema } from "@/lib/validations/product-schema";
+import { 
+  step1CoreSchema, 
+  step2MediaSchema, 
+  step3SettingsSchema 
+} from "@/lib/validations/product-schema";
+import { createProduct, updateProductApi, getProductById, CreateProductPayload } from "@/services/productService";
+import { uploadImage } from "@/lib/uploadService";
 
 export type Step =
-  | "category"
-  | "identity"
-  | "details"
-  | "pricing"
-  | "media";
+  | "step1_core"
+  | "step2_media"
+  | "step3_settings";
 
-export const useProductForm = () => {
-  const [currentStep, setCurrentStep] = useState<Step>("category");
+export const useProductForm = (productId?: string) => {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const user = (session as any)?.user;
+  const isEditMode = !!productId;
+
+  const [currentStep, setCurrentStep] = useState<Step>("step1_core");
+  const [isLoading, setIsLoading] = useState(!!productId);
   const [product, setProduct] = useState<ProductFormData>({
-    pricingMethod: "manual",
-    features: { en: [], ar: [] },
-    highlights: { en: [], ar: [] },
-    images: [],
-    sizes: [],
-    colors: [],
-    specifications: [],
+    highlightsEn: [],
+    highlightsAr: [],
     title: { en: "", ar: "" },
-    description: { en: "", ar: "" },
-    sku: "",
-    slug: { en: "", ar: "" },
-    productType: "physical",
+    slugEn: "",
+    slugAr: "",
+    descriptions: { descriptionEn: "", descriptionAr: "" },
+    identity: { sku: "", skuMode: "manual" },
+    classification: { 
+      category: "", 
+      subcategory: "", 
+      childCategory: "", 
+      brand: "", 
+      productType: "Physical Product" 
+    },
+    pricing: { 
+      originalPrice: 0, 
+      salePrice: 0, 
+      startDate: null, 
+      endDate: null 
+    },
+    inventory: { 
+      trackStock: true, 
+      stockQuantity: 0, 
+      stockStatus: "in_stock" 
+    },
+    media: { 
+      galleryImages: [] 
+    },
+    productVariants: [],
+    tags: [],
+    specifications: [],
+    images: [],
+    createdBy: "seller",
+    approved: false,
+    rate: 0,
+    store: "",
   });
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedProduct, setConfirmedProduct] =
     useState<ProductFormData>(product);
 
   const updateProduct = useCallback((updates: Partial<ProductFormData>) => {
-    setProduct((prev) => {
-      const updated = { ...prev, ...updates };
-      return updated;
-    });
-
-    // Clear errors when user updates the field
+    setProduct((prev) => ({ ...prev, ...updates }));
+    
     const updatedFields = Object.keys(updates);
     if (updatedFields.length > 0) {
       setErrors((prev) => {
@@ -53,120 +85,199 @@ export const useProductForm = () => {
     }
   }, []);
 
+  // Load existing product data when in edit mode
+  useEffect(() => {
+    if (!productId || !token) return;
+    setIsLoading(true);
+    getProductById(productId, token).then((data: any) => {
+      if (data) {
+        // Log full response so we can see every field the API returns
+        console.log("DEBUG: Full product data for edit:", JSON.stringify(data, null, 2));
+
+        const d = data; // shorthand
+
+        setProduct((prev) => ({
+          ...prev,
+          title: { en: d.nameEn || "", ar: d.nameAr || "" },
+          slugEn: d.slugEn || "",
+          slugAr: d.slugAr || "",
+
+          // Descriptions — handle nested or flat
+          descriptions: {
+            descriptionEn: d.descriptions?.descriptionEn || d.descriptionEn || "",
+            descriptionAr: d.descriptions?.descriptionAr || d.descriptionAr || "",
+          },
+
+          // Identity — handle nested or flat
+          identity: {
+            sku: d.identity?.sku || d.sku || "",
+            skuMode: d.identity?.skuMode || d.skuMode || "manual",
+          },
+
+          // Classification — handle nested object or direct IDs
+          classification: {
+            category: d.classification?.category?._id || d.classification?.category || d.categoryId || d.category || "",
+            subcategory: d.classification?.subcategory?._id || d.classification?.subcategory || d.subcategoryId || d.subcategory || "",
+            childCategory: d.classification?.childCategory?._id || d.classification?.childCategory || d.childCategoryId || d.childCategory || "",
+            brand: d.classification?.brand?._id || d.classification?.brand || d.brandId || d.brand || "",
+            productType: d.classification?.productType || d.productType || "Physical Product",
+          },
+
+          // Pricing — handle nested or flat
+          pricing: {
+            originalPrice: d.pricing?.originalPrice ?? d.originalPrice ?? d.price ?? 0,
+            salePrice: d.pricing?.salePrice ?? d.salePrice ?? d.sale_price ?? 0,
+            startDate: d.pricing?.startDate || d.startDate || null,
+            endDate: d.pricing?.endDate || d.endDate || null,
+          },
+
+          // Inventory — handle nested or flat
+          inventory: d.inventory || {
+            trackStock: d.trackStock ?? true,
+            stockQuantity: d.stockQuantity ?? d.stock ?? 0,
+            stockStatus: d.stockStatus || "in_stock",
+          },
+
+          highlightsEn: d.highlightsEn || [],
+          highlightsAr: d.highlightsAr || [],
+          specifications: d.specifications || [],
+
+          // Images — handle both media-wrapped and flat
+          images: d.media?.galleryImages || d.galleryImages || (d.media?.featuredImages ? [d.media.featuredImages] : d.featuredImages ? [d.featuredImages] : []),
+          media: {
+            galleryImages: d.media?.galleryImages || d.galleryImages || [],
+            productVideo: d.media?.productVideo || d.productVideo,
+          },
+
+          approved: d.approved ?? false,
+          store: d.store?._id || d.store || (typeof d.seller === "string" ? d.seller : d.seller?._id || ""),
+          createdBy: d.createdBy || "seller",
+          rate: d.rate || 0,
+
+          // Variants — pre-fill productVariants if they exist
+          productVariants: (d.variants || []).map((v: any) => 
+            typeof v === "string" ? { id: v } : { id: v._id || v.id, ...v }
+          ),
+          tags: d.tags || [],
+        }));
+      }
+    }).finally(() => setIsLoading(false));
+  }, [productId, token]);
+
   const validateStep = useCallback(async (): Promise<boolean> => {
-    // Determine next step
-    const steps: Step[] = [
-      "category",
-      "identity",
-      "details",
-      "pricing",
-      "media",
-    ];
+    const steps: Step[] = ["step1_core", "step2_media", "step3_settings"];
     const currentIndex = steps.indexOf(currentStep);
 
-    // Only validate on the media step (final submission)
-    if (currentStep !== "media") {
-      console.log(
-        "🔄 Moving to next step from:",
-        currentStep,
-        "- just navigating",
-      );
+    let schema;
+    if (currentStep === "step1_core") schema = step1CoreSchema;
+    else if (currentStep === "step2_media") schema = step2MediaSchema;
+    else if (currentStep === "step3_settings") schema = step3SettingsSchema;
 
-      if (currentIndex < steps.length - 1) {
-        const nextStep = steps[currentIndex + 1];
-        console.log("➡️ Moving to next step:", nextStep);
-        setConfirmedProduct(product); // Confirm current data for health score
-        setCurrentStep(nextStep);
-        setErrors({}); // Clear errors when navigating
-        window.scrollTo({ top: 0, behavior: "smooth" });
+    if (schema) {
+      const result = schema.safeParse(product);
+      if (!result.success) {
+        const newErrors: Record<string, string> = {};
+        result.error.issues.forEach((err) => {
+          newErrors[err.path.join(".")] = err.message;
+        });
+        setErrors(newErrors);
+        return false;
       }
-      return true;
     }
 
-    // Only validate on the details step (final submission)
-    console.log("🔄 Validating final submission on details step");
-    setIsSubmitting(true);
-
-    console.log(
-      "📦 Product data for validation:",
-      JSON.stringify(product, null, 2),
-    );
-
-    try {
-      const result = detailsStepSchema.safeParse(product);
-
-      if (result.success) {
-        console.log("✅ Validation successful!");
-        setErrors({});
-
-        // Final submission
-        console.log("🎉 Product submitted successfully:", product);
-        alert("Product created successfully!");
-
-        // Reset form
-        setProduct({
-          pricingMethod: "manual",
-          images: [],
-          features: { en: [], ar: [] },
-          highlights: { en: [], ar: [] },
-          sizes: [],
-          colors: [],
-          specifications: [],
-          title: { en: "", ar: "" },
-          description: { en: "", ar: "" },
-          productType: "physical",
-        });
-        setCurrentStep("category");
-
-        setIsSubmitting(false);
-        return true;
-      } else {
-        console.log("❌ Validation failed. Issues:", result.error.issues);
-
-        const newErrors: Record<string, string> = {};
-
-        result.error.issues.forEach((err) => {
-          if (err.path.length > 0) {
-            const fieldPath = err.path.join(".");
-            newErrors[fieldPath] = err.message;
-            console.log(`📝 Error for ${fieldPath}:`, err.message);
-          } else {
-            newErrors["_root"] = err.message;
-          }
-        });
-
-        console.log("📋 All validation errors:", newErrors);
-        setErrors(newErrors);
-        setIsSubmitting(false);
-
-        // Scroll to first error
-        if (Object.keys(newErrors).length > 0) {
-          const firstErrorField = Object.keys(newErrors)[0];
-          if (firstErrorField !== "_root") {
-            const element = document.querySelector(
-              `[data-field="${firstErrorField}"]`,
-            );
-            if (element) {
-              element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setErrors({});
+    if (currentStep === "step3_settings") {
+      setIsSubmitting(true);
+      try {
+        // 1. Upload any File objects to get URLs
+        const imageUrls: string[] = [];
+        for (const img of product.images) {
+          if (typeof img === "string") {
+            imageUrls.push(img);
+          } else if (img instanceof File) {
+            try {
+              const url = await uploadImage(img, "product", token);
+              imageUrls.push(url);
+            } catch (uploadErr) {
+              console.error("Image upload failed:", uploadErr);
+              // Continue with other images
             }
           }
         }
 
+        // 2. Map form state to API payload
+        const payload: CreateProductPayload = {
+          nameEn: product.title.en,
+          nameAr: product.title.ar,
+          slugEn: product.slugEn || product.title.en.toLowerCase().replace(/ /g, "-"),
+          slugAr: product.slugAr || product.title.ar.replace(/ /g, "-"),
+          highlightsEn: product.highlightsEn,
+          highlightsAr: product.highlightsAr,
+          identity: {
+            sku: product.identity.sku || "",
+            skuMode: product.identity.skuMode,
+          },
+          classification: {
+            category: product.classification.category || "",
+            subcategory: product.classification.subcategory || "",
+            childCategory: product.classification.childCategory || "",
+            brand: product.classification.brand || "",
+            productType: product.classification.productType,
+          },
+          descriptions: product.descriptions,
+          pricing: {
+            originalPrice: product.pricing.originalPrice,
+            salePrice: product.pricing.salePrice,
+            startDate: product.pricing.startDate || null,
+            endDate: product.pricing.endDate || null,
+          },
+          inventory: product.inventory,
+          variants: product.productVariants.map(v => v.id).filter(Boolean) as string[],
+          // Strip _id from specifications (MongoDB adds them but API rejects them)
+          specifications: product.specifications.map(({ _id, ...rest }: any) => rest),
+          store: product.store || (user as any)?.storeId || "",
+          createdBy: user?.role === "admin" ? "admin" : "seller",
+          media: {
+            featuredImages: imageUrls[0] || "",
+            galleryImages: imageUrls,
+            // Strip _id from productVideo (MongoDB adds it but API rejects it)
+            productVideo: product.media?.productVideo 
+              ? (({ _id, ...rest }: any) => rest)(product.media.productVideo)
+              : undefined,
+          },
+          approved: false,
+          rate: product.rate || 0,
+        } as any;
+
+        let response;
+        if (isEditMode && productId) {
+          response = await updateProductApi(productId, payload, token);
+          console.log("Product Updated Successfully:", response);
+          alert(isEditMode ? "Product Updated Successfully!" : "Product Created Successfully!");
+        } else {
+          response = await createProduct(payload, token);
+          console.log("Product Created Successfully:", response);
+          alert("Product Created Successfully!");
+        }
+        setIsSubmitting(false);
+        return true;
+      } catch (e) {
+        console.error("Failed to create product", e);
+        setErrors({ submit: "Failed to create product. Please check all fields." });
+        setIsSubmitting(false);
         return false;
       }
-    } catch (error) {
-      console.error("💥 Validation error:", error);
-      setIsSubmitting(false);
-      return false;
+    } else {
+      const nextStep = steps[currentIndex + 1];
+      setCurrentStep(nextStep);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return true;
     }
-  }, [currentStep, product]);
+  }, [currentStep, product, token, user]);
 
   const goToStep = useCallback((step: Step) => {
-    console.log("🎯 Navigating to step:", step);
-
-    // Simple navigation without validation for step indicators
     setCurrentStep(step);
-    setErrors({}); // Clear errors when navigating
+    setErrors({});
   }, []);
 
   return {
@@ -175,6 +286,8 @@ export const useProductForm = () => {
     errors,
     currentStep,
     isSubmitting,
+    isLoading,
+    isEditMode,
     setCurrentStep,
     updateProduct,
     validateStep,

@@ -1,12 +1,14 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useState } from "react";
-import { Plus, Trash2, LogOutIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Save, X, Box, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
+import { Card } from "@/components/shared/card";
 import {
   Form,
   FormControl,
@@ -15,445 +17,243 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/shared/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/shared/select";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { Card, CardContent, CardHeader } from "@/components/shared/card";
-import { Switch } from "@/components/shared/switch";
+import {
+  VariantTypeSelector,
+  VariantValues,
+} from "../components/VariantFormElements";
+import { createVariant, VariantData } from "@/services/variantService";
+import { useSession } from "next-auth/react";
+import { useState } from "react";
 
-// ---------------- Schema & Types ----------------
-const messages = {
-  name_en_required: {
-    en: "Name in English is required",
-    ar: "الاسم بالإنجليزية مطلوب",
-  },
-  name_ar_required: {
-    en: "Name in Arabic is required",
-    ar: "الاسم بالعربية مطلوب",
-  },
-  option_value_required: {
-    en: "At least one option value is required",
-    ar: "يجب إضافة قيمة خيار واحدة على الأقل",
-  },
-};
-
-const optionSchema = z.object({
-  name: z.object({
-    en: z.string().min(1, messages.name_en_required.en),
-    ar: z.string().min(1, messages.name_ar_required.ar),
-  }),
-  option_type: z.enum(["dropdown", "checkbox", "radio"]),
-  option_values: z
-    .array(
-      z.object({
-        id: z.string(),
-        label: z.object({
-          en: z.string().min(1, "English label is required"),
-          ar: z.string().min(1, "التسمية بالعربية مطلوبة"),
+const variantSchema = z
+  .object({
+    type: z.enum(["dropdown", "color", "options"]).optional(),
+    name: z.object({
+      en: z.string().min(1, "English name is required"),
+      ar: z.string().min(1, "Arabic name is required"),
+    }),
+    values: z
+      .array(
+        z.object({
+          label: z.object({
+            en: z.string().optional(),
+            ar: z.string().optional(),
+          }),
+          color: z.string().optional(),
+          price: z.string().optional(),
+          stock: z.string().optional(),
         }),
-        price: z.string().optional(),
-        price_type: z.enum(["fixed", "percent"]),
-      }),
-    )
-    .min(1, messages.option_value_required.en),
-  required: z.boolean(),
-});
-
-type OptionFormData = z.infer<typeof optionSchema>;
-type OptionValue = OptionFormData["option_values"][number];
-
-// ---------------- Component ----------------
-export default function CreateOptionPage() {
-  const locale = useAppLocale();
-  const [optionValues, setOptionValues] = useState<OptionValue[]>([
-    {
-      id: "1",
-      label: { en: "", ar: "" },
-      price: "",
-      price_type: "fixed",
+      )
+      .min(1, "At least one option is required"),
+  })
+  .refine((data) => !!data.type, {
+    message: "Variant type is required",
+    path: ["type"],
+  })
+  .refine(
+    (data) => {
+      if (data.type !== "color") {
+        return data.values.every((v) => !!v.label?.en && !!v.label?.ar);
+      }
+      return true;
     },
-  ]);
+    {
+      message: "Labels are required for this type",
+      path: ["values"],
+    },
+  );
 
-  const form = useForm<OptionFormData>({
-    resolver: zodResolver(optionSchema),
+type VariantFormData = z.infer<typeof variantSchema>;
+
+export default function CreateVariantPage() {
+  const t = useTranslations("admin.productVariantsPage");
+  const locale = useAppLocale();
+  const router = useRouter();
+  const { data: session } = useSession();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const methods = useForm<VariantFormData>({
+    resolver: zodResolver(variantSchema),
     defaultValues: {
+      type: undefined,
       name: { en: "", ar: "" },
-      option_type: "dropdown",
-      option_values: [
-        {
-          id: "1",
-          label: { en: "", ar: "" },
-          price: "",
-          price_type: "fixed",
-        },
+      values: [
+        { label: { en: "", ar: "" }, color: "#000000", price: "", stock: "0" },
       ],
-      required: false,
     },
   });
 
-  const addOptionValue = () => {
-    const newId = (optionValues.length + 1).toString();
-    const newOptionValue: OptionValue = {
-      id: newId,
-      label: { en: "", ar: "" },
-      price: "",
-      price_type: "fixed",
-    };
-    setOptionValues([...optionValues, newOptionValue]);
-  };
+  const { watch, setValue, handleSubmit, control } = methods;
+  const currentType = watch("type");
 
-  const removeOptionValue = (id: string) => {
-    if (optionValues.length > 1) {
-      setOptionValues(optionValues.filter((value) => value.id !== id));
-    }
-  };
-
-  const updateOptionValue = <K extends keyof OptionValue>(
-    id: string,
-    field: K,
-    value: OptionValue[K],
-  ) => {
-    setOptionValues(
-      optionValues.map((val) =>
-        val.id === id ? { ...val, [field]: value } : val,
-      ),
-    );
-  };
-
-  const updateOptionValueLabel = (
-    id: string,
-    lang: "en" | "ar",
-    value: string,
-  ) => {
-    setOptionValues(
-      optionValues.map((val) =>
-        val.id === id
-          ? {
-              ...val,
-              label: { ...val.label, [lang]: value },
-            }
-          : val,
-      ),
-    );
-  };
-
-  const onSubmit = async (data: OptionFormData) => {
+  const onSubmit = async (data: VariantFormData) => {
+    setIsSubmitting(true);
     try {
-      console.log({ ...data, option_values: optionValues });
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const apiData: VariantData = {
+        nameEn: data.name.en,
+        nameAr: data.name.ar,
+        type: data.type as string,
+        createdBy: "admin",
+        optionsEn: data.values.map((v) => ({
+          optionName: v.label?.en || "",
+          price: parseFloat(v.price || "0"),
+          stock: parseInt(v.stock || "0"),
+          ...(data.type === "color" ? { color: v.color } : {}),
+        })),
+        optionsAr: data.values.map((v) => ({
+          optionName: v.label?.ar || "",
+          price: parseFloat(v.price || "0"),
+          stock: parseInt(v.stock || "0"),
+          ...(data.type === "color" ? { color: v.color } : {}),
+        })),
+      };
+
+      const token = (session as any)?.accessToken;
+      await createVariant(apiData, token);
+      router.push("/admin/product-settings");
     } catch (error) {
       console.error("Submission failed", error);
+      alert("Failed to create variant");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const t = {
-    en: {
-      title: "Edit Option",
-      language_version: "You are editing 'English' version",
-      name: "Name",
-      option_value: "Option value",
-      label: "Label",
-      price: "Price",
-      price_type: "Price Type",
-      option_type: "Option Type",
-      dropdown: "Dropdown",
-      checkbox: "Checkbox",
-      radio: "Radio Button",
-      fixed: "Fixed",
-      percent: "Percent",
-      required: "Required",
-      save: "Save",
-      saveExit: "Save and Exit",
-      published: "Published",
-      add_option_value: "Add Option Value",
-      remove: "Remove",
-      new_option: "New Product Option",
-      english: "English",
-      arabic: "Arabic",
-    },
-    ar: {
-      title: "تحرير الخيار",
-      language_version: "أنت تقوم بتحرير النسخة 'العربية'",
-      name: "الاسم",
-      option_value: "قيمة الخيار",
-      label: "التسمية",
-      price: "السعر",
-      price_type: "نوع السعر",
-      option_type: "نوع الخيار",
-      dropdown: "قائمة منسدلة",
-      checkbox: "مربع اختيار",
-      radio: "زر اختيار",
-      fixed: "ثابت",
-      percent: "نسبة مئوية",
-      required: "مطلوب",
-      save: "حفظ",
-      saveExit: "حفظ وخروج",
-      published: "منشور",
-      add_option_value: "إضافة قيمة خيار",
-      remove: "إزالة",
-      new_option: "خيار منتج جديد",
-      english: "الإنجليزية",
-      arabic: "العربية",
-    },
-  }[locale];
-
   return (
-    <div>
+    <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-6 lg:p-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">{t.new_option}</h1>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-xl shadow-gray-200/50">
+            <Box className="text-primary" size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-black tracking-tight text-gray-900">
+              {t("createVariant")}
+            </h1>
+            <p className="text-xs font-medium text-gray-400">{t("subtitle")}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.back()}
+            disabled={isSubmitting}
+            className="h-9 rounded-lg border-gray-100 px-4 text-xs font-black hover:bg-gray-50"
+          >
+            <X size={14} className="mr-1.5" /> {t("cancel")}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSubmit(onSubmit)}
+            disabled={!currentType || isSubmitting}
+            className="shadow-primary/20 h-9 rounded-lg bg-primary px-6 text-xs font-black shadow-lg transition-all hover:scale-[1.02] disabled:opacity-50 disabled:grayscale"
+          >
+            {isSubmitting ? (
+              <Loader2 size={14} className="mr-1.5 animate-spin" />
+            ) : (
+              <Save size={14} className="mr-1.5" />
+            )}
+            {t("save")}
+          </Button>
+        </div>
       </div>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-6">
-            {/* Left Column - Main Content */}
-            <div className="space-y-6 lg:col-span-4">
-              {/* Name Section - Bilingual */}
-              <Card className="p-4">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold">{t.name}</h3>
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <FormField
-                    name="name.en"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {t.name} ({t.english}) *
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder={`${t.name} (${t.english})`}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="name.ar"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {t.name} ({t.arabic}) *
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder={`${t.name} (${t.arabic})`}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </Card>
+      <FormProvider {...methods}>
+        <Form {...methods}>
+          <form className="space-y-6">
+            {/* Step 1: Type Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="bg-primary/10 flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black text-primary">
+                  1
+                </span>
+                <h2 className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+                  {t("variantType")}
+                </h2>
+              </div>
+              <VariantTypeSelector
+                value={currentType}
+                onChange={(v) => setValue("type", v as any)}
+              />
+            </div>
 
-              {/* Option Values Section - Bilingual */}
-              <Card className="p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">{t.option_value}</h3>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addOptionValue}
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    {t.add_option_value}
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  {optionValues.map((optionValue) => (
-                    <div key={optionValue.id} className="rounded-lg border p-4">
-                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
-                        {/* Label - Bilingual */}
-                        <div className="md:col-span-2">
-                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            <div>
-                              <label className="mb-2 block text-sm font-medium">
-                                {t.label} ({t.english})
-                              </label>
-                              <Input
-                                value={optionValue.label.en}
-                                onChange={(e) =>
-                                  updateOptionValueLabel(
-                                    optionValue.id,
-                                    "en",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder={`${t.label} (${t.english})`}
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-2 block text-sm font-medium">
-                                {t.label} ({t.arabic})
-                              </label>
-                              <Input
-                                value={optionValue.label.ar}
-                                onChange={(e) =>
-                                  updateOptionValueLabel(
-                                    optionValue.id,
-                                    "ar",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder={`${t.label} (${t.arabic})`}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Price and Price Type */}
-                        <div className="flex gap-2 md:col-span-2">
-                          <div className="flex-1">
-                            <label className="mb-2 block text-sm font-medium">
-                              {t.price}
-                            </label>
+            {currentType && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6 duration-500">
+                {/* Step 2: Basic Info (Bilingual) */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-primary/10 flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black text-primary">
+                      2
+                    </span>
+                    <h2 className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+                      {t("variantName")}
+                    </h2>
+                  </div>
+                  <Card className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+                    <FormField
+                      control={control}
+                      name="name.en"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-wider text-gray-400">
+                            {t("nameEn")}
+                          </FormLabel>
+                          <FormControl>
                             <Input
-                              type="number"
-                              value={optionValue.price}
-                              onChange={(e) =>
-                                updateOptionValue(
-                                  optionValue.id,
-                                  "price",
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="0.00"
+                              placeholder="Size / Color / Material"
+                              className="h-9 rounded-lg text-sm"
+                              {...field}
                             />
-                          </div>
-                          <div className="flex-1">
-                            <label className="mb-2 block text-sm font-medium">
-                              {t.price_type}
-                            </label>
-                            <Select
-                              value={optionValue.price_type}
-                              onValueChange={(value: "fixed" | "percent") =>
-                                updateOptionValue(
-                                  optionValue.id,
-                                  "price_type",
-                                  value,
-                                )
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="fixed">{t.fixed}</SelectItem>
-                                <SelectItem value="percent">
-                                  {t.percent}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex items-end">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeOptionValue(optionValue.id)}
-                              disabled={optionValues.length <= 1}
-                              className="flex items-center gap-2 text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              {t.remove}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                          </FormControl>
+                          <FormMessage className="text-[10px]" />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={control}
+                      name="name.ar"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-wider text-gray-400">
+                            {t("nameAr")}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="المقاس / اللون / الخامة"
+                              className="h-9 rounded-lg text-right text-sm"
+                              dir="rtl"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage className="text-[10px]" />
+                        </FormItem>
+                      )}
+                    />
+                  </Card>
                 </div>
-              </Card>
-            </div>
 
-            {/* Right Column - Sidebar */}
-            <div className="space-y-6 lg:col-span-2">
-              {/* Save Buttons */}
-              <Card className="p-4">
-                <CardContent className="flex gap-2 p-0">
-                  <Button
-                    type="submit"
-                    variant="outline"
-                    className="flex flex-1 items-center gap-2 truncate"
-                  >
-                    <LogOutIcon className="h-4 w-4" />
-                    {t.saveExit}
-                  </Button>
-                  <Button type="submit" className="flex-1 truncate">
-                    {t.published}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Required Switch */}
-              <Card className="p-4">
-                <CardHeader className="pl-2 font-semibold">
-                  {t.required}
-                </CardHeader>
-                <div className="flex items-center justify-between">
-                  <FormField
-                    name="required"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
+                {/* Step 3: Values */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-primary/10 flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black text-primary">
+                      3
+                    </span>
+                    <h2 className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+                      {t("options")}
+                    </h2>
+                  </div>
+                  <VariantValues
+                    type={currentType as "dropdown" | "color" | "options"}
                   />
                 </div>
-              </Card>
-
-              {/* Option Type */}
-              <Card className="p-4">
-                <FormField
-                  name="option_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base">
-                        {t.option_type}
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t.option_type} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="dropdown">{t.dropdown}</SelectItem>
-                          <SelectItem value="checkbox">{t.checkbox}</SelectItem>
-                          <SelectItem value="radio">{t.radio}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </Card>
-            </div>
-          </div>
-        </form>
-      </Form>
+              </div>
+            )}
+          </form>
+        </Form>
+      </FormProvider>
     </div>
   );
 }

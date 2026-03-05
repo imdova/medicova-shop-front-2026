@@ -1,132 +1,128 @@
 "use client";
 
-import React, { useMemo } from "react";
-import Image from "next/image";
+import React from "react";
 import Link from "next/link";
-import { PencilIcon, TrashIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { TrashIcon, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import DynamicTable from "@/components/features/tables/DTable";
-import { Product } from "@/types/product";
+import { ApiProduct } from "@/services/productService";
 import { LanguageType } from "@/util/translations";
 
 interface ProductTableContainerProps {
-  data: Product[];
+  data: ApiProduct[];
   locale: LanguageType;
-  onEdit: (product: Product) => void;
-  onDelete: (product: Product) => void;
+  onDelete: (product: ApiProduct) => void;
+  onToggleApprove: (product: ApiProduct) => void;
+  approvingId?: string | null;
+}
+
+/**
+ * Extract seller name from various possible API shapes.
+ */
+function getSellerName(product: ApiProduct): string {
+  const s = product.seller;
+  if (!s) return product.createdBy || "—";
+
+  if (typeof s === "string") {
+    // It's just an ID
+    return product.createdBy === "admin" ? "Admin" : s.slice(0, 8) + "…";
+  }
+
+  // It's an object
+  if (s.name) return s.name;
+  if (s.firstName || s.lastName) {
+    return [s.firstName, s.lastName].filter(Boolean).join(" ");
+  }
+
+  return product.createdBy || "—";
 }
 
 const ProductTableContainer: React.FC<ProductTableContainerProps> = ({
   data,
   locale,
-  onEdit,
   onDelete,
+  onToggleApprove,
+  approvingId,
 }) => {
-  const t = useTranslations("admin");
+  const isAr = locale === "ar";
 
-  const columns = useMemo(
-    () => [
-      {
-        key: "title",
-        header: t("productName"),
-        render: (item: Product) => (
-          <div className="flex items-center gap-3">
-            <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
-              <Image
-                fill
-                src={item.images?.[0] || "/images/placeholder.jpg"}
-                alt={item.title[locale]}
-                className="object-cover"
-              />
-            </div>
-            <Link
-              href={`/${locale}/admin/product-settings/products/${item.id}`}
-              className="line-clamp-1 font-bold text-gray-900 transition-colors hover:text-primary"
-            >
-              {item.title[locale]}
-            </Link>
-          </div>
-        ),
+  const columns = [
+    {
+      key: "name",
+      header: isAr ? "اسم المنتج" : "Product Name",
+      render: (item: ApiProduct) => {
+        const name = isAr
+          ? item.nameAr || item.nameEn
+          : item.nameEn || item.nameAr;
+        return (
+          <Link
+            href={`/${locale}/admin/products/${item._id}`}
+            className="line-clamp-1 font-bold text-gray-900 transition-colors hover:text-primary hover:underline"
+          >
+            {name || "—"}
+          </Link>
+        );
       },
-      {
-        key: "sku",
-        header: t("sku"),
-        render: (item: Product) => (
-          <span className="font-mono text-xs text-gray-500">{item.id}</span>
-        ),
-      },
-      {
-        key: "category",
-        header: t("category"),
-        render: (item: Product) => (
-          <span className="inline-flex items-center rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600">
-            {item.category?.title[locale] || t("medicalWear")}
-          </span>
-        ),
-      },
-      {
-        key: "price",
-        header: t("unitPrice"),
-        render: (item: Product) => (
-          <div className="flex flex-col">
-            <span className="font-black text-gray-900">{item.price} EGP</span>
-            {item.del_price && (
-              <span className="text-[10px] font-bold text-gray-400 line-through">
-                {item.del_price} EGP
-              </span>
+    },
+    {
+      key: "seller",
+      header: isAr ? "اسم البائع" : "Seller",
+      render: (item: ApiProduct) => (
+        <span className="text-sm font-semibold text-gray-600">
+          {getSellerName(item)}
+        </span>
+      ),
+    },
+    {
+      key: "approved",
+      header: isAr ? "الحالة" : "Status",
+      render: (item: ApiProduct) => {
+        const isApproving = approvingId === item._id;
+        return (
+          <button
+            onClick={() => onToggleApprove(item)}
+            disabled={isApproving}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+              item.approved
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+            } disabled:opacity-50`}
+          >
+            {isApproving ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : item.approved ? (
+              <CheckCircle size={12} />
+            ) : (
+              <XCircle size={12} />
             )}
-          </div>
-        ),
+            {item.approved
+              ? isAr
+                ? "معتمد"
+                : "Approved"
+              : isAr
+                ? "غير معتمد"
+                : "Pending"}
+          </button>
+        );
       },
-      {
-        key: "status",
-        header: t("status"),
-        render: (item: Product) => {
-          const status = item.status?.en || "draft";
-          const configs = {
-            active: "bg-emerald-50 text-emerald-600 border-emerald-100",
-            pending: "bg-amber-50 text-amber-600 border-amber-100",
-            draft: "bg-gray-50 text-gray-600 border-gray-100",
-          };
-          const config =
-            configs[status as keyof typeof configs] || configs.draft;
-
-          return (
-            <span
-              className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${config}`}
-            >
-              {item.status?.[locale] || status}
-            </span>
-          );
-        },
-      },
-    ],
-    [t, locale],
-  );
+    },
+  ];
 
   return (
     <div className="rounded-3xl border border-white/60 bg-white/70 p-6 shadow-xl shadow-gray-200/40 backdrop-blur-xl transition-all duration-500">
       <DynamicTable
         data={data}
         columns={columns}
-        minWidth={1100}
         pagination={true}
         itemsPerPage={10}
-
         headerClassName="bg-gray-50/50 text-gray-400 text-[11px] font-black uppercase tracking-wider"
         rowClassName="hover:bg-gray-50/80 transition-colors duration-300 border-b border-gray-50/50"
-        actions={[
+        solidActions={[
           {
-            label: t("edit"),
-            onClick: (item) => onEdit(item as Product),
-            icon: <PencilIcon className="h-4 w-4" />,
-            className: "text-blue-600 font-bold",
-          },
-          {
-            label: t("delete"),
-            onClick: (item) => onDelete(item as Product),
+            label: isAr ? "حذف" : "Delete",
+            onClick: (item) => onDelete(item as ApiProduct),
             icon: <TrashIcon className="h-4 w-4" />,
-            className: "text-rose-600 font-bold",
+            className: "text-rose-500 hover:text-rose-700",
+            color: "#dc2626",
           },
         ]}
       />

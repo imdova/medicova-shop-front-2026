@@ -203,6 +203,7 @@ export interface Product {
 export type ProductTag = {
   id: string;
   name: LocalizedTitle;
+  categoryId?: string;
   createdAt: string;
   status: LocalizedTitle;
   slug: string;
@@ -252,7 +253,7 @@ export type ProductOption = {
   id: string;
   slug: string;
   name: LocalizedTitle;
-  option_type: "dropdown" | "radio" | "checkbox" | "text";
+  option_type: "dropdown" | "radio" | "checkbox" | "text" | "color";
   isRequired: boolean;
   createdAt: string;
   option_values: OptionValue[];

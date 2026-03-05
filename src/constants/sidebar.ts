@@ -228,21 +228,6 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
               icon: PackagePlus,
             },
             {
-              title: { en: "Products Tags", ar: "علامات المنتجات" },
-              href: "/admin/products-tags",
-              icon: Tags,
-            },
-            {
-              title: { en: "Product Attributes", ar: "سمات المنت" },
-              href: "/admin/product-attributes",
-              icon: Album,
-            },
-            {
-              title: { en: "Product options", ar: "خيارات المنتج" },
-              href: "/admin/product-options",
-              icon: Database,
-            },
-            {
               title: {en: "Product Settings", ar: "اعدادات المنتج"},
               href: "/admin/product-settings",
               icon: Settings
@@ -265,28 +250,7 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
           href: "/admin/flash-sales",
           icon: Zap,
         },
-        {
-          title: { en: "Product Specification", ar: "مواصفات المنت" },
-          href: "/admin/product-specification",
-          icon: LayoutTemplate,
-          subItems: [
-            {
-              title: { en: "Groups", ar: "المجموعات" },
-              href: "/admin/specification-groups",
-              icon: Folder,
-            },
-            {
-              title: { en: "Attributes", ar: "الصفات" },
-              href: "/admin/specification-attributes",
-              icon: LayoutList,
-            },
-            {
-              title: { en: "Tables", ar: "جداول" },
-              href: "/admin/specification-tables",
-              icon: Table2,
-            },
-          ],
-        },
+    
         {
           title: {
             en: "Shipments",
@@ -335,14 +299,7 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
           href: "/admin/data-synchronize",
           icon: PackagePlus,
         },
-        {
-          title: {
-            en: "Pages",
-            ar: "الصفحات",
-          },
-          href: "/admin/pages",
-          icon: PanelTop,
-        },
+  
         {
           title: {
             en: "Testimonials",
