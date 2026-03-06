@@ -1,18 +1,11 @@
 "use client";
 
-import { Eye, List, Plus } from "lucide-react";
-import OverviewPanel from "./panels/OverviewPanel";
+import { Plus, Store } from "lucide-react";
 import SellersListPanel from "./panels/SellersListPanel";
 import { useState } from "react";
 import AddSellerModal from "../components/AddSellerModal";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { useTranslations } from "next-intl";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/shared/Tabs";
 
 export default function SellersPage() {
   const t = useTranslations("admin");
@@ -24,58 +17,37 @@ export default function SellersPage() {
     <div className="animate-in fade-in min-h-screen bg-[#F8FAFC] p-4 duration-700 md:p-8">
       <div className="mx-auto max-w-[1440px]">
         {/* Page Header */}
-        <div className="mb-8 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-gray-900">
-              {t("sellers")}
-            </h1>
-            <p className="mt-1 font-medium text-gray-400">
-              {t("sellersSubtitle")}
-            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+                <Store className="h-5 w-5 text-[#31533A]" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-gray-900 md:text-3xl">
+                  {isArabic ? "إدارة البائعين" : "Sellers Management"}
+                </h1>
+                <p className="mt-0.5 text-sm font-medium text-gray-400">
+                  {isArabic
+                    ? "راقب وأدر بائعين سوق الرعاية الصحية."
+                    : "Monitor and manage marketplace healthcare vendors."}
+                </p>
+              </div>
+            </div>
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 rounded-2xl bg-[#31533A] px-6 py-3 text-sm font-black text-white shadow-xl shadow-emerald-900/10 transition-all duration-300 hover:brightness-110 active:scale-95"
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-[#2F6B3A] px-5 text-sm font-black text-white shadow-xl shadow-emerald-900/10 transition-all duration-300 hover:brightness-110 active:scale-95"
           >
             <Plus
               size={18}
               className="transition-transform duration-300 group-hover:rotate-90"
             />
-            <span>{t("create")}</span>
+            <span>{isArabic ? "إضافة بائع" : "Onboard New Seller"}</span>
           </button>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="mb-8 w-fit rounded-2xl bg-gray-100/40 p-1.5 backdrop-blur-sm">
-            <TabsTrigger
-              value="overview"
-              className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-xs font-bold transition-all duration-300 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-lg data-[state=active]:shadow-gray-200/50"
-            >
-              <div className="flex size-5 items-center justify-center rounded-md bg-[#EDF3F0] text-[#7BA68E]">
-                <Eye className="size-3.5" />
-              </div>
-              {t("overview")}
-            </TabsTrigger>
-            <TabsTrigger
-              value="list"
-              className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-xs font-bold transition-all duration-300 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-lg data-[state=active]:shadow-gray-200/50"
-            >
-              <List className="size-4 text-gray-400" />
-              {t("sellersList")}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent
-            value="overview"
-            className="mt-0 focus-visible:outline-none"
-          >
-            <OverviewPanel locale={locale} />
-          </TabsContent>
-
-          <TabsContent value="list" className="mt-0 focus-visible:outline-none">
-            <SellersListPanel locale={locale} />
-          </TabsContent>
-        </Tabs>
+        <SellersListPanel locale={locale} />
 
         <AddSellerModal
           isModalOpen={isModalOpen}

@@ -15,7 +15,6 @@ import {
   LayoutList,
   LayoutTemplate,
   MapPin,
-  MessageCircleQuestion,
   PackagePlus,
   PackageSearch,
   PanelTop,
@@ -23,7 +22,6 @@ import {
   ShieldUser,
   Star,
   Table2,
-  Tags,
   Truck,
   Undo2,
   UserRoundPen,
@@ -184,28 +182,6 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
           href: "/admin",
           icon: LayoutDashboard,
         },
-        {
-          title: { en: "Users", ar: "المستخدمين" },
-          href: "/seller/products",
-          icon: Users2,
-          subItems: [
-            {
-              title: { en: "All Sellers", ar: "جميع البائعين" },
-              href: "/admin/sellers",
-              icon: Users2,
-            },
-            {
-              title: { en: "All Customers", ar: "جميع العملاء" },
-              href: "/admin/Customers",
-              icon: Users2,
-            },
-          ],
-        },
-        {
-          title: { en: "Financial", ar: "المالية" },
-          href: "/admin/financial",
-          icon: Building2,
-        },
       ],
     },
     {
@@ -213,54 +189,31 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
       items: [
         {
           title: { en: "All Products", ar: "كل المنتجات" },
-          href: "/admin/products",
-          icon: PackageSearch,
-          subItems: [
-            {
-              title: { en: "All Products", ar: "كل المنتجات" },
-              href: "/admin/products",
-              icon: PackageSearch,
-            },
-            {
-              title: { en: "Create Product", ar: "إنشاء منتج" },
-              href: "/admin/create-product",
-              icon: PackagePlus,
-            },
-            {
-              title: {en: "Product Settings", ar: "اعدادات المنتج"},
-              href: "/admin/product-settings",
-              icon: Settings
-            }
-          ],
-        },
-        {
-          title: { en: "All Products 2", ar: "كل المنتجات 2" },
           href: "/admin/products-2",
           icon: PackageSearch,
           subItems: [
             {
-              title: { en: "All Products 2", ar: "كل المنتجات 2" },
+              title: { en: "All Products", ar: "كل المنتجات" },
               href: "/admin/products-2",
               icon: PackageSearch,
             },
             {
-              title: { en: "Create Product 2", ar: "إنشاء منتج 2" },
+              title: { en: "Create Product", ar: "إنشاء منتج" },
               href: "/admin/create-product-2",
               icon: PackagePlus,
             },
             {
-              title: { en: "Product Settings 2", ar: "اعدادات المنتج 2" },
+              title: { en: "Product Collections", ar: "مجموعات المنتجات" },
+              href: "/admin/product-collections",
+            },
+            {
+              title: { en: "Product Settings", ar: "اعدادات المنتج" },
               href: "/admin/product-settings-2",
               icon: Settings,
             },
           ],
         },
 
-        {
-          title: { en: "Product Collections", ar: "مجموعات المنتجات" },
-          href: "/admin/product-collections",
-          icon: Group,
-        },
         {
           title: { en: "Inventory", ar: "المخزون" },
           href: "/admin/inventory",
@@ -290,52 +243,26 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
         },
         {
           title: {
-            en: "Vendors",
-            ar: "الباعة",
-          },
-          href: "/admin/vendors",
-          icon: Users2,
-        },
-        {
-          title: {
             en: "Discounts",
             ar: "خصومات",
           },
           href: "/admin/discounts",
           icon: BadgePercent,
         },
+      ],
+    },
+    {
+      title: { en: "Users", ar: "المستخدمين" },
+      items: [
         {
-          title: {
-            en: "Categories and Brands",
-            ar: "التصنيفات والعلامات التجارية",
-          },
-          href: "/admin/categories",
-          icon: Tags,
+          title: { en: "All Sellers", ar: "جميع البائعين" },
+          href: "/admin/sellers",
+          icon: Users2,
         },
         {
-          title: {
-            en: "Export/Import",
-            ar: "التصنيفات والعلامات التجارية",
-          },
-          href: "/admin/data-synchronize",
-          icon: PackagePlus,
-        },
-  
-        {
-          title: {
-            en: "Testimonials",
-            ar: "الشهادات",
-          },
-          href: "/admin/testimonials",
-          icon: Star,
-        },
-        {
-          title: {
-            en: "FAQs",
-            ar: "الأسئلة الشائعة",
-          },
-          href: "/admin/faqs",
-          icon: MessageCircleQuestion,
+          title: { en: "All Customers", ar: "جميع العملاء" },
+          href: "/admin/Customers",
+          icon: Users2,
         },
       ],
     },
@@ -355,25 +282,45 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
       ],
     },
     {
-      title: { en: "My Account", ar: "حسابي" },
+      title: { en: "Finance", ar: "المالية" },
       items: [
         {
-          title: { en: "Profile", ar: "الملف الشخصي" },
-          href: "/admin/profile",
-          icon: UserRoundPen,
+          title: { en: "Overview", ar: "نظرة عامة" },
+          href: "/admin/financial",
+          icon: Building2,
+        },
+        {
+          title: { en: "Transactions", ar: "المعاملات" },
+          href: "/admin/financial?tab=transactions",
+          icon: SendToBack,
+        },
+        {
+          title: { en: "Withdrawals", ar: "السحوبات" },
+          href: "/admin/financial/withdrawals",
+          icon: Undo2,
+        },
+        {
+          title: { en: "Plans", ar: "الخطط" },
+          href: "/admin/financial/plans",
+          icon: BadgePercent,
         },
       ],
     },
     {
-      title: { en: "Others", ar: "أخرى" },
+      title: { en: "Settings", ar: "الإعدادات" },
       items: [
+        {
+          title: { en: "Testimonials", ar: "الشهادات" },
+          href: "/admin/testimonials",
+          icon: Star,
+        },
         {
           title: { en: "Notifications", ar: "الإشعارات" },
           href: "/admin/notifications",
           icon: Bell,
         },
         {
-          title: { en: "Security Settings", ar: "إعدادات الأمان" },
+          title: { en: "Site Settings", ar: "إعدادات الموقع" },
           href: "/admin/security",
           icon: ShieldUser,
         },

@@ -31,6 +31,16 @@ const OrderTableContainer: React.FC<OrderTableContainerProps> = ({
         key: "id",
         header: t("orderId"),
         sortable: true,
+        render: (item: Order) => (
+          <Link
+            href={`/${locale}/admin/orders/${encodeURIComponent(
+              item.id.replace(/^#/, ""),
+            )}`}
+            className="font-black text-gray-900 underline-offset-4 hover:text-primary hover:underline"
+          >
+            {item.id}
+          </Link>
+        ),
       },
       {
         key: "date",

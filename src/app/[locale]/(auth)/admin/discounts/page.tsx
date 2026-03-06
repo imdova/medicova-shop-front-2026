@@ -1,142 +1,446 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import React, { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { Ticket, ShieldCheck, Activity, Gift } from "lucide-react";
+import { Link } from "@/i18n/navigation";
+import {
+  ChevronDown,
+  Copy,
+  Pencil,
+  Plus,
+  Search,
+  Tag,
+  Trash2,
+} from "lucide-react";
 
 // Types & Data
 import { Discount } from "@/types/product";
 import { dummyDiscounts } from "@/constants/discounts";
-import { DynamicFilterItem } from "@/types/filters";
-import { productFilters } from "@/constants/drawerFilter";
 
-// Components
-import DynamicFilter from "@/components/features/filter/DynamicFilter";
-import DiscountFilters from "./components/DiscountFilters";
-import DiscountTableContainer from "./components/DiscountTableContainer";
+function hashToNumber(input: string) {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  return hash;
+}
+
+function titleFromCode(code: string) {
+  const s = code
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase();
+  return s
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0]?.toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function formatNumber(value: number, locale: string) {
+  const loc = locale === "ar" ? "ar-EG" : "en-US";
+  return new Intl.NumberFormat(loc).format(value);
+}
+
+function formatCurrency(value: number, locale: string) {
+  const loc = locale === "ar" ? "ar-EG" : "en-US";
+  return new Intl.NumberFormat(loc, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatDate(value: string, locale: string) {
+  const loc = locale === "ar" ? "ar-EG" : "en-US";
+  return new Intl.DateTimeFormat(loc, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
 
 export default function DiscountsPage() {
   const t = useTranslations("admin");
   const locale = useAppLocale();
   const isArabic = locale === "ar";
-  const router = useRouter();
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | Discount["status"]>("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | Discount["discountType"]>("all");
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 10;
 
-  const filteredDiscounts = useMemo(() => {
-    return dummyDiscounts.filter((discount) => {
-      const matchesSearch =
-        !searchQuery ||
-        discount.couponCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        discount.store.toLowerCase().includes(searchQuery.toLowerCase());
+  const rows = useMemo(() => {
+    return dummyDiscounts.map((d) => {
+      const h = hashToNumber(`discount:${d.id}:${d.couponCode}`);
+      const usageLimit = d.isUnlimited
+        ? undefined
+        : d.usageLimit ?? (150 + (h % 850));
+      const usedCount = d.usedCount ?? (usageLimit ? Math.min(usageLimit, h % (usageLimit + 1)) : 12 + (h % 260));
 
-      return matchesSearch;
+      const name =
+        d.description?.split(".")[0]?.trim() ||
+        titleFromCode(d.couponCode);
+
+      const typeLabel =
+        d.discountType === "percentage"
+          ? `${d.value}% Off`
+          : d.discountType === "fixed"
+            ? `$${d.value} Fixed`
+            : isArabic
+              ? "شحن مجاني"
+              : "Free Shipping";
+
+      const expiryLabel = d.neverExpired ? (isArabic ? "بدون انتهاء" : "No Expiry") : formatDate(d.endDate, locale);
+
+      const usageLabel =
+        usageLimit == null
+          ? `${formatNumber(usedCount, locale)} / ∞`
+          : `${formatNumber(usedCount, locale)} / ${formatNumber(usageLimit, locale)}`;
+
+      return {
+        ...d,
+        name,
+        typeLabel,
+        usedCount,
+        usageLimit,
+        usageLabel,
+        expiryLabel,
+      };
     });
-  }, [searchQuery, locale]);
+  }, [isArabic, locale]);
 
-  const statusCounts = useMemo(
-    () =>
-      dummyDiscounts.reduce(
-        (acc: Record<string, number>, discount) => {
-          const status = discount.status;
-          acc[status] = (acc[status] || 0) + 1;
-          return acc;
-        },
-        { active: 0, expired: 0, scheduled: 0 },
-      ),
-    [locale],
-  );
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return rows.filter((d) => {
+      const matchesSearch =
+        !q ||
+        d.couponCode.toLowerCase().includes(q) ||
+        d.name.toLowerCase().includes(q) ||
+        d.store.toLowerCase().includes(q);
+      const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
+      const matchesType = typeFilter === "all" ? true : d.discountType === typeFilter;
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [rows, searchQuery, statusFilter, typeFilter]);
 
-  const predefinedFilters: DynamicFilterItem[] = [
-    {
-      id: "status",
-      label: { en: "Status", ar: "الحالة" },
-      type: "dropdown",
-      options: [
-        { id: "active", name: { en: "Active", ar: "نشط" } },
-        { id: "expired", name: { en: "Expired", ar: "منتهي" } },
-        { id: "scheduled", name: { en: "Scheduled", ar: "مجدول" } },
-      ],
-      visible: true,
-    },
-  ];
+  const totals = useMemo(() => {
+    const activeCount = rows.filter((d) => d.status === "active").length;
+    const totalRedemptions = rows.reduce((acc, d) => acc + (d.usedCount ?? 0), 0);
+    const revenueSaved = rows.reduce((acc, d) => {
+      const unit =
+        d.discountType === "percentage"
+          ? Math.max(1, d.value) * 2.3
+          : d.discountType === "shipping"
+            ? Math.max(1, d.value)
+            : Math.max(1, d.value);
+      return acc + (d.usedCount ?? 0) * unit;
+    }, 0);
+    return { activeCount, totalRedemptions, revenueSaved };
+  }, [rows]);
 
-  const handleReset = () => {
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(() => {
+    const start = (safePage - 1) * itemsPerPage;
+    return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, safePage]);
+
+  const onReset = () => {
     setSearchQuery("");
+    setStatusFilter("all");
+    setTypeFilter("all");
+    setPage(1);
   };
 
   return (
     <div className="animate-in fade-in space-y-8 duration-700">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-xl shadow-gray-200/50">
-            <Ticket className="text-rose-500" size={32} />
+      {/* Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+              <Tag className="h-3.5 w-3.5" />
+            </span>
+            <span>{isArabic ? "إدارة الخصومات" : "Manage Discounts"}</span>
           </div>
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-gray-900">
-              {t("discounts")}
-            </h1>
-            <p className="mt-1 font-medium text-gray-400">
-              {t("managePromotions")}
-            </p>
-          </div>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">
+            {isArabic ? "العروض" : "Promotions"}
+          </h1>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            {isArabic
+              ? "إدارة وتتبع الحملات الترويجية وخصومات الجملة."
+              : "Manage and track your promotional campaigns and wholesale discounts."}
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col items-end">
-            <span className="flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-rose-500">
-              <Gift size={10} />
-              Promotion Engine
-            </span>
-            <span className="mt-1 text-[10px] font-bold text-gray-400">
-              Campaigns: <span className="text-gray-900">Live</span>
-            </span>
+        <Link
+          href="/admin/discounts/create"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
+        >
+          <Plus className="h-4 w-4" />
+          {isArabic ? "إنشاء خصم جديد" : "Create New Discount"}
+        </Link>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {[
+          {
+            label: isArabic ? "الخصومات النشطة" : "Active Discounts",
+            value: formatNumber(totals.activeCount, locale),
+            delta: "+2%",
+            tone: "emerald",
+          },
+          {
+            label: isArabic ? "إجمالي مرات الاستخدام" : "Total Redemptions",
+            value: formatNumber(totals.totalRedemptions, locale),
+            delta: "+15%",
+            tone: "emerald",
+          },
+          {
+            label: isArabic ? "قيمة التوفير" : "Revenue Saved",
+            value: formatCurrency(totals.revenueSaved, locale),
+            delta: "+10%",
+            tone: "emerald",
+          },
+        ].map((k) => (
+          <div
+            key={k.label}
+            className="relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm"
+          >
+            <div className="absolute -right-10 -top-10 h-24 w-24 rounded-full bg-emerald-500/5" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                <Tag className="h-5 w-5" />
+              </div>
+              <div className="text-xs font-extrabold text-emerald-700">{k.delta}</div>
+            </div>
+            <div className="mt-4 text-sm font-semibold text-slate-500">{k.label}</div>
+            <div className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">
+              {k.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as any);
+                  setPage(1);
+                }}
+                className="h-10 appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="all">{isArabic ? "كل الحالات" : "All Statuses"}</option>
+                <option value="active">{isArabic ? "نشط" : "Active"}</option>
+                <option value="scheduled">{isArabic ? "مجدول" : "Scheduled"}</option>
+                <option value="expired">{isArabic ? "منتهي" : "Expired"}</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            </div>
+
+            <div className="relative">
+              <select
+                value={typeFilter}
+                onChange={(e) => {
+                  setTypeFilter(e.target.value as any);
+                  setPage(1);
+                }}
+                className="h-10 appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="all">{isArabic ? "كل الأنواع" : "All Types"}</option>
+                <option value="percentage">{isArabic ? "نسبة" : "Percentage"}</option>
+                <option value="fixed">{isArabic ? "ثابت" : "Fixed"}</option>
+                <option value="shipping">{isArabic ? "شحن" : "Shipping"}</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            </div>
+
+            <button
+              type="button"
+              onClick={onReset}
+              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              {isArabic ? "إعادة تعيين" : "Reset"}
+            </button>
+          </div>
+
+          <div className="relative w-full lg:max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              placeholder={isArabic ? "ابحث باسم الخصم أو الكود..." : "Search discount name or code..."}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
           </div>
         </div>
       </div>
 
-      <DynamicFilter
-        isOpen={isOpen}
-        onToggle={() => setIsOpen(false)}
-        drawerFilters={productFilters}
-        statusCounts={statusCounts}
-        filtersOpen={filtersOpen}
-        setFiltersOpen={setFiltersOpen}
-        filters={predefinedFilters}
-      />
+      {/* Table */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                <th className="px-5 py-3">{isArabic ? "اسم الخصم" : "Discount Name"}</th>
+                <th className="px-5 py-3">{isArabic ? "النوع" : "Type"}</th>
+                <th className="px-5 py-3">{isArabic ? "الكود" : "Code"}</th>
+                <th className="px-5 py-3">{isArabic ? "الاستخدام" : "Usage"}</th>
+                <th className="px-5 py-3">{isArabic ? "الحالة" : "Status"}</th>
+                <th className="px-5 py-3">{isArabic ? "تاريخ الانتهاء" : "Expiry Date"}</th>
+                <th className="px-5 py-3 text-right">{isArabic ? "الإجراءات" : "Actions"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((d) => {
+                const statusTone =
+                  d.status === "active"
+                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+                    : d.status === "scheduled"
+                      ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100"
+                      : "bg-slate-100 text-slate-500 ring-1 ring-slate-200";
+                const codeTone =
+                  d.status === "expired"
+                    ? "bg-slate-100 text-slate-500"
+                    : "bg-emerald-50 text-emerald-700";
 
-      <DiscountFilters
-        locale={locale}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onToggleFilters={() => setIsOpen(true)}
-        onReset={handleReset}
-      />
+                return (
+                  <tr key={d.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40">
+                    <td className="px-5 py-4">
+                      <div className="font-extrabold text-slate-900">{(d as any).name}</div>
+                      <div className="mt-1 text-xs font-medium text-slate-500">
+                        {d.description || d.store}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 font-semibold text-slate-700">
+                      {(d as any).typeLabel}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-lg px-2 py-1 text-xs font-extrabold ${codeTone}`}>
+                          {d.couponCode}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(d.couponCode)}
+                          className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                          aria-label="Copy code"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 font-semibold text-slate-700">
+                      {(d as any).usageLabel}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${statusTone}`}>
+                        {d.status === "active"
+                          ? isArabic
+                            ? "نشط"
+                            : "Active"
+                          : d.status === "scheduled"
+                            ? isArabic
+                              ? "مجدول"
+                              : "Scheduled"
+                            : isArabic
+                              ? "منتهي"
+                              : "Expired"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-sm font-semibold text-slate-600">
+                      {(d as any).expiryLabel}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/admin/discounts/edit/${encodeURIComponent(d.id)}`}
+                          className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                          aria-label="Edit discount"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(d.couponCode)}
+                          className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                          aria-label="Copy discount"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => console.log("delete", d.id)}
+                          className="rounded-xl p-2 text-slate-500 transition hover:bg-rose-50 hover:text-rose-600"
+                          aria-label="Delete discount"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
 
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2 rounded-xl border border-white/60 bg-gray-100/50 p-1 backdrop-blur-sm">
-          <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-bold text-primary shadow-sm">
-            <Activity size={14} />
-            {t("allStatuses")}
-          </div>
+              {paged.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-10 text-center">
+                    <div className="text-sm font-extrabold text-slate-900">
+                      {isArabic ? "لا توجد خصومات" : "No discounts found"}
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-slate-500">
+                      {isArabic ? "جرّب تغيير الفلاتر أو البحث." : "Try changing filters or search."}
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
 
-        <p className="rounded-xl border border-white/60 bg-white/50 px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-400 backdrop-blur-sm">
-          {filteredDiscounts.length} {t("discounts")} {t("found")}
-        </p>
-      </div>
+        <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm font-medium text-slate-500">
+            {isArabic
+              ? `عرض ${(safePage - 1) * itemsPerPage + 1} - ${Math.min(
+                  safePage * itemsPerPage,
+                  filtered.length,
+                )} من ${filtered.length}`
+              : `Showing ${(safePage - 1) * itemsPerPage + 1}-${Math.min(
+                  safePage * itemsPerPage,
+                  filtered.length,
+                )} of ${filtered.length} discounts`}
+          </div>
 
-      <DiscountTableContainer
-        data={filteredDiscounts}
-        locale={locale}
-        onEdit={(d) => router.push(`/${locale}/admin/discounts/edit/${d.id}`)}
-        onDelete={(d) => console.log("delete", d.id)}
-      />
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              disabled={safePage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isArabic ? "السابق" : "Previous"}
+            </button>
+            <button
+              type="button"
+              disabled={safePage >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isArabic ? "التالي" : "Next"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

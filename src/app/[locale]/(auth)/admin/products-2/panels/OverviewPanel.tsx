@@ -103,7 +103,7 @@ export default function OverviewPanel({ locale }: { locale: LanguageType }) {
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
                 <h2 className="text-xl font-black text-gray-900">
-                  {t("recentProducts")} 2
+                  {t("recentProducts")}
                 </h2>
                 <p className="mt-1 text-xs font-bold uppercase tracking-wider text-gray-400">
                   {products.length} {t("productsLabel")}
@@ -145,7 +145,7 @@ export default function OverviewPanel({ locale }: { locale: LanguageType }) {
 
           <div className="rounded-3xl border border-white/60 bg-white/70 p-6 shadow-xl shadow-gray-200/30 backdrop-blur-xl">
             <h2 className="mb-6 text-lg font-black text-gray-900">
-              {t("recentProducts")} 2
+              {t("recentProducts")}
             </h2>
             <div className="custom-scrollbar max-h-[600px] space-y-4 overflow-y-auto pr-2">
               {products.map((product) => (

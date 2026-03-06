@@ -15,7 +15,7 @@ import {
 
 import CategoryPanelWrapper from "./components/CategoryPanelWrapper";
 import TagsListPanel from "../products-tags/page";
-import ProductOptionsListPanel from "../product-options/page";
+import ProductVariantsPanel from "./components/ProductVariantsPanel";
 
 type TabType =
   | "categories"
@@ -72,10 +72,10 @@ export default function ProductSettings2Page() {
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tight text-gray-900">
-              {t("productSettings")} 2
+              {t("productSettings")}
             </h1>
             <p className="mt-1 font-medium text-gray-400">
-              {t("productSettingsDescription")} 2
+              {t("productSettingsDescription")}
             </p>
           </div>
         </div>
@@ -118,7 +118,7 @@ export default function ProductSettings2Page() {
             <CategoryPanelWrapper activeTab={activeTab} />
           )}
           {activeTab === "tags" && <TagsListPanel />}
-          {activeTab === "variants" && <ProductOptionsListPanel />}
+          {activeTab === "variants" && <ProductVariantsPanel />}
         </div>
       </div>
     </div>

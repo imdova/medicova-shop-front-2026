@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Search,
   SlidersHorizontal,
@@ -70,7 +71,21 @@ export default function RefundRequestsListPanel({
 
   const orderColumns = useMemo(
     () => [
-      { key: "id", header: t("orderId"), sortable: true },
+      {
+        key: "id",
+        header: t("orderId"),
+        sortable: true,
+        render: (item: Order) => (
+          <Link
+            href={`/${locale}/admin/orders/${encodeURIComponent(
+              item.id.replace(/^#/, ""),
+            )}`}
+            className="font-black text-gray-900 underline-offset-4 hover:text-primary hover:underline"
+          >
+            {item.id}
+          </Link>
+        ),
+      },
       {
         key: "customer",
         header: t("customer"),

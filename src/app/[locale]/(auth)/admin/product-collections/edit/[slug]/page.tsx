@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader } from "@/components/shared/card";
 import { Switch } from "@/components/shared/switch";
 import { useParams } from "next/navigation";
 import Image from "next/image";
+import { Link } from "@/i18n/navigation";
 import { Product } from "@/types/product";
 import { ProductCollections } from "@/constants/productCollection";
 import NotFound from "@/app/[locale]/not-found";
@@ -357,10 +358,17 @@ export default function EditCollectionPage() {
     <div>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">{t.title}</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          {locale === "en" ? "Editing:" : "جاري تحرير:"}{" "}
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+          {t.title}
+        </p>
+        <Link
+          href={`/admin/product-collections/${collection.id}/overview`}
+          className="mt-1 block text-2xl font-bold text-gray-900 underline-offset-4 hover:text-primary hover:underline"
+        >
           {collection.name[locale]}
+        </Link>
+        <p className="mt-1 text-sm text-gray-600">
+          {locale === "en" ? "Editing collection" : "جاري تحرير المجموعة"}
         </p>
       </div>
 

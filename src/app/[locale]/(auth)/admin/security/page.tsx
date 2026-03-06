@@ -1,276 +1,391 @@
 "use client";
 
-import React, { useState } from "react";
-import { useTranslations } from "next-intl";
+import React, { useMemo, useState } from "react";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import {
-  Shield,
-  ShieldAlert,
-  Key,
-  Trash2,
-  Smartphone,
-  AlertTriangle,
+  BadgeCheck,
+  ChevronRight,
+  Globe,
+  LayoutGrid,
+  Link2,
+  Lock,
+  Megaphone,
+  Settings2,
+  Wrench,
 } from "lucide-react";
-import { useForm } from "react-hook-form";
-import Modal from "@/components/shared/Modals/DynamicModal";
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
+import { Switch } from "@/components/shared/switch";
 
-type PasswordFormInputs = {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-};
+type SettingsNavKey =
+  | "general"
+  | "branding"
+  | "integrations"
+  | "marketing"
+  | "security"
+  | "maintenance"
+  | "api"
+  | "webhooks";
 
-export default function SecuritySettingsPage() {
-  const t = useTranslations("admin");
+export default function SiteSettingsPage() {
   const locale = useAppLocale();
-  const isRTL = locale === "ar";
+  const isArabic = locale === "ar";
 
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [active, setActive] = useState<SettingsNavKey>("general");
+  const [academyName, setAcademyName] = useState("Medicova");
+  const [supportEmail, setSupportEmail] = useState("support@medicova.net");
+  const [address, setAddress] = useState("");
+  const [timezone, setTimezone] = useState("GMT (Europe/London)");
+  const [language, setLanguage] = useState("English");
+  const [currency, setCurrency] = useState("GBP (£)");
+  const [seoTitle, setSeoTitle] = useState("Medicova | Medical Education & Resources");
+  const [metaDescription, setMetaDescription] = useState("");
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [studentRegistration, setStudentRegistration] = useState(true);
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm<PasswordFormInputs>();
+  const faviconLabel = useMemo(() => {
+    if (!faviconFile) {
+      return isArabic
+        ? "انقر للرفع (PNG, ICO حتى 1MB)"
+        : "Click to upload (PNG, ICO up to 1MB)";
+    }
+    return faviconFile.name;
+  }, [faviconFile, isArabic]);
 
-  const onSubmit = (data: PasswordFormInputs) => {
-    alert(t("save") + " " + t("success"));
-    setShowPasswordModal(false);
-    reset();
+  const navGroups = useMemo(
+    () => [
+      {
+        label: isArabic ? "إدارة الموقع" : "SITE MANAGEMENT",
+        items: [
+          { key: "general" as const, label: isArabic ? "عام" : "General", icon: Settings2 },
+          { key: "branding" as const, label: isArabic ? "الهوية" : "Branding", icon: BadgeCheck },
+          { key: "integrations" as const, label: isArabic ? "التكاملات" : "Integrations", icon: Link2 },
+          { key: "marketing" as const, label: isArabic ? "التسويق والتحليلات" : "Marketing & Analytics", icon: Megaphone },
+          { key: "security" as const, label: isArabic ? "الأمان" : "Security", icon: Lock },
+          { key: "maintenance" as const, label: isArabic ? "الصيانة" : "Maintenance", icon: Wrench },
+        ],
+      },
+      {
+        label: isArabic ? "متقدم" : "ADVANCED",
+        items: [
+          { key: "api" as const, label: isArabic ? "وصول API" : "API Access", icon: Globe },
+          { key: "webhooks" as const, label: isArabic ? "Webhooks" : "Webhooks", icon: LayoutGrid },
+        ],
+      },
+    ],
+    [isArabic],
+  );
+
+  const onDiscard = () => {
+    setAcademyName("Medicova");
+    setSupportEmail("support@medicova.net");
+    setAddress("");
+    setTimezone("GMT (Europe/London)");
+    setLanguage("English");
+    setCurrency("GBP (£)");
+    setSeoTitle("Medicova | Medical Education & Resources");
+    setMetaDescription("");
+    setMaintenanceMode(false);
+    setStudentRegistration(true);
+    setFaviconFile(null);
   };
 
-  const handleAccountDeletion = () => {
-    alert(t("accountDeletion") + " " + t("pending"));
-    setShowDeleteConfirmation(false);
+  const onSave = () => {
+    alert(isArabic ? "تم حفظ التغييرات" : "Changes saved");
   };
 
   return (
-    <div className="animate-in fade-in space-y-8 duration-700">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-xl shadow-gray-200/50">
-            <Shield className="text-emerald-500" size={32} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-gray-900">
-              {t("securitySettings")}
-            </h1>
-            <p className="mt-1 font-medium text-gray-400">
-              Advanced Security & Account Privacy
-            </p>
-          </div>
+    <div dir={isArabic ? "rtl" : "ltr"} className="animate-in fade-in space-y-6 duration-700">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <span className="truncate">{isArabic ? "إعدادات الموقع" : "Site Settings"}</span>
+          <ChevronRight className="h-4 w-4" />
+          <span className="truncate">{isArabic ? "عام" : "General"}</span>
         </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col items-end">
-            <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-emerald-500">
-              <ShieldAlert size={10} />
-              High Protection
-            </span>
-            <span className="mt-1 text-[10px] font-bold text-gray-400">
-              Encryption: <span className="text-gray-900">AES-256 Enabled</span>
-            </span>
-          </div>
-        </div>
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900">
+          {isArabic ? "الإعدادات العامة" : "General Settings"}
+        </h1>
+        <p className="mt-1 text-sm font-medium text-slate-500">
+          {isArabic
+            ? "إدارة معلومات الموقع الأساسية والتفضيلات الإقليمية."
+            : "Manage your site's core information and regional preferences."}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Password Card */}
-        <div className="group relative overflow-hidden rounded-[32px] border border-white/60 bg-white/70 p-8 shadow-xl shadow-gray-200/40 backdrop-blur-xl transition-all duration-500 hover:shadow-2xl hover:shadow-emerald-500/10 active:scale-[0.99]">
-          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-emerald-500/5 transition-transform duration-700 group-hover:scale-150" />
-
-          <div className="mb-8 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 shadow-inner transition-transform duration-500 group-hover:rotate-12">
-              <Key size={24} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px,1fr]">
+        <aside className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+          {navGroups.map((g) => (
+            <div key={g.label} className="mb-5 last:mb-0">
+              <div className="px-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                {g.label}
+              </div>
+              <div className="mt-2 space-y-1">
+                {g.items.map((it) => {
+                  const Icon = it.icon;
+                  const isActive = active === it.key;
+                  return (
+                    <button
+                      key={it.key}
+                      type="button"
+                      onClick={() => setActive(it.key)}
+                      className={[
+                        "flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition",
+                        isActive ? "bg-emerald-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={[
+                            "flex h-8 w-8 items-center justify-center rounded-lg transition",
+                            isActive ? "bg-white/15" : "bg-slate-100 text-slate-600",
+                          ].join(" ")}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        {it.label}
+                      </span>
+                      <ChevronRight
+                        className={[
+                          "h-4 w-4 transition",
+                          isActive ? "text-white/90" : "text-slate-300",
+                        ].join(" ")}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div>
-              <h3 className="text-xl font-black text-gray-900">
-                {t("changePassword")}
-              </h3>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                Credentials Management
+          ))}
+        </aside>
+
+        <main className="space-y-6">
+          {active !== "general" ? (
+            <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
+              <div className="text-sm font-extrabold text-slate-900">
+                {isArabic ? "قريباً" : "Coming soon"}
+              </div>
+              <p className="mt-1 text-sm font-medium text-slate-500">
+                {isArabic
+                  ? "هذه الصفحة قيد الإعداد. حالياً تم تنفيذ تصميم قسم الإعدادات العامة."
+                  : "This section is being prepared. For now, the General Settings design is implemented."}
               </p>
             </div>
-          </div>
+          ) : null}
 
-          <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
-            <div>
-              <p className="mb-1 text-xs font-bold uppercase tracking-tighter text-gray-400">
-                Current Password
-              </p>
-              <p className="text-sm font-black tracking-[0.3em] text-gray-900">
-                ••••••••
-              </p>
+          {/* Academy Details */}
+          <section className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                <Globe className="h-4 w-4" />
+              </div>
+              <h2 className="text-sm font-extrabold text-slate-900">
+                {isArabic ? "تفاصيل الموقع" : "Academy Details"}
+              </h2>
             </div>
-            <Button
-              onClick={() => setShowPasswordModal(true)}
-              variant="outline"
-              className="h-10 rounded-xl border-emerald-100 px-6 font-bold text-emerald-600 transition-all hover:bg-emerald-50 active:scale-95"
-            >
-              {t("edit")}
-            </Button>
-          </div>
-        </div>
 
-        {/* Delete Account Card */}
-        <div className="group relative overflow-hidden rounded-[32px] border border-white/60 bg-white/70 p-8 shadow-xl shadow-gray-200/40 backdrop-blur-xl transition-all duration-500 hover:shadow-2xl hover:shadow-rose-500/10 active:scale-[0.99]">
-          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-rose-500/5 transition-transform duration-700 group-hover:scale-150" />
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <div className="mb-1 text-[12px] font-semibold text-slate-600">
+                  {isArabic ? "اسم الموقع" : "Academy Name"}
+                </div>
+                <Input
+                  value={academyName}
+                  onChange={(e) => setAcademyName(e.target.value)}
+                  className="h-11 rounded-xl border-slate-200 bg-white text-sm font-medium text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
 
-          <div className="mb-8 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 shadow-inner transition-transform duration-500 group-hover:scale-110">
-              <Trash2 size={24} />
+              <div>
+                <div className="mb-1 text-[12px] font-semibold text-slate-600">
+                  {isArabic ? "بريد الدعم" : "Support Email"}
+                </div>
+                <Input
+                  value={supportEmail}
+                  onChange={(e) => setSupportEmail(e.target.value)}
+                  className="h-11 rounded-xl border-slate-200 bg-white text-sm font-medium text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-[12px] font-semibold text-slate-600">
+                  {isArabic ? "العنوان الفعلي" : "Physical Address"}
+                </div>
+                <textarea
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder={isArabic ? "أدخل العنوان" : "Enter address"}
+                  className="min-h-[96px] w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
             </div>
-            <div>
-              <h3 className="text-xl font-black text-gray-900">
-                {t("accountDeletion")}
-              </h3>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                Universal Account Access
-              </p>
+          </section>
+
+          {/* Regional Settings */}
+          <section className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                <Globe className="h-4 w-4" />
+              </div>
+              <h2 className="text-sm font-extrabold text-slate-900">
+                {isArabic ? "الإعدادات الإقليمية" : "Regional Settings"}
+              </h2>
             </div>
-          </div>
 
-          <div className="rounded-2xl border border-rose-100/50 bg-rose-50/30 p-6">
-            <p className="mb-4 text-xs font-bold text-gray-400">
-              {t("deleteNote")}
-            </p>
-            <Button
-              onClick={() => setShowDeleteConfirmation(true)}
-              className="h-11 w-full rounded-xl bg-rose-500 font-bold text-white shadow-lg shadow-rose-500/20 transition-all hover:bg-rose-600 active:scale-[0.98]"
-            >
-              {t("deleteAccount")}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Multi-Factor Authentication (Coming Soon / Stylized) */}
-      <div className="shadow-3xl relative overflow-hidden rounded-[32px] border border-white/60 bg-indigo-900 p-10">
-        <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-indigo-500/20 to-transparent" />
-        <div className="relative z-10 flex flex-col justify-between gap-8 md:flex-row md:items-center">
-          <div className="flex items-center gap-6">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-indigo-400/30 bg-indigo-500/20 text-indigo-200 ring-8 ring-indigo-500/10">
-              <Smartphone size={32} />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div>
+                <div className="mb-1 text-[12px] font-semibold text-slate-600">
+                  {isArabic ? "المنطقة الزمنية" : "Timezone"}
+                </div>
+                <select
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option>GMT (Europe/London)</option>
+                  <option>UTC</option>
+                  <option>GMT+2 (Africa/Cairo)</option>
+                </select>
+              </div>
+              <div>
+                <div className="mb-1 text-[12px] font-semibold text-slate-600">
+                  {isArabic ? "اللغة" : "Language"}
+                </div>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option>English</option>
+                  <option>Arabic</option>
+                </select>
+              </div>
+              <div>
+                <div className="mb-1 text-[12px] font-semibold text-slate-600">
+                  {isArabic ? "العملة" : "Currency"}
+                </div>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option>GBP (£)</option>
+                  <option>USD ($)</option>
+                  <option>EGP (E£)</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <h3 className="text-2xl font-black text-white">
-                Multi-Factor Authentication
-              </h3>
-              <p className="mt-1 text-sm font-medium text-indigo-200/60">
-                Enhance your login security with an extra layer of verification.
-              </p>
+          </section>
+
+          {/* Site Meta & SEO */}
+          <section className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                <BadgeCheck className="h-4 w-4" />
+              </div>
+              <h2 className="text-sm font-extrabold text-slate-900">
+                {isArabic ? "بيانات الموقع و SEO" : "Site Meta & SEO"}
+              </h2>
             </div>
-          </div>
-          <button className="rounded-2xl bg-white px-8 py-3 text-sm font-black uppercase tracking-widest text-indigo-900 shadow-xl shadow-black/20 transition-all hover:scale-105 active:scale-95">
-            Setup Now
-          </button>
-        </div>
-      </div>
 
-      {/* Modals */}
-      <Modal
-        isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
-        title={t("changePassword")}
-      >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="space-y-2">
-            <label className="ml-1 text-[11px] font-black uppercase tracking-wider text-gray-400">
-              {t("currentPassword")}
-            </label>
-            <Input
-              type="password"
-              {...register("currentPassword", { required: true })}
-              className="h-12 rounded-2xl border-none bg-gray-50 transition-all focus:ring-4 focus:ring-emerald-500/5"
-            />
-          </div>
+            <div className="space-y-4">
+              <div>
+                <div className="mb-1 text-[12px] font-semibold text-slate-600">
+                  {isArabic ? "أيقونة الموقع" : "Site Favicon"}
+                </div>
+                <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-sm font-semibold text-slate-500 hover:bg-slate-50/80">
+                  <input
+                    type="file"
+                    accept="image/png,image/x-icon"
+                    className="hidden"
+                    onChange={(e) => setFaviconFile(e.target.files?.[0] ?? null)}
+                  />
+                  {faviconLabel}
+                </label>
+              </div>
 
-          <div className="space-y-2">
-            <label className="ml-1 text-[11px] font-black uppercase tracking-wider text-gray-400">
-              {t("newPassword")}
-            </label>
-            <Input
-              type="password"
-              {...register("newPassword", { required: true, minLength: 6 })}
-              className="h-12 rounded-2xl border-none bg-gray-50 transition-all focus:ring-4 focus:ring-emerald-500/5"
-            />
-          </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[12px] font-semibold text-slate-600">
+                  <span>{isArabic ? "عنوان SEO" : "SEO Title"}</span>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    {Math.min(60, seoTitle.length)}/60 {isArabic ? "موصى به" : "recommended"}
+                  </span>
+                </div>
+                <Input
+                  value={seoTitle}
+                  onChange={(e) => setSeoTitle(e.target.value)}
+                  className="h-11 rounded-xl border-slate-200 bg-white text-sm font-medium text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <label className="ml-1 text-[11px] font-black uppercase tracking-wider text-gray-400">
-              {t("confirmNewPassword")}
-            </label>
-            <Input
-              type="password"
-              {...register("confirmPassword", {
-                required: true,
-                validate: (v) => v === watch("newPassword"),
-              })}
-              className="h-12 rounded-2xl border-none bg-gray-50 transition-all focus:ring-4 focus:ring-emerald-500/5"
-            />
-          </div>
+              <div>
+                <div className="mb-1 text-[12px] font-semibold text-slate-600">
+                  {isArabic ? "وصف الميتا" : "Meta Description"}
+                </div>
+                <textarea
+                  value={metaDescription}
+                  onChange={(e) => setMetaDescription(e.target.value)}
+                  placeholder={isArabic ? "وصف مختصر لنتائج البحث" : "Brief description for search results"}
+                  className="min-h-[110px] w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+            </div>
+          </section>
 
-          <div className="flex gap-4 pt-2">
+          {/* Quick System Toggles */}
+          <section className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                <Wrench className="h-4 w-4" />
+              </div>
+              <h2 className="text-sm font-extrabold text-slate-900">
+                {isArabic ? "مفاتيح النظام السريعة" : "Quick System Toggles"}
+              </h2>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/40 px-4 py-3">
+                <div className="text-sm font-semibold text-slate-800">
+                  {isArabic ? "تفعيل وضع الصيانة" : "Enable Maintenance Mode"}
+                </div>
+                <Switch
+                  checked={maintenanceMode}
+                  onCheckedChange={(v) => setMaintenanceMode(Boolean(v))}
+                  className="data-[state=checked]:bg-emerald-600"
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/40 px-4 py-3">
+                <div className="text-sm font-semibold text-slate-800">
+                  {isArabic ? "السماح بتسجيل الطلاب" : "Allow Student Registration"}
+                </div>
+                <Switch
+                  checked={studentRegistration}
+                  onCheckedChange={(v) => setStudentRegistration(Boolean(v))}
+                  className="data-[state=checked]:bg-emerald-600"
+                />
+              </div>
+            </div>
+          </section>
+
+          <div className="flex items-center justify-end gap-3">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setShowPasswordModal(false)}
-              className="h-12 flex-1 rounded-2xl border-gray-100 font-bold text-gray-400"
+              onClick={onDiscard}
+              className="h-10 rounded-xl border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             >
-              {t("cancel")}
+              {isArabic ? "تجاهل" : "Discard"}
             </Button>
             <Button
-              type="submit"
-              className="h-12 flex-1 rounded-2xl bg-emerald-500 font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-[0.98]"
+              type="button"
+              onClick={onSave}
+              className="h-10 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
             >
-              {t("save")}
+              {isArabic ? "حفظ التغييرات" : "Save Changes"}
             </Button>
           </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={showDeleteConfirmation}
-        onClose={() => setShowDeleteConfirmation(false)}
-        title={t("accountDeletion")}
-      >
-        <div className="space-y-6 text-center">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-rose-100 bg-rose-50 text-rose-500 ring-8 ring-rose-50">
-            <AlertTriangle size={40} />
-          </div>
-          <div>
-            <h4 className="mb-2 text-lg font-black text-gray-900">
-              {t("confirmDelete")}
-            </h4>
-            <p className="px-4 text-xs font-medium text-gray-400">
-              This action is permanent and will remove all your data from our
-              servers.
-            </p>
-          </div>
-
-          <div className="flex gap-4">
-            <Button
-              onClick={() => setShowDeleteConfirmation(false)}
-              variant="outline"
-              className="h-12 flex-1 rounded-2xl border-gray-100 font-bold text-gray-400"
-            >
-              {t("cancel")}
-            </Button>
-            <Button
-              onClick={handleAccountDeletion}
-              className="h-12 flex-1 rounded-2xl bg-rose-500 font-bold text-white shadow-lg shadow-rose-500/20 transition-all hover:bg-rose-600 active:scale-[0.98]"
-            >
-              {t("confirm")}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </main>
+      </div>
     </div>
   );
 }

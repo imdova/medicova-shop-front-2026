@@ -328,13 +328,8 @@ export default function Products2Page() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-              {isAr ? "مخزون المنتجات" : "Product Inventory"}
+              {isAr ? "إدارة المنتجات" : "Products Management"}
             </h1>
-            <p className="mt-1 max-w-xl text-sm text-slate-500">
-              {isAr
-                ? "مراقبة وإدارة كتالوج السوق الطبي عبر جميع الفئات الطبية."
-                : "Monitor and manage healthcare marketplace catalog across all medical categories."}
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -361,7 +356,7 @@ export default function Products2Page() {
           </div>
         </div>
 
-        {/* Summary cards: glass, hover lift */}
+        {/* Summary cards: smart, modern */}
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             {
@@ -369,56 +364,87 @@ export default function Products2Page() {
               value: formatNumber(totalProducts, locale),
               label: isAr ? "إجمالي المنتجات" : "Total Products",
               sub: isAr ? "مباشر" : "Live",
-              iconBg: "bg-emerald-500/10",
+              accent: "emerald",
+              gradient: "from-emerald-500/8 to-emerald-600/4",
+              iconBg: "bg-emerald-500/15",
               iconColor: "text-emerald-600",
-              subColor: "text-emerald-600",
+              ring: "ring-emerald-500/20",
+              shadow: "hover:shadow-emerald-500/10",
             },
             {
               icon: FileCheck,
               value: String(pendingCount),
               label: isAr ? "قيد الموافقة" : "Pending Approval",
               sub: isAr ? "مراجعة عاجلة" : "Requires urgent review",
-              iconBg: "bg-amber-500/10",
+              accent: "amber",
+              gradient: "from-amber-500/8 to-amber-600/4",
+              iconBg: "bg-amber-500/15",
               iconColor: "text-amber-600",
-              subColor: "text-amber-600",
+              ring: "ring-amber-500/20",
+              shadow: "hover:shadow-amber-500/10",
             },
             {
               icon: AlertCircle,
               value: String(outOfStockCount),
               label: isAr ? "نفد من المخزون" : "Out of Stock",
               sub: `${outOfStockCount} critical`,
-              iconBg: "bg-rose-500/10",
+              accent: "rose",
+              gradient: "from-rose-500/8 to-rose-600/4",
+              iconBg: "bg-rose-500/15",
               iconColor: "text-rose-600",
-              subColor: "text-rose-600",
+              ring: "ring-rose-500/20",
+              shadow: "hover:shadow-rose-500/10",
             },
             {
               icon: Star,
               value: topCategory,
               label: isAr ? "أفضل فئة مبيعاً" : "Top Selling Category",
               sub: isAr ? "الأكثر تكراراً" : "Most frequent",
-              iconBg: "bg-violet-500/10",
+              accent: "violet",
+              gradient: "from-violet-500/8 to-violet-600/4",
+              iconBg: "bg-violet-500/15",
               iconColor: "text-violet-600",
-              subColor: "text-violet-600",
+              ring: "ring-violet-500/20",
+              shadow: "hover:shadow-violet-500/10",
             },
           ].map((card, i) => (
             <div
               key={i}
-              className="group relative overflow-hidden rounded-2xl border border-white/60 bg-white/80 p-3 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-white hover:shadow-lg hover:shadow-slate-200/50"
+              className={`group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm ring-1 ring-slate-900/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${card.shadow} hover:ring-2 ${card.ring}`}
             >
-              <div className="flex items-start justify-between">
-                <div
-                  className={`rounded-lg p-1.5 ${card.iconBg} ${card.iconColor} transition-transform duration-300 group-hover:scale-110`}
-                >
-                  <card.icon className="h-4 w-4" />
+              <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-100`} aria-hidden />
+              <div className="relative flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${card.iconBg} ${card.iconColor} transition-transform duration-300 group-hover:scale-105`}
+                  >
+                    <card.icon className="h-5 w-5" strokeWidth={2.25} />
+                  </div>
+                  <p className="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900">
+                    {card.value}
+                  </p>
                 </div>
-                <span className={`text-[10px] font-semibold ${card.subColor}`}>
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${card.iconBg} ${card.iconColor}`}>
                   {card.sub}
                 </span>
               </div>
-              <p className="mt-1.5 text-base font-bold tabular-nums tracking-tight text-slate-900 md:text-lg">
-                {card.value}
-              </p>
-              <p className="text-xs text-slate-500">{card.label}</p>
+              <div className="relative mt-3">
+                <p className="text-xs font-medium text-slate-500">
+                  {card.label}
+                </p>
+              </div>
+              <div
+                className={`absolute top-0 left-0 h-0.5 w-14 rounded-r-full ${
+                  card.accent === "emerald"
+                    ? "bg-emerald-500"
+                    : card.accent === "amber"
+                      ? "bg-amber-500"
+                      : card.accent === "rose"
+                        ? "bg-rose-500"
+                        : "bg-violet-500"
+                }`}
+                aria-hidden
+              />
             </div>
           ))}
         </div>
@@ -550,9 +576,15 @@ export default function Products2Page() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={isAr ? "البحث بالاسم أو SKU..." : "Search by name or SKU..."}
-                      className={`focus:ring-primary/20 w-full rounded-xl border border-slate-200/80 bg-slate-50/50 py-2 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-primary focus:bg-white focus:outline-none focus:ring-2 ${isAr ? "pl-4 pr-10" : "pl-10 pr-4"}`}
+                      className={`w-full rounded-xl border border-slate-200/80 bg-slate-50/50 py-2 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${isAr ? "pl-4 pr-10" : "pl-10 pr-4"}`}
                     />
                     </div>
+                    <p className="shrink-0 text-xs font-medium text-slate-500">
+                      {isAr ? "النتائج" : "Results"}:{" "}
+                      <span className="font-semibold text-slate-700">
+                        {formatNumber(filteredProducts.length, locale)}
+                      </span>
+                    </p>
 
                     {/* List / Grid toggle (right of search) */}
                     <div className="flex w-fit rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
@@ -582,26 +614,17 @@ export default function Products2Page() {
                       </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between gap-3 lg:justify-end">
-                    <p className="text-xs font-medium text-slate-500">
-                      {isAr ? "النتائج" : "Results"}:{" "}
-                      <span className="font-semibold text-slate-700">
-                        {formatNumber(filteredProducts.length, locale)}
-                      </span>
-                    </p>
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
                   <div className="flex flex-col gap-1">
-                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                    <label className={`text-xs font-semibold text-slate-700 ${isAr ? "text-right" : ""}`}>
                       {isAr ? "البائع" : "Seller"}
                     </label>
                     <select
                       value={sellerFilter}
                       onChange={(e) => setSellerFilter(e.target.value)}
-                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                      className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     >
                       <option value="">{isAr ? "الكل" : "All"}</option>
                       {Array.from(new Set(products.map(getSellerName))).map((name) => (
@@ -613,13 +636,13 @@ export default function Products2Page() {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                    <label className={`text-xs font-semibold text-slate-700 ${isAr ? "text-right" : ""}`}>
                       {isAr ? "الفئة" : "Category"}
                     </label>
                     <select
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                      className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     >
                       <option value="">{isAr ? "الكل" : "All"}</option>
                       {Array.from(new Set(products.map((p) => getCategoryName(p, locale))))
@@ -633,13 +656,13 @@ export default function Products2Page() {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                    <label className={`text-xs font-semibold text-slate-700 ${isAr ? "text-right" : ""}`}>
                       {isAr ? "الفئة الفرعية" : "Subcategory"}
                     </label>
                     <select
                       value={subCategoryFilter}
                       onChange={(e) => setSubCategoryFilter(e.target.value)}
-                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                      className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     >
                       <option value="">{isAr ? "الكل" : "All"}</option>
                       {Array.from(new Set(products.map((p) => getSubCategoryName(p, locale))))
@@ -653,13 +676,13 @@ export default function Products2Page() {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                    <label className={`text-xs font-semibold text-slate-700 ${isAr ? "text-right" : ""}`}>
                       {isAr ? "الفئة الفرعية للطفل" : "Child Category"}
                     </label>
                     <select
                       value={childCategoryFilter}
                       onChange={(e) => setChildCategoryFilter(e.target.value)}
-                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                      className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     >
                       <option value="">{isAr ? "الكل" : "All"}</option>
                       {Array.from(new Set(products.map((p) => getChildCategoryName(p, locale))))
@@ -673,13 +696,13 @@ export default function Products2Page() {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                    <label className={`text-xs font-semibold text-slate-700 ${isAr ? "text-right" : ""}`}>
                       {isAr ? "الحالة" : "Status"}
                     </label>
                     <select
                       value={approvalFilter}
                       onChange={(e) => setApprovalFilter(e.target.value as "" | "approved" | "pending")}
-                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                      className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     >
                       <option value="">{isAr ? "الكل" : "All"}</option>
                       <option value="approved">{isAr ? "معتمد" : "Approved"}</option>
@@ -688,13 +711,13 @@ export default function Products2Page() {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                    <label className={`text-xs font-semibold text-slate-700 ${isAr ? "text-right" : ""}`}>
                       {isAr ? "النشر" : "Publish"}
                     </label>
                     <select
                       value={publishFilter}
                       onChange={(e) => setPublishFilter(e.target.value as "" | "Published" | "Draft")}
-                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                      className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     >
                       <option value="">{isAr ? "الكل" : "All"}</option>
                       <option value="Published">{isAr ? "منشور" : "Published"}</option>
@@ -703,13 +726,13 @@ export default function Products2Page() {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                    <label className={`text-xs font-semibold text-slate-700 ${isAr ? "text-right" : ""}`}>
                       {isAr ? "التاريخ" : "Date"}
                     </label>
                     <select
                       value={dateFilter}
                       onChange={(e) => setDateFilter(e.target.value as "" | "7" | "30" | "90" | "no-date")}
-                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                      className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     >
                       <option value="">{isAr ? "الكل" : "All"}</option>
                       <option value="7">{isAr ? "آخر 7 أيام" : "Last 7 days"}</option>
@@ -721,7 +744,7 @@ export default function Products2Page() {
 
                   {/* Clear all button at far right of filters */}
                   <div className="flex flex-col gap-1">
-                    <div className="hidden text-xs font-medium text-slate-500 xl:block">
+                    <div className="hidden text-xs font-semibold text-slate-700 xl:block">
                       {isAr ? " " : " "}
                     </div>
                     <button
@@ -737,8 +760,9 @@ export default function Products2Page() {
                         setDateFilter("");
                         setSearchQuery("");
                       }}
-                      className="hover:bg-primary/10 disabled:hover:bg-transparent h-9 rounded-xl px-3.5 text-sm font-medium text-primary transition-colors disabled:opacity-40"
+                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white"
                     >
+                      <X className="h-4 w-4" />
                       {isAr ? "مسح الكل" : "Clear all"}
                     </button>
                   </div>
@@ -859,7 +883,7 @@ export default function Products2Page() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <Link
-                              href={`/${locale}/admin/products-2/${item._id}`}
+                              href={`/${locale}/admin/products-2/details/${item._id}`}
                               className="line-clamp-2 font-semibold text-slate-900 transition-colors hover:text-primary"
                             >
                               {name || "—"}
@@ -872,7 +896,7 @@ export default function Products2Page() {
                           <div className="flex items-center gap-1">
                             <Link
                               href={`/${locale}/admin/products-2/${item._id}`}
-                              className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                              className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
                               aria-label={isAr ? "تعديل" : "Edit"}
                             >
                               <Pencil className="h-4 w-4" />
@@ -922,7 +946,7 @@ export default function Products2Page() {
                               aria-checked={item.approved}
                               onClick={() => handleToggleApprove(item)}
                               disabled={approvingId === item._id}
-                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 disabled:opacity-50 ${
+                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50 ${
                                 item.approved
                                   ? "border-emerald-500 bg-emerald-500"
                                   : "border-slate-200 bg-slate-100"
@@ -1000,7 +1024,7 @@ export default function Products2Page() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1400px] text-left text-sm">
                   <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-slate-800">
                       <th className="px-5 py-3.5">
                         {isAr ? "المنتج" : "Product"}
                       </th>
@@ -1084,7 +1108,7 @@ export default function Products2Page() {
                               </div>
                               <div className="min-w-0">
                                 <Link
-                                  href={`/${locale}/admin/products-2/${item._id}`}
+                                  href={`/${locale}/admin/products-2/details/${item._id}`}
                                   className="font-semibold text-slate-900 transition-colors hover:text-primary"
                                 >
                                   {name || "—"}
@@ -1149,7 +1173,7 @@ export default function Products2Page() {
                               aria-checked={item.approved}
                               onClick={() => handleToggleApprove(item)}
                               disabled={approvingId === item._id}
-                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 disabled:opacity-50 ${
+                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-offset-2 disabled:opacity-50 ${
                                 item.approved
                                   ? "border-emerald-500 bg-emerald-500"
                                   : "border-slate-200 bg-slate-100"
@@ -1208,7 +1232,7 @@ export default function Products2Page() {
                             <div className="flex items-center gap-1">
                               <Link
                                 href={`/${locale}/admin/products-2/${item._id}`}
-                                className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                                className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
                                 aria-label={isAr ? "تعديل" : "Edit"}
                               >
                                 <Pencil className="h-4 w-4" />

@@ -3,7 +3,13 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { CircleDollarSign, TextSearch, Wallet, Coins } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import {
+  CalendarDays,
+  CircleDollarSign,
+  Download,
+  TextSearch,
+} from "lucide-react";
 
 // Components
 import {
@@ -14,13 +20,14 @@ import {
 } from "@/components/shared/Tabs";
 import OverviewPanel from "./panels/OverviewPanel";
 import TransactionsListPanel from "./panels/TransactionsListPanel";
-import PlansListPanel from "./panels/PlansListPanel";
-import WithdrawalsListPanel from "./panels/WithdrawalsListPanel";
 
 export default function FinancialPage() {
   const t = useTranslations("admin");
   const locale = useAppLocale();
   const isArabic = locale === "ar";
+  const searchParams = useSearchParams();
+  const initialTab =
+    searchParams.get("tab") === "transactions" ? "transactions" : "overview";
 
   const tabs = [
     {
@@ -35,52 +42,47 @@ export default function FinancialPage() {
       icon: CircleDollarSign,
       content: <TransactionsListPanel />,
     },
-    {
-      value: "withdrawals",
-      label: t("withdrawals"),
-      icon: Wallet,
-      content: <WithdrawalsListPanel />,
-    },
-    {
-      value: "plans",
-      label: t("plans"),
-      icon: Coins,
-      content: <PlansListPanel />,
-    },
   ];
 
   return (
     <div className="animate-in fade-in space-y-8 duration-700">
       {/* Page Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-xl shadow-gray-200/50">
-            <CircleDollarSign className="text-emerald-500" size={32} />
+            <CircleDollarSign className="text-emerald-600" size={32} />
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tight text-gray-900">
-              {t("financial")}
+              {isArabic ? "نظرة عامة مالية" : "Financial Overview"}
             </h1>
-            <p className="mt-1 font-medium text-gray-400">
-              {t("financialOverview")}
+            <p className="mt-1 max-w-2xl text-sm font-medium text-gray-400">
+              {isArabic
+                ? "مقاييس أداء فورية لمنصة HealthMarket"
+                : "Real-time performance metrics for HealthMarket platform"}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col items-end">
-            <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-emerald-500">
-              <Wallet size={10} />
-              Secure Wallet
-            </span>
-            <span className="mt-1 text-[10px] font-bold text-gray-400">
-              Status: <span className="text-gray-900">Synchronized</span>
-            </span>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            <CalendarDays className="h-4 w-4 text-slate-500" />
+            {isArabic ? "آخر 30 يومًا" : "Last 30 Days"}
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+          >
+            <Download className="h-4 w-4" />
+            {isArabic ? "تصدير التقرير" : "Export Report"}
+          </button>
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs defaultValue={initialTab} className="w-full">
         <TabsList className="mb-8 w-fit rounded-2xl border border-white/60 bg-gray-100/50 p-1.5 backdrop-blur-sm">
           {tabs.map(({ value, label, icon: Icon }) => (
             <TabsTrigger
