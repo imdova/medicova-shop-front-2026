@@ -3,10 +3,12 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+const isVercel = Boolean(process.env.VERCEL);
+
 const nextConfig: NextConfig = {
   // Hostinger (and some deployment UIs) may fail to detect hidden folders like `.next`
   // when asking for an "output directory". Use a non-hidden build directory instead.
-  distDir: "build",
+  ...(isVercel ? {} : { distDir: "build" }),
   async redirects() {
     return [
       {
