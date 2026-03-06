@@ -91,8 +91,20 @@ const ProductCreationWizard = ({
 
       <div className="mx-auto max-w-5xl px-4 pt-6">
         {/* Header & Top Navigation */}
-        <div className="mb-6 rounded-[2rem] border border-white/80 bg-white/60 p-4 shadow-xl shadow-gray-200/10 backdrop-blur-2xl">
-          <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="mb-6 rounded-[2rem] border border-white/80 bg-white/60 p-6 shadow-xl shadow-gray-200/10 backdrop-blur-2xl">
+          {/* Step Indicator */}
+          <div className="mb-4">
+            <WizardHeader
+              steps={steps}
+              currentStep={currentStep}
+              product={product as any}
+              onStepClick={(step) => goToStep(step as Step)}
+              errors={errors}
+            />
+          </div>
+
+          {/* Navigation Buttons */}
+          <div className="flex items-center justify-between">
             <DynamicButton
               variant="outline"
               onClick={() => {
@@ -110,16 +122,6 @@ const ProductCreationWizard = ({
               }
               iconPosition="left"
             />
-
-            <div className="max-w-md flex-1">
-              <WizardHeader
-                steps={steps}
-                currentStep={currentStep}
-                product={product as any}
-                onStepClick={(step) => goToStep(step as Step)}
-                errors={errors}
-              />
-            </div>
 
             <DynamicButton
               variant={isLastStep ? "success" : "primary"}
@@ -156,7 +158,7 @@ const ProductCreationWizard = ({
         </div>
 
         {/* Main Content Area */}
-        <div className="rounded-[2.5rem] border border-white/80 bg-white/40 p-2 shadow-2xl shadow-gray-200/10 backdrop-blur-3xl transition-all">
+        <div className="rounded-[2.5rem] border border-gray-100 bg-gray-50/80 p-2 shadow-sm transition-all">
           <div className="p-4">{renderStep()}</div>
         </div>
       </div>

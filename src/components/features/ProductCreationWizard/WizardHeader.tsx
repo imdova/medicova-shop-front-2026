@@ -23,67 +23,77 @@ export const WizardHeader = ({
   onStepClick,
 }: WizardHeaderProps) => {
   const currentIndex = steps.findIndex((s) => s.key === currentStep);
-  const progress = ((currentIndex + 1) / steps.length) * 100;
 
   return (
-    <div className="space-y-4">
-      {/* Dynamic Progress Bar */}
-      <div className="relative h-1 w-full overflow-hidden rounded-full bg-gray-100/30">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          transition={{ type: "spring", stiffness: 50, damping: 20 }}
-          style={{ backgroundColor: "lab(58.4941% -47.8529 35.5714)" }}
-          className="absolute left-0 top-0 h-full shadow-[0_0_15px_rgba(0,128,128,0.2)]"
-        />
-      </div>
-
-      <div className="flex items-center justify-between gap-1 px-1">
+    <div className="w-full py-2">
+      <div className="flex items-start justify-center">
         {steps.map((step, idx) => {
           const isActive = step.key === currentStep;
-          const isCompleted =
-            steps.findIndex((s) => s.key === currentStep) > idx;
+          const isCompleted = currentIndex > idx;
+          const isLast = idx === steps.length - 1;
 
           return (
-            <button
+            <div
               key={step.key}
-              onClick={() => onStepClick(step.key)}
-              className="group relative flex flex-col gap-1 outline-none"
+              className={`flex items-start ${!isLast ? "flex-1" : ""}`}
             >
-              <div className="flex items-center gap-1.5">
-                <div
-                  style={
-                    isCompleted || isActive
-                      ? { backgroundColor: "lab(58.4941% -47.8529 35.5714)" }
-                      : {}
-                  }
-                  className={`flex h-6 w-6 items-center justify-center rounded-lg transition-all duration-500 ${
-                    isActive
-                      ? "scale-105 text-white shadow-lg"
-                      : isCompleted
-                        ? "text-white"
-                        : "border border-gray-100 bg-white text-gray-300"
+              {/* Step circle + label */}
+              <button
+                onClick={() => onStepClick(step.key)}
+                className="group relative flex flex-col items-center gap-2 outline-none"
+              >
+                <motion.div
+                  initial={false}
+                  animate={{
+                    scale: isActive ? 1.05 : 1,
+                  }}
+                  className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                    isCompleted
+                      ? "border-emerald-500 bg-emerald-500 text-white shadow-md shadow-emerald-200"
+                      : isActive
+                        ? "border-emerald-500 bg-white text-emerald-600 shadow-md shadow-emerald-100"
+                        : "border-gray-200 bg-white text-gray-400"
                   }`}
                 >
                   {isCompleted ? (
-                    <Check size={12} strokeWidth={3} />
+                    <Check size={16} strokeWidth={3} />
                   ) : (
-                    <span className="text-[10px] font-black">
-                      {step.number}
-                    </span>
+                    <span className="text-sm font-bold">{step.number}</span>
                   )}
+                </motion.div>
+                <span
+                  className={`whitespace-nowrap text-[11px] font-semibold transition-colors ${
+                    isActive
+                      ? "text-emerald-600"
+                      : isCompleted
+                        ? "text-emerald-500"
+                        : "text-gray-400"
+                  }`}
+                >
+                  {step.label || `Step ${step.number}`}
+                </span>
+              </button>
+
+              {/* Connecting line */}
+              {!isLast && (
+                <div className="relative mt-[18px] flex h-[2px] flex-1 items-center px-2">
+                  <div className="h-full w-full rounded-full bg-gray-200">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{
+                        width: isCompleted ? "100%" : "0%",
+                      }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 60,
+                        damping: 20,
+                      }}
+                      className="h-full rounded-full bg-emerald-500"
+                    />
+                  </div>
                 </div>
-                <div className="hidden text-left md:block">
-                  <p
-                    className={`text-[8px] font-black uppercase tracking-widest transition-colors ${
-                      isActive ? "text-gray-900" : "text-gray-300"
-                    }`}
-                  >
-                    {step.label || `P${step.number}`}
-                  </p>
-                </div>
-              </div>
-            </button>
+              )}
+            </div>
           );
         })}
       </div>
