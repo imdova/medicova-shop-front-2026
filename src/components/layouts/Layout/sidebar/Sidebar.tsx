@@ -6,7 +6,6 @@ import { Power, ChevronDown, ChevronUp } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { isCurrentPage } from "@/util";
 import { AccountPageProps } from "@/app/[locale]/(auth)/user/types/account";
-import ProfileCompletion from "@/app/[locale]/(auth)/user/component/ProfileCompletion";
 import { useAppLocale } from "@/hooks/useAppLocale";
 
 const Sidebar: React.FC<AccountPageProps> = ({ user }) => {
@@ -28,19 +27,7 @@ const Sidebar: React.FC<AccountPageProps> = ({ user }) => {
 
   return (
     <aside className="sticky top-8 w-60">
-      <div className="rounded-[2rem] border border-white/60 bg-white/70 p-6 shadow-xl shadow-gray-200/40 backdrop-blur-xl">
-        <div className="mb-6">
-          <h1 className="text-xl font-bold tracking-tight text-gray-900">
-            {user.name || "Hala!"}
-          </h1>
-          <p className="truncate text-sm font-medium text-gray-400">
-            {user.email}
-          </p>
-        </div>
-        <ProfileCompletion isArabic={isArabic} percentage={40} />
-      </div>
-
-      <nav className="mt-4">
+      <nav>
         {groups.map((group, groupIndex) => (
           <div key={groupIndex} className="mb-4">
             {group.title && (

@@ -61,10 +61,19 @@ export default async function LocaleLayout({ children, params }: Props) {
     headerLinks = staticHeaderLinks;
   }
 
+  // Remove "Clothes" section from categories nav below navbar
+  const clothesTitles = ["Clothes", "clothes", "Clothing", "ملابس"];
+  headerLinks = headerLinks.filter((link: { title?: { en?: string; ar?: string } }) => {
+    const en = link.title?.en?.trim() ?? "";
+    const ar = link.title?.ar?.trim() ?? "";
+    return !clothesTitles.includes(en) && !clothesTitles.includes(ar);
+  });
+
   return (
-    <html lang={locale} dir={direction}>
+    <html lang={locale} dir={direction} suppressHydrationWarning>
       <body
         className={`${raleway.variable} ${cairo.variable} ${fontClass} bg-gray-50 antialiased`}
+        suppressHydrationWarning
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
           <StoreProvider>

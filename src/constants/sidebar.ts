@@ -178,7 +178,6 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
   ],
   admin: [
     {
-      title: { en: "Dashboard", ar: "لوحة التحكم" },
       items: [
         {
           title: { en: "Dashboard", ar: "لوحة التحكم" },
@@ -232,6 +231,28 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
               href: "/admin/product-settings",
               icon: Settings
             }
+          ],
+        },
+        {
+          title: { en: "All Products 2", ar: "كل المنتجات 2" },
+          href: "/admin/products-2",
+          icon: PackageSearch,
+          subItems: [
+            {
+              title: { en: "All Products 2", ar: "كل المنتجات 2" },
+              href: "/admin/products-2",
+              icon: PackageSearch,
+            },
+            {
+              title: { en: "Create Product 2", ar: "إنشاء منتج 2" },
+              href: "/admin/create-product-2",
+              icon: PackagePlus,
+            },
+            {
+              title: { en: "Product Settings 2", ar: "اعدادات المنتج 2" },
+              href: "/admin/product-settings-2",
+              icon: Settings,
+            },
           ],
         },
 

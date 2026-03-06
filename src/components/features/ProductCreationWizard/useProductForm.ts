@@ -1,18 +1,25 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { ProductFormData } from "@/lib/validations/product-schema";
-import { 
-  step1CoreSchema, 
-  step2MediaSchema, 
-  step3SettingsSchema 
+import {
+  step1CoreSchema,
+  step2MediaSchema,
+  step3MediaSchema,
+  step4SettingsSchema,
 } from "@/lib/validations/product-schema";
-import { createProduct, updateProductApi, getProductById, CreateProductPayload } from "@/services/productService";
+import {
+  createProduct,
+  updateProductApi,
+  getProductById,
+  CreateProductPayload,
+} from "@/services/productService";
 import { uploadImage } from "@/lib/uploadService";
 
 export type Step =
   | "step1_core"
-  | "step2_media"
-  | "step3_settings";
+  | "step2_pricing"
+  | "step3_media"
+  | "step4_settings";
 
 export const useProductForm = (productId?: string) => {
   const { data: session } = useSession();
@@ -30,26 +37,26 @@ export const useProductForm = (productId?: string) => {
     slugAr: "",
     descriptions: { descriptionEn: "", descriptionAr: "" },
     identity: { sku: "", skuMode: "manual" },
-    classification: { 
-      category: "", 
-      subcategory: "", 
-      childCategory: "", 
-      brand: "", 
-      productType: "Physical Product" 
+    classification: {
+      category: "",
+      subcategory: "",
+      childCategory: "",
+      brand: "",
+      productType: "Physical Product",
     },
-    pricing: { 
-      originalPrice: 0, 
-      salePrice: 0, 
-      startDate: null, 
-      endDate: null 
+    pricing: {
+      originalPrice: 0,
+      salePrice: 0,
+      startDate: null,
+      endDate: null,
     },
-    inventory: { 
-      trackStock: true, 
-      stockQuantity: 0, 
-      stockStatus: "in_stock" 
+    inventory: {
+      trackStock: true,
+      stockQuantity: 0,
+      stockStatus: "in_stock",
     },
-    media: { 
-      galleryImages: [] 
+    media: {
+      galleryImages: [],
     },
     productVariants: [],
     tags: [],
@@ -68,7 +75,7 @@ export const useProductForm = (productId?: string) => {
 
   const updateProduct = useCallback((updates: Partial<ProductFormData>) => {
     setProduct((prev) => ({ ...prev, ...updates }));
-    
+
     const updatedFields = Object.keys(updates);
     if (updatedFields.length > 0) {
       setErrors((prev) => {
@@ -89,89 +96,137 @@ export const useProductForm = (productId?: string) => {
   useEffect(() => {
     if (!productId || !token) return;
     setIsLoading(true);
-    getProductById(productId, token).then((data: any) => {
-      if (data) {
-        // Log full response so we can see every field the API returns
-        console.log("DEBUG: Full product data for edit:", JSON.stringify(data, null, 2));
+    getProductById(productId, token)
+      .then((data: any) => {
+        if (data) {
+          // Log full response so we can see every field the API returns
+          console.log(
+            "DEBUG: Full product data for edit:",
+            JSON.stringify(data, null, 2),
+          );
 
-        const d = data; // shorthand
+          const d = data; // shorthand
 
-        setProduct((prev) => ({
-          ...prev,
-          title: { en: d.nameEn || "", ar: d.nameAr || "" },
-          slugEn: d.slugEn || "",
-          slugAr: d.slugAr || "",
+          setProduct((prev) => ({
+            ...prev,
+            title: { en: d.nameEn || "", ar: d.nameAr || "" },
+            slugEn: d.slugEn || "",
+            slugAr: d.slugAr || "",
 
-          // Descriptions — handle nested or flat
-          descriptions: {
-            descriptionEn: d.descriptions?.descriptionEn || d.descriptionEn || "",
-            descriptionAr: d.descriptions?.descriptionAr || d.descriptionAr || "",
-          },
+            // Descriptions — handle nested or flat
+            descriptions: {
+              descriptionEn:
+                d.descriptions?.descriptionEn || d.descriptionEn || "",
+              descriptionAr:
+                d.descriptions?.descriptionAr || d.descriptionAr || "",
+            },
 
-          // Identity — handle nested or flat
-          identity: {
-            sku: d.identity?.sku || d.sku || "",
-            skuMode: d.identity?.skuMode || d.skuMode || "manual",
-          },
+            // Identity — handle nested or flat
+            identity: {
+              sku: d.identity?.sku || d.sku || "",
+              skuMode: d.identity?.skuMode || d.skuMode || "manual",
+            },
 
-          // Classification — handle nested object or direct IDs
-          classification: {
-            category: d.classification?.category?._id || d.classification?.category || d.categoryId || d.category || "",
-            subcategory: d.classification?.subcategory?._id || d.classification?.subcategory || d.subcategoryId || d.subcategory || "",
-            childCategory: d.classification?.childCategory?._id || d.classification?.childCategory || d.childCategoryId || d.childCategory || "",
-            brand: d.classification?.brand?._id || d.classification?.brand || d.brandId || d.brand || "",
-            productType: d.classification?.productType || d.productType || "Physical Product",
-          },
+            // Classification — handle nested object or direct IDs
+            classification: {
+              category:
+                d.classification?.category?._id ||
+                d.classification?.category ||
+                d.categoryId ||
+                d.category ||
+                "",
+              subcategory:
+                d.classification?.subcategory?._id ||
+                d.classification?.subcategory ||
+                d.subcategoryId ||
+                d.subcategory ||
+                "",
+              childCategory:
+                d.classification?.childCategory?._id ||
+                d.classification?.childCategory ||
+                d.childCategoryId ||
+                d.childCategory ||
+                "",
+              brand:
+                d.classification?.brand?._id ||
+                d.classification?.brand ||
+                d.brandId ||
+                d.brand ||
+                "",
+              productType:
+                d.classification?.productType ||
+                d.productType ||
+                "Physical Product",
+            },
 
-          // Pricing — handle nested or flat
-          pricing: {
-            originalPrice: d.pricing?.originalPrice ?? d.originalPrice ?? d.price ?? 0,
-            salePrice: d.pricing?.salePrice ?? d.salePrice ?? d.sale_price ?? 0,
-            startDate: d.pricing?.startDate || d.startDate || null,
-            endDate: d.pricing?.endDate || d.endDate || null,
-          },
+            // Pricing — handle nested or flat
+            pricing: {
+              originalPrice:
+                d.pricing?.originalPrice ?? d.originalPrice ?? d.price ?? 0,
+              salePrice:
+                d.pricing?.salePrice ?? d.salePrice ?? d.sale_price ?? 0,
+              startDate: d.pricing?.startDate || d.startDate || null,
+              endDate: d.pricing?.endDate || d.endDate || null,
+            },
 
-          // Inventory — handle nested or flat
-          inventory: d.inventory || {
-            trackStock: d.trackStock ?? true,
-            stockQuantity: d.stockQuantity ?? d.stock ?? 0,
-            stockStatus: d.stockStatus || "in_stock",
-          },
+            // Inventory — handle nested or flat
+            inventory: d.inventory || {
+              trackStock: d.trackStock ?? true,
+              stockQuantity: d.stockQuantity ?? d.stock ?? 0,
+              stockStatus: d.stockStatus || "in_stock",
+            },
 
-          highlightsEn: d.highlightsEn || [],
-          highlightsAr: d.highlightsAr || [],
-          specifications: d.specifications || [],
+            highlightsEn: d.highlightsEn || [],
+            highlightsAr: d.highlightsAr || [],
+            specifications: d.specifications || [],
 
-          // Images — handle both media-wrapped and flat
-          images: d.media?.galleryImages || d.galleryImages || (d.media?.featuredImages ? [d.media.featuredImages] : d.featuredImages ? [d.featuredImages] : []),
-          media: {
-            galleryImages: d.media?.galleryImages || d.galleryImages || [],
-            productVideo: d.media?.productVideo || d.productVideo,
-          },
+            // Images — handle both media-wrapped and flat
+            images:
+              d.media?.galleryImages ||
+              d.galleryImages ||
+              (d.media?.featuredImages
+                ? [d.media.featuredImages]
+                : d.featuredImages
+                  ? [d.featuredImages]
+                  : []),
+            media: {
+              galleryImages: d.media?.galleryImages || d.galleryImages || [],
+              productVideo: d.media?.productVideo || d.productVideo,
+            },
 
-          approved: d.approved ?? false,
-          store: d.store?._id || d.store || (typeof d.seller === "string" ? d.seller : d.seller?._id || ""),
-          createdBy: d.createdBy || "seller",
-          rate: d.rate || 0,
+            approved: d.approved ?? false,
+            store:
+              d.store?._id ||
+              d.store ||
+              (typeof d.seller === "string" ? d.seller : d.seller?._id || ""),
+            createdBy: d.createdBy || "seller",
+            rate: d.rate || 0,
 
-          // Variants — pre-fill productVariants if they exist
-          productVariants: (d.variants || []).map((v: any) => 
-            typeof v === "string" ? { id: v } : { id: v._id || v.id, ...v }
-          ),
-          tags: d.tags || [],
-        }));
-      }
-    }).finally(() => setIsLoading(false));
+            // Variants — pre-fill productVariants if they exist
+            productVariants: (d.variants || []).map((v: any) =>
+              typeof v === "string" ? { id: v } : { id: v._id || v.id, ...v },
+            ),
+            tags: d.tags || [],
+          }));
+        }
+      })
+      .finally(() => setIsLoading(false));
   }, [productId, token]);
 
   const validateStep = useCallback(async (): Promise<boolean> => {
-    const steps: Step[] = ["step1_core", "step2_media", "step3_settings"];
+    const steps: Step[] = [
+      "step1_core",
+      "step2_pricing",
+      "step3_media",
+      "step4_settings",
+    ];
     const currentIndex = steps.indexOf(currentStep);
 
     let schema;
     if (currentStep === "step1_core") schema = step1CoreSchema;
-    else if (currentStep === "step2_media") schema = step2MediaSchema;
-    else if (currentStep === "step3_settings") schema = step3SettingsSchema;
+    else if (currentStep === "step2_pricing") schema = step3MediaSchema; // Pricing & Media
+    else if (currentStep === "step3_media") schema = step2MediaSchema; // Inventory & Shipping
+    else if (currentStep === "step4_settings") schema = step4SettingsSchema;
 
     if (schema) {
       const result = schema.safeParse(product);
@@ -186,7 +241,7 @@ export const useProductForm = (productId?: string) => {
     }
 
     setErrors({});
-    if (currentStep === "step3_settings") {
+    if (currentStep === "step4_settings") {
       setIsSubmitting(true);
       try {
         // 1. Upload any File objects to get URLs
@@ -206,10 +261,52 @@ export const useProductForm = (productId?: string) => {
         }
 
         // 2. Map form state to API payload
+        const mappedSpecifications = (product.specifications || []).map(
+          ({ _id, ...rest }: any) => {
+            const key = String(rest?.keyEn || "").toLowerCase();
+            if (key === "color images") {
+              try {
+                const raw = String(rest?.valueEn || "").trim();
+                if (!raw) return rest;
+                const parsed = JSON.parse(raw);
+                if (!Array.isArray(parsed)) return rest;
+                const next = parsed.map((e: any) => {
+                  const color = typeof e?.color === "string" ? e.color : "";
+                  const colorHex =
+                    typeof e?.colorHex === "string" ? e.colorHex : undefined;
+                  const idx = Number.isFinite(Number(e?.imageIdx))
+                    ? Number(e.imageIdx)
+                    : undefined;
+                  const imageUrl =
+                    typeof e?.imageUrl === "string" ? e.imageUrl : undefined;
+                  const urlFromIdx =
+                    idx !== undefined && imageUrls[idx]
+                      ? imageUrls[idx]
+                      : undefined;
+                  return {
+                    color,
+                    colorHex,
+                    imageUrl: urlFromIdx || imageUrl,
+                  };
+                });
+                return {
+                  ...rest,
+                  valueEn: JSON.stringify(next),
+                  valueAr: JSON.stringify(next),
+                };
+              } catch {
+                return rest;
+              }
+            }
+            return rest;
+          },
+        );
+
         const payload: CreateProductPayload = {
           nameEn: product.title.en,
           nameAr: product.title.ar,
-          slugEn: product.slugEn || product.title.en.toLowerCase().replace(/ /g, "-"),
+          slugEn:
+            product.slugEn || product.title.en.toLowerCase().replace(/ /g, "-"),
           slugAr: product.slugAr || product.title.ar.replace(/ /g, "-"),
           highlightsEn: product.highlightsEn,
           highlightsAr: product.highlightsAr,
@@ -232,16 +329,19 @@ export const useProductForm = (productId?: string) => {
             endDate: product.pricing.endDate || null,
           },
           inventory: product.inventory,
-          variants: product.productVariants.map(v => v.id).filter(Boolean) as string[],
+          variants: product.productVariants
+            .map((v) => v.id)
+            .filter(Boolean) as string[],
           // Strip _id from specifications (MongoDB adds them but API rejects them)
-          specifications: product.specifications.map(({ _id, ...rest }: any) => rest),
+          // Also resolve any "Color Images" indices to uploaded URLs
+          specifications: mappedSpecifications as any,
           store: product.store || (user as any)?.storeId || "",
           createdBy: user?.role === "admin" ? "admin" : "seller",
           media: {
             featuredImages: imageUrls[0] || "",
             galleryImages: imageUrls,
             // Strip _id from productVideo (MongoDB adds it but API rejects it)
-            productVideo: product.media?.productVideo 
+            productVideo: product.media?.productVideo
               ? (({ _id, ...rest }: any) => rest)(product.media.productVideo)
               : undefined,
           },
@@ -253,7 +353,11 @@ export const useProductForm = (productId?: string) => {
         if (isEditMode && productId) {
           response = await updateProductApi(productId, payload, token);
           console.log("Product Updated Successfully:", response);
-          alert(isEditMode ? "Product Updated Successfully!" : "Product Created Successfully!");
+          alert(
+            isEditMode
+              ? "Product Updated Successfully!"
+              : "Product Created Successfully!",
+          );
         } else {
           response = await createProduct(payload, token);
           console.log("Product Created Successfully:", response);
@@ -263,7 +367,9 @@ export const useProductForm = (productId?: string) => {
         return true;
       } catch (e) {
         console.error("Failed to create product", e);
-        setErrors({ submit: "Failed to create product. Please check all fields." });
+        setErrors({
+          submit: "Failed to create product. Please check all fields.",
+        });
         setIsSubmitting(false);
         return false;
       }

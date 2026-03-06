@@ -75,7 +75,10 @@ export async function apiClient<T = unknown>({
   }
 
   if (!response.ok) {
-    console.error("API Error Details:", JSON.stringify(data, null, 2));
+    // Avoid noisy logs for common auth-expiry cases (handled upstream).
+    if (response.status !== 401) {
+      console.error("API Error Details:", JSON.stringify(data, null, 2));
+    }
     const errorMsg =
       data.errors?.message?.[0] ||
       data.message ||

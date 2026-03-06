@@ -21,7 +21,7 @@ const AccountLayout: React.FC<AccountLayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
-      <div className="container mx-auto flex gap-6 p-4 lg:max-w-[1536px]">
+      <div className="container mx-auto flex gap-6 px-4 pb-4 pt-0 lg:max-w-[1536px]">
         <div className="hidden lg:block">
           <Sidebar user={safeUser} />
         </div>

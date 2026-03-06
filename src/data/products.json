@@ -44,21 +44,10 @@
     },
     "rating": 4.7,
     "sale": "23% OFF",
-    "sizes": [
-      "S",
-      "M",
-      "L",
-      "XL"
-    ],
+    "sizes": ["S", "M", "L", "XL"],
     "colors": {
-      "en": [
-        "Orange",
-        "White"
-      ],
-      "ar": [
-        "برتقالي",
-        "أبيض"
-      ]
+      "en": ["Orange", "White"],
+      "ar": ["برتقالي", "أبيض"]
     },
     "images": [
       "https://www.drbrandscrubs.com/_next/image?url=https%3A%2F%2Fs.drbrandscrubs.com%2Fuploads%2F1730710595034-Untitled-1.jpg&w=1920&q=70",
@@ -269,21 +258,10 @@
     },
     "rating": 4.8,
     "sale": "23% OFF",
-    "sizes": [
-      "S",
-      "M",
-      "L",
-      "XL"
-    ],
+    "sizes": ["S", "M", "L", "XL"],
     "colors": {
-      "en": [
-        "Orange",
-        "White"
-      ],
-      "ar": [
-        "برتقالي",
-        "أبيض"
-      ]
+      "en": ["Orange", "White"],
+      "ar": ["برتقالي", "أبيض"]
     },
     "images": [
       "https://www.drbrandscrubs.com/_next/image?url=https%3A%2F%2Fs.drbrandscrubs.com%2Fuploads%2F1725131056230-MM%20Photography-.jpg&w=1920&q=70",
@@ -493,23 +471,10 @@
     },
     "rating": 4.6,
     "sale": "20% OFF",
-    "sizes": [
-      "38",
-      "30",
-      "40",
-      "28"
-    ],
+    "sizes": ["38", "30", "40", "28"],
     "colors": {
-      "en": [
-        "Black",
-        "White",
-        "Red"
-      ],
-      "ar": [
-        "أسود",
-        "أبيض",
-        "أحمر"
-      ]
+      "en": ["Black", "White", "Red"],
+      "ar": ["أسود", "أبيض", "أحمر"]
     },
     "images": [
       "https://www.drbrandscrubs.com/_next/image?url=https%3A%2F%2Fs.drbrandscrubs.com%2Fuploads%2F1720957542880-1.jpg&w=1920&q=70",
@@ -724,25 +689,10 @@
       "https://www.drbrandscrubs.com/_next/image?url=https%3A%2F%2Fs.drbrandscrubs.com%2Fuploads%2F1720961738648-Untitled-2.jpg&w=1920&q=70",
       "https://www.drbrandscrubs.com/_next/image?url=https%3A%2F%2Fs.drbrandscrubs.com%2Fuploads%2F1730380870868-Untitled-2.jpg&w=1920&q=70"
     ],
-    "sizes": [
-      "XS",
-      "S",
-      "M",
-      "L",
-      "XL",
-      "XXL"
-    ],
+    "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
     "colors": {
-      "en": [
-        "Black",
-        "White",
-        "Red"
-      ],
-      "ar": [
-        "أسود",
-        "أبيض",
-        "أحمر"
-      ]
+      "en": ["Black", "White", "Red"],
+      "ar": ["أسود", "أبيض", "أحمر"]
     },
     "isBestSaller": false,
     "nudges": {
@@ -947,25 +897,10 @@
     },
     "rating": 4.8,
     "sale": "22% OFF",
-    "sizes": [
-      "XS",
-      "S",
-      "M",
-      "L",
-      "XL",
-      "XXL"
-    ],
+    "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
     "colors": {
-      "en": [
-        "Black",
-        "White",
-        "Red"
-      ],
-      "ar": [
-        "أسود",
-        "أبيض",
-        "أحمر"
-      ]
+      "en": ["Black", "White", "Red"],
+      "ar": ["أسود", "أبيض", "أحمر"]
     },
     "images": [
       "https://www.healinghandsscrubs.com/dw/image/v2/BDTL_PRD/on/demandware.static/-/Sites-allheart-m-catalog/default/dw182c65ac/images/large/1_hh-2285---sls_650.jpg?sw=650&sh=1000&sm=fit&sfrm=JPG",
@@ -1175,24 +1110,10 @@
     },
     "rating": 4.7,
     "sale": "22% OFF",
-    "sizes": [
-      "XS",
-      "S",
-      "M",
-      "L",
-      "XL",
-      "XXL"
-    ],
+    "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
     "colors": {
-      "en": [
-        "Blue",
-        "Maroon",
-        "Red"
-      ],
-      "ar": [
-        "أزرق",
-        "أحمر"
-      ]
+      "en": ["Blue", "Maroon", "Red"],
+      "ar": ["أزرق", "أحمر"]
     },
     "images": [
       "https://www.healinghandsscrubs.com/dw/image/v2/BDTL_PRD/on/demandware.static/-/Sites-allheart-m-catalog/default/dwa73ac753/images/large/1_hh-hh701--pew_650.jpg?sw=650&sh=1000&sm=fit&sfrm=JPG",
@@ -1402,12 +1323,7 @@
     },
     "rating": 4.6,
     "sale": "25% OFF",
-    "sizes": [
-      "M",
-      "L",
-      "XL",
-      "XXL"
-    ],
+    "sizes": ["M", "L", "XL", "XXL"],
     "images": [
       "https://shopcdnpro.grainajz.com/category/73695/1348/da3048e2afa28ec288c428d54142c0d7/71.jpg",
       "https://shopcdnpro.grainajz.com/category/73695/1348/6a8f3e99428a0f482f0aff80d352f847/00.jpg",
@@ -1616,25 +1532,10 @@
     },
     "rating": 4.5,
     "sale": "18% OFF",
-    "sizes": [
-      "XS",
-      "S",
-      "M",
-      "L",
-      "XL",
-      "XXL"
-    ],
+    "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
     "colors": {
-      "en": [
-        "Black",
-        "White",
-        "Red"
-      ],
-      "ar": [
-        "أسود",
-        "أبيض",
-        "أحمر"
-      ]
+      "en": ["Black", "White", "Red"],
+      "ar": ["أسود", "أبيض", "أحمر"]
     },
     "images": [
       "https://www.healinghandsscrubs.com/dw/image/v2/BDTL_PRD/on/demandware.static/-/Sites-allheart-m-catalog/default/dw07336ef5/images/large/1_hh-hh300f-roy_650.jpg?sw=650&sh=1000&sm=fit&sfrm=JPGhttps://www.healinghandsscrubs.com/dw/image/v2/BDTL_PRD/on/demandware.static/-/Sites-allheart-m-catalog/default/dw07336ef5/images/large/1_hh-hh300f-roy_650.jpg?sw=650&sh=1000&sm=fit&sfrm=JPG",
@@ -2052,10 +1953,7 @@
     },
     "rating": 4.6,
     "sale": "22% OFF",
-    "sizes": [
-      "50ml",
-      "100ml"
-    ],
+    "sizes": ["50ml", "100ml"],
     "images": [
       "https://f.nooncdn.com/p/v1633322266/N12890384A_1.jpg?width=800",
       "https://f.nooncdn.com/p/v1633322266/N12890384A_2.jpg?width=800",
@@ -2431,5 +2329,653 @@
       "ar": "قياسي"
     },
     "weightKg": 0.5
+  },
+  {
+    "id": "12",
+    "brand": {
+      "id": "12",
+      "name": {
+        "en": "SafeStep",
+        "ar": "سيف ستيب"
+      },
+      "url": "/SafeStep",
+      "image": "/images/SafeStep.jpg"
+    },
+    "model": {
+      "en": "Slip-Resistant Clogs",
+      "ar": "صنادل مقاومة للانزلاق"
+    },
+    "category": {
+      "id": "1",
+      "title": {
+        "en": "Medical Wear",
+        "ar": "ملابس طبية"
+      },
+      "url": "/medical-wear",
+      "image": "/images/medical-wear.jpg",
+      "subcategory": {
+        "title": {
+          "en": "Medical Shoes",
+          "ar": "أحذية طبية"
+        },
+        "url": "/medical-wear/shoes"
+      }
+    },
+    "title": {
+      "en": "SafeStep Professional Slip-Resistant Medical Clogs",
+      "ar": "صنادل طبية احترافية مقاومة للانزلاق من سيف ستيب"
+    },
+    "price": 5499,
+    "del_price": 6999,
+    "stock": 12,
+    "status": {
+      "en": "In stock",
+      "ar": "متوفر"
+    },
+    "rating": 4.7,
+    "sale": "21% OFF",
+    "sizes": ["36", "37", "38", "39", "40", "41", "42"],
+    "colors": {
+      "en": ["White", "Black", "Navy"],
+      "ar": ["أبيض", "أسود", "كحلي"]
+    },
+    "images": [
+      "https://www.drbrandscrubs.com/_next/image?url=https%3A%2F%2Fs.drbrandscrubs.com%2Fuploads%2F1720957542880-1.jpg&w=1920&q=70",
+      "https://www.drbrandscrubs.com/_next/image?url=https%3A%2F%2Fs.drbrandscrubs.com%2Fuploads%2F1720957542880-1.jpg&w=1920&q=70"
+    ],
+    "isBestSaller": true,
+    "nudges": {
+      "en": [
+        "📌 Slip-resistant sole",
+        "🔥 Easy to clean",
+        "⚡ Lightweight",
+        "🚚 5-7 days delivery"
+      ],
+      "ar": [
+        "📌 نعل مقاوم للانزلاق",
+        "🔥 سهل التنظيف",
+        "⚡ خفيف الوزن",
+        "🚚 توصيل ٥-٧ أيام"
+      ]
+    },
+    "reviewCount": 198,
+    "description": {
+      "en": "Comfortable slip-resistant clogs for long shifts in healthcare settings",
+      "ar": "صنادل مريحة مقاومة للانزلاق لورديات طويلة في بيئات الرعاية الصحية"
+    },
+    "features": {
+      "en": [
+        "Slip-resistant outsole",
+        "Cushioned insole",
+        "Water-resistant",
+        "Wipe-clean surface",
+        "Arch support"
+      ],
+      "ar": [
+        "نعل خارجي مقاوم للانزلاق",
+        "نعل داخلي مبطن",
+        "مقاوم للماء",
+        "سطح قابل للمسح",
+        "دعم للقوس"
+      ]
+    },
+    "deliveryTime": { "en": "5-7 days", "ar": "٥-٧ أيام" },
+    "installmentOptions": [
+      {
+        "months": 3,
+        "amount": 1833,
+        "methodType": {
+          "id": "1",
+          "name": "visa",
+          "price": 0,
+          "image": "/icons/card-visa.svg"
+        }
+      }
+    ],
+    "bankOffers": [
+      {
+        "title": {
+          "en": "3 months installments at 0% interest",
+          "ar": "3 أشهر أقساط بدون فوائد"
+        },
+        "url": "#"
+      }
+    ],
+    "sellers": {
+      "id": "seller12",
+      "name": "SafeStep Official",
+      "rating": 4.7,
+      "positiveRatings": "93%",
+      "partnerSince": "2019",
+      "returnPolicy": {
+        "en": "30 days return policy",
+        "ar": "سياسة إرجاع خلال 30 يومًا"
+      },
+      "itemShown": 90,
+      "status": { "en": "active", "ar": "نشط" },
+      "isActive": false
+    },
+    "overview_desc": {
+      "en": "Professional medical clogs with slip-resistant soles, ideal for nurses and healthcare workers.",
+      "ar": "صنادل طبية احترافية بنعال مقاومة للانزلاق، مثالية للممرضات والعاملين في الرعاية الصحية."
+    },
+    "highlights": {
+      "en": ["Slip-resistant for safety", "Easy to clean", "All-day comfort"],
+      "ar": ["مقاوم للانزلاق للسلامة", "سهل التنظيف", "راحة طوال اليوم"]
+    },
+    "specifications": [
+      {
+        "label": { "en": "Material", "ar": "الخامة" },
+        "content": {
+          "en": "Synthetic upper, rubber sole",
+          "ar": "جزء علوي صناعي، نعل مطاطي"
+        }
+      },
+      {
+        "label": { "en": "Care", "ar": "العناية" },
+        "content": { "en": "Wipe clean", "ar": "مسح ونظافة" }
+      }
+    ],
+    "shipping_fee": 0,
+    "shippingMethod": { "en": "standard", "ar": "قياسي" },
+    "weightKg": 0.8
+  },
+  {
+    "id": "13",
+    "brand": {
+      "id": "13",
+      "name": { "en": "ClearView", "ar": "كلير فيو" },
+      "url": "/ClearView",
+      "image": "/images/ClearView.jpg"
+    },
+    "model": { "en": "Safety Goggles", "ar": "نظارات وقائية" },
+    "category": {
+      "id": "2",
+      "title": { "en": "Medical Accessories", "ar": "إكسسوارات طبية" },
+      "url": "/medical-accessories",
+      "image": "/images/medical-accessories.jpg",
+      "subcategory": {
+        "title": { "en": "Eye Protection", "ar": "حماية العين" },
+        "url": "/medical-accessories/eye-protection"
+      }
+    },
+    "title": {
+      "en": "ClearView Anti-Fog Safety Goggles for Healthcare",
+      "ar": "نظارات وقائية مضادة للضباب من كلير فيو للرعاية الصحية"
+    },
+    "price": 1899,
+    "del_price": 2499,
+    "stock": 50,
+    "status": { "en": "In stock", "ar": "متوفر" },
+    "rating": 4.6,
+    "sale": "24% OFF",
+    "images": [
+      "https://www.drbrandscrubs.com/_next/image?url=https%3A%2F%2Fs.drbrandscrubs.com%2Fuploads%2F1720961738648-Untitled-1.jpg&w=1920&q=70"
+    ],
+    "isBestSaller": false,
+    "nudges": {
+      "en": [
+        "📌 Anti-fog coating",
+        "🔥 UV protection",
+        "⚡ Adjustable strap",
+        "🚚 Bulk discount"
+      ],
+      "ar": [
+        "📌 طلاء مضاد للضباب",
+        "🔥 حماية من الأشعة فوق البنفسجية",
+        "⚡ حزام قابل للتعديل",
+        "🚚 خصم بالجملة"
+      ]
+    },
+    "reviewCount": 89,
+    "description": {
+      "en": "Anti-fog safety goggles with UV protection for clinical and laboratory use",
+      "ar": "نظارات وقائية مضادة للضباب مع حماية من الأشعة فوق البنفسجية للاستخدام السريري والمختبرات"
+    },
+    "features": {
+      "en": [
+        "Anti-fog lens",
+        "UV400 protection",
+        "Adjustable elastic strap",
+        "Ventilation channels",
+        "Lightweight"
+      ],
+      "ar": [
+        "عدسة مضادة للضباب",
+        "حماية UV400",
+        "حزام مطاطي قابل للتعديل",
+        "قنوات تهوية",
+        "خفيف الوزن"
+      ]
+    },
+    "deliveryTime": { "en": "3-5 days", "ar": "٣-٥ أيام" },
+    "installmentOptions": [
+      {
+        "months": 3,
+        "amount": 633,
+        "methodType": {
+          "id": "1",
+          "name": "visa",
+          "price": 0,
+          "image": "/icons/card-visa.svg"
+        }
+      }
+    ],
+    "bankOffers": [
+      { "title": { "en": "Free shipping", "ar": "شحن مجاني" }, "url": "#" }
+    ],
+    "sellers": {
+      "id": "seller13",
+      "name": "ClearView Safety",
+      "rating": 4.6,
+      "positiveRatings": "91%",
+      "partnerSince": "2018",
+      "returnPolicy": {
+        "en": "30 days return policy",
+        "ar": "سياسة إرجاع خلال 30 يومًا"
+      },
+      "itemShown": 90,
+      "status": { "en": "active", "ar": "نشط" },
+      "isActive": false
+    },
+    "overview_desc": {
+      "en": "Comfortable anti-fog safety goggles for healthcare and lab environments.",
+      "ar": "نظارات وقائية مريحة مضادة للضباب لبيئات الرعاية الصحية والمختبرات."
+    },
+    "highlights": {
+      "en": [
+        "Anti-fog for clear vision",
+        "UV protection",
+        "Comfortable for long wear"
+      ],
+      "ar": [
+        "مضاد للضباب لرؤية واضحة",
+        "حماية من الأشعة فوق البنفسجية",
+        "مريح للارتداء الطويل"
+      ]
+    },
+    "specifications": [
+      {
+        "label": { "en": "Material", "ar": "الخامة" },
+        "content": { "en": "Polycarbonate lens", "ar": "عدسة بولي كربونات" }
+      },
+      {
+        "label": { "en": "Protection", "ar": "الحماية" },
+        "content": { "en": "UV400, impact", "ar": "UV400، صدمات" }
+      }
+    ],
+    "shipping_fee": 0,
+    "shippingMethod": { "en": "standard", "ar": "قياسي" },
+    "weightKg": 0.1
+  },
+  {
+    "id": "14",
+    "brand": {
+      "id": "14",
+      "name": { "en": "PulseGuard", "ar": "بولس جارد" },
+      "url": "/PulseGuard",
+      "image": "/images/PulseGuard.jpg"
+    },
+    "model": { "en": "N95 Respirator", "ar": "كمامة N95" },
+    "category": {
+      "id": "4",
+      "title": { "en": "Medical Supplies", "ar": "مستلزمات طبية" },
+      "url": "/medical-supplies",
+      "image": "/images/medical-supplies.jpg",
+      "subcategory": {
+        "title": { "en": "Masks & Respirators", "ar": "كمامات وأجهزة تنفس" },
+        "url": "/medical-supplies/masks"
+      }
+    },
+    "title": {
+      "en": "PulseGuard N95 Respirator Masks (20 Pack)",
+      "ar": "كمامات جهاز تنفس N95 من بولس جارد (عبوة 20 قطعة)"
+    },
+    "price": 3299,
+    "del_price": 4199,
+    "stock": 200,
+    "status": { "en": "Bestseller", "ar": "الأكثر مبيعاً" },
+    "rating": 4.8,
+    "sale": "21% OFF",
+    "images": [
+      "https://www.drbrandscrubs.com/_next/image?url=https%3A%2F%2Fs.drbrandscrubs.com%2Fuploads%2F1730380870868-Untitled-2.jpg&w=1920&q=70"
+    ],
+    "isBestSaller": true,
+    "nudges": {
+      "en": [
+        "📌 NIOSH approved",
+        "🔥 20 masks per box",
+        "⚡ 95% filtration",
+        "🚚 Fast delivery"
+      ],
+      "ar": [
+        "📌 معتمد NIOSH",
+        "🔥 20 كمامة في الصندوق",
+        "⚡ ترشيح 95%",
+        "🚚 توصيل سريع"
+      ]
+    },
+    "reviewCount": 412,
+    "description": {
+      "en": "NIOSH-approved N95 respirator masks for healthcare professionals",
+      "ar": "كمامات جهاز تنفس N95 معتمدة من NIOSH للمهنيين الصحيين"
+    },
+    "features": {
+      "en": [
+        "NIOSH N95 certified",
+        "95% particulate filtration",
+        "Adjustable nose clip",
+        "Low breathing resistance",
+        "20 per box"
+      ],
+      "ar": [
+        "شهادة NIOSH N95",
+        "ترشيح 95% للجسيمات",
+        "مشبك أنف قابل للتعديل",
+        "مقاومة تنفس منخفضة",
+        "20 في الصندوق"
+      ]
+    },
+    "deliveryTime": { "en": "2-4 days", "ar": "٢-٤ أيام" },
+    "installmentOptions": [
+      {
+        "months": 3,
+        "amount": 1100,
+        "methodType": {
+          "id": "1",
+          "name": "visa",
+          "price": 0,
+          "image": "/icons/card-visa.svg"
+        }
+      }
+    ],
+    "bankOffers": [
+      {
+        "title": { "en": "Bulk discount available", "ar": "خصم بالجملة متاح" },
+        "url": "#"
+      }
+    ],
+    "sellers": {
+      "id": "seller14",
+      "name": "PulseGuard Medical",
+      "rating": 4.8,
+      "positiveRatings": "95%",
+      "partnerSince": "2017",
+      "returnPolicy": {
+        "en": "30 days return policy",
+        "ar": "سياسة إرجاع خلال 30 يومًا"
+      },
+      "itemShown": 90,
+      "status": { "en": "active", "ar": "نشط" },
+      "isActive": false
+    },
+    "overview_desc": {
+      "en": "NIOSH-approved N95 respirators offering high filtration for clinical use.",
+      "ar": "أجهزة تنفس N95 معتمدة من NIOSH توفر ترشيحًا عاليًا للاستخدام السريري."
+    },
+    "highlights": {
+      "en": ["NIOSH certified", "High filtration", "Comfortable fit"],
+      "ar": ["معتمد NIOSH", "ترشيح عالي", "ملاءمة مريحة"]
+    },
+    "specifications": [
+      {
+        "label": { "en": "Certification", "ar": "الشهادة" },
+        "content": { "en": "NIOSH N95", "ar": "NIOSH N95" }
+      },
+      {
+        "label": { "en": "Quantity", "ar": "الكمية" },
+        "content": { "en": "20 per box", "ar": "20 في الصندوق" }
+      }
+    ],
+    "shipping_fee": 0,
+    "shippingMethod": { "en": "express", "ar": "سريع" },
+    "weightKg": 0.3
+  },
+  {
+    "id": "15",
+    "brand": {
+      "id": "15",
+      "name": { "en": "SoftTouch", "ar": "سوفت تاتش" },
+      "url": "/SoftTouch",
+      "image": "/images/SoftTouch.jpg"
+    },
+    "model": { "en": "Nitrile Gloves", "ar": "قفازات نيتريل" },
+    "category": {
+      "id": "4",
+      "title": { "en": "Medical Supplies", "ar": "مستلزمات طبية" },
+      "url": "/medical-supplies",
+      "image": "/images/medical-supplies.jpg",
+      "subcategory": {
+        "title": { "en": "Gloves", "ar": "قفازات" },
+        "url": "/medical-supplies/gloves"
+      }
+    },
+    "title": {
+      "en": "SoftTouch Powder-Free Nitrile Exam Gloves (100 Pack)",
+      "ar": "قفازات فحص نيتريل خالية من المسحوق من سوفت تاتش (عبوة 100 قطعة)"
+    },
+    "price": 2199,
+    "del_price": 2899,
+    "stock": 150,
+    "status": { "en": "Popular", "ar": "شائع" },
+    "rating": 4.7,
+    "sale": "24% OFF",
+    "sizes": ["XS", "S", "M", "L", "XL"],
+    "images": [
+      "https://www.cokingmed.com/upload/1c/202109/porous-zinc-oxide-adhesive-tape.jpg"
+    ],
+    "isBestSaller": true,
+    "nudges": {
+      "en": [
+        "📌 Powder-free",
+        "🔥 Latex-free",
+        "⚡ 100 gloves",
+        "🚚 Free shipping"
+      ],
+      "ar": [
+        "📌 خالية من المسحوق",
+        "🔥 خالية من اللاتكس",
+        "⚡ 100 قفاز",
+        "🚚 شحن مجاني"
+      ]
+    },
+    "reviewCount": 567,
+    "description": {
+      "en": "Powder-free nitrile gloves for medical examination and procedures",
+      "ar": "قفازات نيتريل خالية من المسحوق للفحص الطبي والإجراءات"
+    },
+    "features": {
+      "en": [
+        "Powder-free nitrile",
+        "Latex-free",
+        "Textured grip",
+        "Ambidextrous",
+        "100 per box"
+      ],
+      "ar": [
+        "نيتريل خالٍ من المسحوق",
+        "خالٍ من اللاتكس",
+        "قبضة محززة",
+        "مناسب لليدين",
+        "100 في الصندوق"
+      ]
+    },
+    "deliveryTime": { "en": "3-5 days", "ar": "٣-٥ أيام" },
+    "installmentOptions": [
+      {
+        "months": 3,
+        "amount": 733,
+        "methodType": {
+          "id": "1",
+          "name": "visa",
+          "price": 0,
+          "image": "/icons/card-visa.svg"
+        }
+      }
+    ],
+    "bankOffers": [
+      {
+        "title": {
+          "en": "Free shipping on orders over ₹1500",
+          "ar": "شحن مجاني للطلبات فوق ١٥٠٠ جنيه"
+        },
+        "url": "#"
+      }
+    ],
+    "sellers": {
+      "id": "seller15",
+      "name": "SoftTouch Supplies",
+      "rating": 4.7,
+      "positiveRatings": "94%",
+      "partnerSince": "2019",
+      "returnPolicy": {
+        "en": "30 days return policy",
+        "ar": "سياسة إرجاع خلال 30 يومًا"
+      },
+      "itemShown": 90,
+      "status": { "en": "active", "ar": "نشط" },
+      "isActive": false
+    },
+    "overview_desc": {
+      "en": "Comfortable powder-free nitrile gloves for clinical and examination use.",
+      "ar": "قفازات نيتريل مريحة خالية من المسحوق للاستخدام السريري والفحص."
+    },
+    "highlights": {
+      "en": ["Powder-free and latex-free", "Textured for grip", "100 per box"],
+      "ar": ["خالية من المسحوق واللاتكس", "محززة للإمساك", "100 في الصندوق"]
+    },
+    "specifications": [
+      {
+        "label": { "en": "Material", "ar": "الخامة" },
+        "content": { "en": "Nitrile", "ar": "نيتريل" }
+      },
+      {
+        "label": { "en": "Quantity", "ar": "الكمية" },
+        "content": { "en": "100 gloves", "ar": "100 قفاز" }
+      }
+    ],
+    "shipping_fee": 0,
+    "shippingMethod": { "en": "standard", "ar": "قياسي" },
+    "weightKg": 0.6
+  },
+  {
+    "id": "16",
+    "brand": {
+      "id": "16",
+      "name": { "en": "ThermoRead", "ar": "ثيرمو ريد" },
+      "url": "/ThermoRead",
+      "image": "/images/ThermoRead.jpg"
+    },
+    "model": { "en": "Digital Thermometer", "ar": "ميزان حرارة رقمي" },
+    "category": {
+      "id": "2",
+      "title": { "en": "Medical Accessories", "ar": "إكسسوارات طبية" },
+      "url": "/medical-accessories",
+      "image": "/images/medical-accessories.jpg",
+      "subcategory": {
+        "title": { "en": "Diagnostic Tools", "ar": "أدوات تشخيصية" },
+        "url": "/medical-accessories/diagnostic"
+      }
+    },
+    "title": {
+      "en": "ThermoRead Fast-Reading Digital Thermometer (Clinical)",
+      "ar": "ميزان حرارة رقمي سريع القراءة من ثيرمو ريد (سريري)"
+    },
+    "price": 799,
+    "del_price": 999,
+    "stock": 80,
+    "status": { "en": "Value pick", "ar": "اختيار قيم" },
+    "rating": 4.5,
+    "sale": "20% OFF",
+    "images": [
+      "https://f.nooncdn.com/p/pnsku/N70176351V/45/_/1747227180/ec2c3973-e042-433c-8e11-caadaf56cb91.jpg?width=800"
+    ],
+    "isBestSaller": false,
+    "nudges": {
+      "en": [
+        "📌 10-second read",
+        "🔥 Water-resistant",
+        "⚡ Memory recall",
+        "🚚 2-year warranty"
+      ],
+      "ar": [
+        "📌 قراءة خلال 10 ثوانٍ",
+        "🔥 مقاوم للماء",
+        "⚡ استدعاء الذاكرة",
+        "🚚 ضمان سنتين"
+      ]
+    },
+    "reviewCount": 234,
+    "description": {
+      "en": "Fast-reading clinical digital thermometer with memory and water-resistant design",
+      "ar": "ميزان حرارة رقمي سريري سريع القراءة مع ذاكرة وتصميم مقاوم للماء"
+    },
+    "features": {
+      "en": [
+        "10-second reading",
+        "Water-resistant tip",
+        "Last reading memory",
+        "Beeper alert",
+        "LCD display"
+      ],
+      "ar": [
+        "قراءة خلال 10 ثوانٍ",
+        "طرف مقاوم للماء",
+        "ذاكرة آخر قراءة",
+        "تنبيه صوتي",
+        "شاشة LCD"
+      ]
+    },
+    "deliveryTime": { "en": "2-4 days", "ar": "٢-٤ أيام" },
+    "installmentOptions": [
+      {
+        "months": 3,
+        "amount": 267,
+        "methodType": {
+          "id": "1",
+          "name": "visa",
+          "price": 0,
+          "image": "/icons/card-visa.svg"
+        }
+      }
+    ],
+    "bankOffers": [
+      { "title": { "en": "Free shipping", "ar": "شحن مجاني" }, "url": "#" }
+    ],
+    "sellers": {
+      "id": "seller16",
+      "name": "ThermoRead Medical",
+      "rating": 4.5,
+      "positiveRatings": "90%",
+      "partnerSince": "2020",
+      "returnPolicy": {
+        "en": "30 days return policy",
+        "ar": "سياسة إرجاع خلال 30 يومًا"
+      },
+      "itemShown": 90,
+      "status": { "en": "active", "ar": "نشط" },
+      "isActive": false
+    },
+    "overview_desc": {
+      "en": "Reliable fast-reading digital thermometer for clinical and home use.",
+      "ar": "ميزان حرارة رقمي موثوق سريع القراءة للاستخدام السريري والمنزلي."
+    },
+    "highlights": {
+      "en": ["Fast 10-second reading", "Water-resistant", "Memory recall"],
+      "ar": ["قراءة سريعة 10 ثوانٍ", "مقاوم للماء", "استدعاء الذاكرة"]
+    },
+    "specifications": [
+      {
+        "label": { "en": "Reading time", "ar": "وقت القراءة" },
+        "content": { "en": "~10 seconds", "ar": "حوالي 10 ثوانٍ" }
+      },
+      {
+        "label": { "en": "Display", "ar": "الشاشة" },
+        "content": { "en": "LCD", "ar": "LCD" }
+      }
+    ],
+    "shipping_fee": 0,
+    "shippingMethod": { "en": "express", "ar": "سريع" },
+    "weightKg": 0.05
   }
 ]

@@ -1,0 +1,1253 @@
+"use client";
+
+import React, { useState, useCallback, useEffect } from "react";
+import Link from "next/link";
+import {
+  Plus,
+  Upload,
+  Download,
+  Package,
+  FileCheck,
+  AlertCircle,
+  Star,
+  Search,
+  Pencil,
+  Copy,
+  Trash2,
+  ChevronDown,
+  X,
+  LayoutGrid,
+  LayoutList,
+} from "lucide-react";
+import { useAppLocale } from "@/hooks/useAppLocale";
+import {
+  getProducts,
+  deleteProduct,
+  approveProduct,
+  ApiProduct,
+} from "@/services/productService";
+import { useSession } from "next-auth/react";
+import Image from "next/image";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/shared/dropdown-menu";
+import { Pagination } from "@/components/shared/Pagination";
+import { LanguageType } from "@/util/translations";
+import { useSearchParams } from "next/navigation";
+
+function getSellerName(product: ApiProduct): string {
+  const s = product.seller;
+  if (!s) return product.createdBy || "—";
+  if (typeof s === "string")
+    return product.createdBy === "admin" ? "Admin" : s.slice(0, 12) + "…";
+  if (s.name) return s.name;
+  if (s.firstName || s.lastName)
+    return [s.firstName, s.lastName].filter(Boolean).join(" ");
+  return product.createdBy || "—";
+}
+
+function getCategoryName(product: ApiProduct, locale: LanguageType): string {
+  const c = (product as any).classification?.category;
+  if (typeof c === "object" && c !== null)
+    return (c as any).title?.[locale] ?? (c as any).name ?? "—";
+  return typeof c === "string" ? c : "—";
+}
+
+function getSubCategoryName(
+  product: ApiProduct,
+  locale: LanguageType
+): string {
+  const s = (product as any).classification?.subcategory;
+  if (typeof s === "object" && s !== null)
+    return (s as any).title?.[locale] ?? (s as any).name ?? "—";
+  return typeof s === "string" ? s : "—";
+}
+
+function getChildCategoryName(
+  product: ApiProduct,
+  locale: LanguageType
+): string {
+  const ch = (product as any).classification?.childCategory;
+  if (typeof ch === "object" && ch !== null)
+    return (ch as any).title?.[locale] ?? (ch as any).name ?? "—";
+  return typeof ch === "string" ? ch : "—";
+}
+
+function formatCreatedAt(
+  createdAt: string | null | undefined,
+  locale: LanguageType,
+): string {
+  if (!createdAt) return "—";
+  try {
+    const d = new Date(createdAt);
+    const fmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+    return fmt.format(d);
+  } catch {
+    return "—";
+  }
+}
+
+function formatNumber(n: number, locale: LanguageType): string {
+  try {
+    return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US").format(n);
+  } catch {
+    return String(n);
+  }
+}
+
+function getInitials(name: string): string {
+  const cleaned = (name || "").trim();
+  if (!cleaned) return "—";
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const second = parts.length > 1 ? parts[1]?.[0] ?? "" : parts[0]?.[1] ?? "";
+  const initials = (first + second).toUpperCase();
+  return initials || "—";
+}
+
+function hashToNumber(input: string): number {
+  // Stable small hash (no random) for derived UI-only stats.
+  let h = 0;
+  for (let i = 0; i < input.length; i++) {
+    h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+function formatCurrency(amount: number, locale: LanguageType): string {
+  try {
+    return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `$${amount.toFixed(2)}`;
+  }
+}
+
+function getStockStatus(product: ApiProduct): {
+  label: string;
+  dot: "green" | "red" | "orange";
+} {
+  const qty =
+    (product as any).stockQuantity ??
+    (product as any).inventory?.stockQuantity ??
+    null;
+  if (qty === null || qty === undefined) return { label: "—", dot: "green" };
+  if (qty === 0) return { label: "Out of Stock", dot: "red" };
+  if (qty < 10) return { label: `${qty} in stock (Low)`, dot: "orange" };
+  return { label: `${qty} in stock`, dot: "green" };
+}
+
+export default function Products2Page() {
+  const locale = useAppLocale();
+  const isAr = locale === "ar";
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+
+  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sellerFilter, setSellerFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [approvalFilter, setApprovalFilter] = useState<
+    "" | "approved" | "pending"
+  >("");
+  const [subCategoryFilter, setSubCategoryFilter] = useState("");
+  const [childCategoryFilter, setChildCategoryFilter] = useState("");
+  const [publishFilter, setPublishFilter] = useState<
+    "" | "Published" | "Draft"
+  >("");
+  const [dateFilter, setDateFilter] = useState<
+    "" | "7" | "30" | "90" | "no-date"
+  >("");
+  const [publishStatus, setPublishStatus] = useState<
+    Record<string, "Published" | "Draft">
+  >({});
+  const searchParams = useSearchParams();
+  const pageFromUrl = Number(searchParams.get("page")) || 1;
+  const currentPage = Math.max(1, pageFromUrl);
+  const itemsPerPage = 20;
+
+  const fetchProducts = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await getProducts(token);
+      setProducts(data);
+    } catch (err) {
+      console.error("Failed to fetch products:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  const filteredProducts = React.useMemo(() => {
+    return products.filter((p) => {
+      const name = isAr ? p.nameAr || p.nameEn : p.nameEn || p.nameAr;
+      const sku = (p as any).sku ?? (p as any).identity?.sku ?? "";
+      const matchesSearch =
+        !searchQuery ||
+        name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(sku).toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSeller = !sellerFilter || getSellerName(p) === sellerFilter;
+      const matchesCategory =
+        !categoryFilter || getCategoryName(p, locale) === categoryFilter;
+      const matchesSubCategory =
+        !subCategoryFilter ||
+        getSubCategoryName(p, locale) === subCategoryFilter;
+      const matchesChildCategory =
+        !childCategoryFilter ||
+        getChildCategoryName(p, locale) === childCategoryFilter;
+      const matchesApproval =
+        !approvalFilter ||
+        (approvalFilter === "approved" && p.approved) ||
+        (approvalFilter === "pending" && !p.approved);
+      const publish = publishStatus[p._id] ?? "Published";
+      const matchesPublish = !publishFilter || publish === publishFilter;
+      const matchesDate =
+        !dateFilter ||
+        (() => {
+          if (!p.createdAt) return dateFilter === "no-date";
+          if (dateFilter === "no-date") return false;
+          const d = new Date(p.createdAt).getTime();
+          const now = Date.now();
+          const day = 86400000;
+          if (dateFilter === "7") return now - d <= 7 * day;
+          if (dateFilter === "30") return now - d <= 30 * day;
+          if (dateFilter === "90") return now - d <= 90 * day;
+          return true;
+        })();
+      return (
+        matchesSearch &&
+        matchesSeller &&
+        matchesCategory &&
+        matchesSubCategory &&
+        matchesChildCategory &&
+        matchesApproval &&
+        matchesPublish &&
+        matchesDate
+      );
+    });
+  }, [
+    products,
+    searchQuery,
+    sellerFilter,
+    categoryFilter,
+    approvalFilter,
+    subCategoryFilter,
+    childCategoryFilter,
+    publishFilter,
+    dateFilter,
+    publishStatus,
+    locale,
+    isAr,
+  ]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / itemsPerPage),
+  );
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (safePage - 1) * itemsPerPage;
+  const paginatedProducts = filteredProducts.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
+
+  const handleDelete = async (product: ApiProduct) => {
+    const name = product.nameEn || product.nameAr || product._id;
+    if (!confirm(isAr ? `حذف "${name}"؟` : `Delete "${name}"?`)) return;
+    try {
+      await deleteProduct(product._id, token);
+      setProducts((prev) => prev.filter((p) => p._id !== product._id));
+    } catch (err: any) {
+      alert(err?.message || "Delete failed");
+    }
+  };
+
+  const handleToggleApprove = async (product: ApiProduct) => {
+    setApprovingId(product._id);
+    try {
+      await approveProduct(product._id, !product.approved, token);
+      setProducts((prev) =>
+        prev.map((p) =>
+          p._id === product._id ? { ...p, approved: !p.approved } : p,
+        ),
+      );
+    } catch (err) {
+      alert("Status update failed");
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const totalProducts = products.length;
+  const pendingCount = products.filter((p) => !p.approved).length;
+  const outOfStockCount = products.filter(
+    (p) =>
+      ((p as any).stockQuantity ?? (p as any).inventory?.stockQuantity ?? 0) ===
+      0,
+  ).length;
+
+  const topCategory = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      const key = getCategoryName(p, locale) || "—";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    let best = "—";
+    let bestCount = -1;
+    for (const [k, c] of counts) {
+      if (c > bestCount && k !== "—") {
+        best = k;
+        bestCount = c;
+      }
+    }
+    return best;
+  }, [products, locale]);
+
+  return (
+    <div className="animate-in fade-in min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 duration-700">
+      <div className="mx-auto max-w-[1440px] p-4 md:p-8">
+        {/* Page header: compact, modern */}
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+              {isAr ? "مخزون المنتجات" : "Product Inventory"}
+            </h1>
+            <p className="mt-1 max-w-xl text-sm text-slate-500">
+              {isAr
+                ? "مراقبة وإدارة كتالوج السوق الطبي عبر جميع الفئات الطبية."
+                : "Monitor and manage healthcare marketplace catalog across all medical categories."}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] hover:border-slate-300 hover:shadow active:scale-[0.98]"
+            >
+              <Upload className="h-4 w-4 opacity-70" />
+              {isAr ? "إجراءات جماعية" : "Bulk Actions"}
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] hover:border-slate-300 hover:shadow active:scale-[0.98]"
+            >
+              <Download className="h-4 w-4 opacity-70" />
+              {isAr ? "تصدير CSV" : "Export CSV"}
+            </button>
+            <Link
+              href={`/${locale}/admin/create-product-2`}
+              className="shadow-primary/25 hover:shadow-primary/30 flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]"
+            >
+              <Plus className="h-4 w-4" />
+              {isAr ? "إضافة منتج جديد" : "Add New Product"}
+            </Link>
+          </div>
+        </div>
+
+        {/* Summary cards: glass, hover lift */}
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              icon: Package,
+              value: formatNumber(totalProducts, locale),
+              label: isAr ? "إجمالي المنتجات" : "Total Products",
+              sub: isAr ? "مباشر" : "Live",
+              iconBg: "bg-emerald-500/10",
+              iconColor: "text-emerald-600",
+              subColor: "text-emerald-600",
+            },
+            {
+              icon: FileCheck,
+              value: String(pendingCount),
+              label: isAr ? "قيد الموافقة" : "Pending Approval",
+              sub: isAr ? "مراجعة عاجلة" : "Requires urgent review",
+              iconBg: "bg-amber-500/10",
+              iconColor: "text-amber-600",
+              subColor: "text-amber-600",
+            },
+            {
+              icon: AlertCircle,
+              value: String(outOfStockCount),
+              label: isAr ? "نفد من المخزون" : "Out of Stock",
+              sub: `${outOfStockCount} critical`,
+              iconBg: "bg-rose-500/10",
+              iconColor: "text-rose-600",
+              subColor: "text-rose-600",
+            },
+            {
+              icon: Star,
+              value: topCategory,
+              label: isAr ? "أفضل فئة مبيعاً" : "Top Selling Category",
+              sub: isAr ? "الأكثر تكراراً" : "Most frequent",
+              iconBg: "bg-violet-500/10",
+              iconColor: "text-violet-600",
+              subColor: "text-violet-600",
+            },
+          ].map((card, i) => (
+            <div
+              key={i}
+              className="group relative overflow-hidden rounded-2xl border border-white/60 bg-white/80 p-3 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-white hover:shadow-lg hover:shadow-slate-200/50"
+            >
+              <div className="flex items-start justify-between">
+                <div
+                  className={`rounded-lg p-1.5 ${card.iconBg} ${card.iconColor} transition-transform duration-300 group-hover:scale-110`}
+                >
+                  <card.icon className="h-4 w-4" />
+                </div>
+                <span className={`text-[10px] font-semibold ${card.subColor}`}>
+                  {card.sub}
+                </span>
+              </div>
+              <p className="mt-1.5 text-base font-bold tabular-nums tracking-tight text-slate-900 md:text-lg">
+                {card.value}
+              </p>
+              <p className="text-xs text-slate-500">{card.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Search & filters */}
+        <div className="mb-6 rounded-2xl border border-slate-200/60 bg-white/90 p-4 shadow-sm backdrop-blur-sm">
+          {(() => {
+            const hasActive =
+              Boolean(searchQuery) ||
+              Boolean(sellerFilter) ||
+              Boolean(categoryFilter) ||
+              Boolean(subCategoryFilter) ||
+              Boolean(childCategoryFilter) ||
+              Boolean(approvalFilter) ||
+              Boolean(publishFilter) ||
+              Boolean(dateFilter);
+
+            const dateLabel =
+              dateFilter === "7"
+                ? isAr
+                  ? "آخر 7 أيام"
+                  : "Last 7 days"
+                : dateFilter === "30"
+                  ? isAr
+                    ? "آخر 30 يومًا"
+                    : "Last 30 days"
+                  : dateFilter === "90"
+                    ? isAr
+                      ? "آخر 90 يومًا"
+                      : "Last 90 days"
+                    : dateFilter === "no-date"
+                      ? isAr
+                        ? "بدون تاريخ"
+                        : "No date"
+                      : "";
+
+            const chips: Array<{
+              key: string;
+              label: string;
+              value: string;
+              clear: () => void;
+            }> = [
+              {
+                key: "search",
+                label: isAr ? "بحث" : "Search",
+                value: searchQuery,
+                clear: () => setSearchQuery(""),
+              },
+              {
+                key: "seller",
+                label: isAr ? "البائع" : "Seller",
+                value: sellerFilter,
+                clear: () => setSellerFilter(""),
+              },
+              {
+                key: "category",
+                label: isAr ? "الفئة" : "Category",
+                value: categoryFilter,
+                clear: () => setCategoryFilter(""),
+              },
+              {
+                key: "subcategory",
+                label: isAr ? "الفئة الفرعية" : "Subcategory",
+                value: subCategoryFilter,
+                clear: () => setSubCategoryFilter(""),
+              },
+              {
+                key: "childCategory",
+                label: isAr ? "الفئة الفرعية للطفل" : "Child Category",
+                value: childCategoryFilter,
+                clear: () => setChildCategoryFilter(""),
+              },
+              {
+                key: "status",
+                label: isAr ? "الحالة" : "Status",
+                value:
+                  approvalFilter === "approved"
+                    ? isAr
+                      ? "معتمد"
+                      : "Approved"
+                    : approvalFilter === "pending"
+                      ? isAr
+                        ? "قيد الانتظار"
+                        : "Pending"
+                      : "",
+                clear: () => setApprovalFilter(""),
+              },
+              {
+                key: "publish",
+                label: isAr ? "النشر" : "Publish",
+                value:
+                  publishFilter === "Published"
+                    ? isAr
+                      ? "منشور"
+                      : "Published"
+                    : publishFilter === "Draft"
+                      ? isAr
+                        ? "مسودة"
+                        : "Draft"
+                      : "",
+                clear: () => setPublishFilter(""),
+              },
+              {
+                key: "date",
+                label: isAr ? "التاريخ" : "Date",
+                value: dateLabel,
+                clear: () => setDateFilter(""),
+              },
+            ].filter((c) => c.value);
+
+            return (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="flex items-center gap-2 text-slate-900">
+                      <span className="text-sm font-bold">
+                        {isAr ? "كل المنتجات" : "All Products"}
+                      </span>
+                      <span className="text-sm font-bold">
+                        ( {formatNumber(totalProducts, locale)} )
+                      </span>
+                    </div>
+                    <div className="relative min-w-[240px] flex-1">
+                    <Search
+                      className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isAr ? "right-3" : "left-3"}`}
+                    />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder={isAr ? "البحث بالاسم أو SKU..." : "Search by name or SKU..."}
+                      className={`focus:ring-primary/20 w-full rounded-xl border border-slate-200/80 bg-slate-50/50 py-2 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-primary focus:bg-white focus:outline-none focus:ring-2 ${isAr ? "pl-4 pr-10" : "pl-10 pr-4"}`}
+                    />
+                    </div>
+
+                    {/* List / Grid toggle (right of search) */}
+                    <div className="flex w-fit rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("list")}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                          viewMode === "list"
+                            ? "bg-slate-100 text-slate-900"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                        }`}
+                        aria-label={isAr ? "عرض القائمة" : "List view"}
+                      >
+                        <LayoutList className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("grid")}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                          viewMode === "grid"
+                            ? "bg-slate-100 text-slate-900"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                        }`}
+                        aria-label={isAr ? "عرض الشبكة" : "Grid view"}
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 lg:justify-end">
+                    <p className="text-xs font-medium text-slate-500">
+                      {isAr ? "النتائج" : "Results"}:{" "}
+                      <span className="font-semibold text-slate-700">
+                        {formatNumber(filteredProducts.length, locale)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+                  <div className="flex flex-col gap-1">
+                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                      {isAr ? "البائع" : "Seller"}
+                    </label>
+                    <select
+                      value={sellerFilter}
+                      onChange={(e) => setSellerFilter(e.target.value)}
+                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                    >
+                      <option value="">{isAr ? "الكل" : "All"}</option>
+                      {Array.from(new Set(products.map(getSellerName))).map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                      {isAr ? "الفئة" : "Category"}
+                    </label>
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                    >
+                      <option value="">{isAr ? "الكل" : "All"}</option>
+                      {Array.from(new Set(products.map((p) => getCategoryName(p, locale))))
+                        .filter(Boolean)
+                        .map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                      {isAr ? "الفئة الفرعية" : "Subcategory"}
+                    </label>
+                    <select
+                      value={subCategoryFilter}
+                      onChange={(e) => setSubCategoryFilter(e.target.value)}
+                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                    >
+                      <option value="">{isAr ? "الكل" : "All"}</option>
+                      {Array.from(new Set(products.map((p) => getSubCategoryName(p, locale))))
+                        .filter(Boolean)
+                        .map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                      {isAr ? "الفئة الفرعية للطفل" : "Child Category"}
+                    </label>
+                    <select
+                      value={childCategoryFilter}
+                      onChange={(e) => setChildCategoryFilter(e.target.value)}
+                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                    >
+                      <option value="">{isAr ? "الكل" : "All"}</option>
+                      {Array.from(new Set(products.map((p) => getChildCategoryName(p, locale))))
+                        .filter(Boolean)
+                        .map((ch) => (
+                          <option key={ch} value={ch}>
+                            {ch}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                      {isAr ? "الحالة" : "Status"}
+                    </label>
+                    <select
+                      value={approvalFilter}
+                      onChange={(e) => setApprovalFilter(e.target.value as "" | "approved" | "pending")}
+                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                    >
+                      <option value="">{isAr ? "الكل" : "All"}</option>
+                      <option value="approved">{isAr ? "معتمد" : "Approved"}</option>
+                      <option value="pending">{isAr ? "قيد الانتظار" : "Pending"}</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                      {isAr ? "النشر" : "Publish"}
+                    </label>
+                    <select
+                      value={publishFilter}
+                      onChange={(e) => setPublishFilter(e.target.value as "" | "Published" | "Draft")}
+                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                    >
+                      <option value="">{isAr ? "الكل" : "All"}</option>
+                      <option value="Published">{isAr ? "منشور" : "Published"}</option>
+                      <option value="Draft">{isAr ? "مسودة" : "Draft"}</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className={`text-xs font-medium text-slate-500 ${isAr ? "text-right" : ""}`}>
+                      {isAr ? "التاريخ" : "Date"}
+                    </label>
+                    <select
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value as "" | "7" | "30" | "90" | "no-date")}
+                      className="focus:ring-primary/20 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-[13px] text-slate-700 focus:border-primary focus:outline-none focus:ring-2"
+                    >
+                      <option value="">{isAr ? "الكل" : "All"}</option>
+                      <option value="7">{isAr ? "آخر 7 أيام" : "Last 7 days"}</option>
+                      <option value="30">{isAr ? "آخر 30 يومًا" : "Last 30 days"}</option>
+                      <option value="90">{isAr ? "آخر 90 يومًا" : "Last 90 days"}</option>
+                      <option value="no-date">{isAr ? "بدون تاريخ" : "No date"}</option>
+                    </select>
+                  </div>
+
+                  {/* Clear all button at far right of filters */}
+                  <div className="flex flex-col gap-1">
+                    <div className="hidden text-xs font-medium text-slate-500 xl:block">
+                      {isAr ? " " : " "}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!hasActive}
+                      onClick={() => {
+                        setSellerFilter("");
+                        setCategoryFilter("");
+                        setSubCategoryFilter("");
+                        setChildCategoryFilter("");
+                        setApprovalFilter("");
+                        setPublishFilter("");
+                        setDateFilter("");
+                        setSearchQuery("");
+                      }}
+                      className="hover:bg-primary/10 disabled:hover:bg-transparent h-9 rounded-xl px-3.5 text-sm font-medium text-primary transition-colors disabled:opacity-40"
+                    >
+                      {isAr ? "مسح الكل" : "Clear all"}
+                    </button>
+                  </div>
+                </div>
+
+                {chips.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-medium text-slate-500">
+                      {isAr ? "فلاتر نشطة:" : "Active filters:"}
+                    </span>
+                    {chips.map((chip) => (
+                      <span
+                        key={chip.key}
+                        className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200/80"
+                      >
+                        <span className="text-slate-500">{chip.label}</span>
+                        <span className="max-w-[220px] truncate">{chip.value}</span>
+                        <button
+                          type="button"
+                          onClick={chip.clear}
+                          className="rounded-full p-0.5 text-slate-500 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
+                          aria-label={isAr ? "إزالة الفلتر" : "Remove filter"}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Table: clean, modern */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200/60 bg-white/90 shadow-sm backdrop-blur-sm">
+          {loading ? (
+            <div className="flex flex-col gap-0">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 border-b border-slate-100 px-4 py-4 last:border-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-11 w-11 shrink-0 animate-pulse rounded-xl bg-slate-200/60" />
+                    <div className="space-y-2">
+                      <div className="h-4 w-32 animate-pulse rounded bg-slate-200/60" />
+                      <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
+                    </div>
+                  </div>
+                  <div className="h-4 w-24 animate-pulse rounded bg-slate-200/60" />
+                  <div className="h-6 w-16 animate-pulse rounded-full bg-slate-100" />
+                  <div className="h-4 w-14 animate-pulse rounded bg-slate-200/60" />
+                </div>
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+              <div className="rounded-2xl bg-slate-100 p-4">
+                <Package className="h-12 w-12 text-slate-400" />
+              </div>
+              <p className="text-sm font-medium text-slate-600">
+                {isAr ? "لا توجد منتجات" : "No products found"}
+              </p>
+              <p className="max-w-sm text-xs text-slate-500">
+                {isAr
+                  ? "غيّر الفلاتر أو أضف منتجاً جديداً."
+                  : "Try adjusting filters or add a new product."}
+              </p>
+              <Link
+                href={`/${locale}/admin/create-product-2`}
+                className="hover:bg-primary/90 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white transition"
+              >
+                {isAr ? "إضافة منتج" : "Add product"}
+              </Link>
+            </div>
+          ) : viewMode === "grid" ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {paginatedProducts.map((item) => {
+                  const name = isAr
+                    ? item.nameAr || item.nameEn
+                    : item.nameEn || item.nameAr;
+                  const sku =
+                    (item as any).sku ??
+                    (item as any).identity?.sku ??
+                    item._id.slice(-6).toUpperCase();
+                  const price =
+                    item.pricing?.salePrice ?? item.pricing?.originalPrice;
+                  const stock = getStockStatus(item);
+
+                  return (
+                    <div
+                      key={item._id}
+                      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-shadow hover:shadow-md"
+                    >
+                      <div className="relative aspect-[4/3] w-full bg-slate-100">
+                        {item.media?.featuredImages ||
+                        (item.media as any)?.galleryImages?.[0] ? (
+                          <Image
+                            src={
+                              item.media?.featuredImages ||
+                              (item.media as any).galleryImages[0]
+                            }
+                            alt={name || ""}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-slate-400">
+                            <Package className="h-10 w-10" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-1 flex-col gap-2 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <Link
+                              href={`/${locale}/admin/products-2/${item._id}`}
+                              className="line-clamp-2 font-semibold text-slate-900 transition-colors hover:text-primary"
+                            >
+                              {name || "—"}
+                            </Link>
+                            <p className="mt-1 text-xs text-slate-500">
+                              SKU: {sku}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <Link
+                              href={`/${locale}/admin/products-2/${item._id}`}
+                              className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                              aria-label={isAr ? "تعديل" : "Edit"}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => {}}
+                              className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                              aria-label={isAr ? "نسخ" : "Copy"}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(item)}
+                              className="rounded-lg p-2 text-rose-600 transition-colors hover:bg-rose-50 hover:text-rose-700"
+                              aria-label={isAr ? "حذف" : "Delete"}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 ring-1 ring-sky-100">
+                            {getCategoryName(item, locale) || "—"}
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium ring-1 ring-inset ring-slate-200/80">
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${stock.dot === "green" ? "bg-emerald-500" : stock.dot === "red" ? "bg-rose-500" : "bg-amber-500"}`}
+                            />
+                            {stock.label}
+                          </span>
+                        </div>
+
+                        <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-2">
+                          <p className="font-semibold tabular-nums text-slate-900">
+                            {price != null
+                              ? `$${Number(price).toFixed(2)}`
+                              : "—"}
+                          </p>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={item.approved}
+                              onClick={() => handleToggleApprove(item)}
+                              disabled={approvingId === item._id}
+                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 disabled:opacity-50 ${
+                                item.approved
+                                  ? "border-emerald-500 bg-emerald-500"
+                                  : "border-slate-200 bg-slate-100"
+                              }`}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                                  item.approved
+                                    ? "translate-x-5"
+                                    : "translate-x-0.5"
+                                }`}
+                              />
+                            </button>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                >
+                                  {publishStatus[item._id] ?? "Published"}
+                                  <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="start"
+                                className="w-36 rounded-xl border-slate-200/80 shadow-lg"
+                              >
+                                <DropdownMenuItem
+                                  className="rounded-lg"
+                                  onClick={() =>
+                                    setPublishStatus((s) => ({
+                                      ...s,
+                                      [item._id]: "Published",
+                                    }))
+                                  }
+                                >
+                                  Published
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="rounded-lg"
+                                  onClick={() =>
+                                    setPublishStatus((s) => ({
+                                      ...s,
+                                      [item._id]: "Draft",
+                                    }))
+                                  }
+                                >
+                                  Draft
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+
+                        <p className="pt-2 text-xs text-slate-500">
+                          {isAr ? "تاريخ الإنشاء:" : "Created:"}{" "}
+                          {formatCreatedAt(item.createdAt, locale)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/30 px-5 py-3">
+                <Pagination
+                  currentPage={safePage}
+                  totalItems={filteredProducts.length}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1400px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="px-5 py-3.5">
+                        {isAr ? "المنتج" : "Product"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "تاريخ الإنشاء" : "Created at"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "البائع" : "Seller"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "الفئة" : "Category"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "الفئة الفرعية" : "Subcategory"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "الفئة الفرعية للطفل" : "Child Category"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "السعر" : "Price"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "الطلبات" : "Orders"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "الإيراد" : "Revenue"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "المخزون" : "Stock"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "الحالة" : "Status"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "النشر" : "Publish"}
+                      </th>
+                      <th className="px-5 py-3.5">
+                        {isAr ? "إجراءات" : "Actions"}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedProducts.map((item) => {
+                      const name = isAr
+                        ? item.nameAr || item.nameEn
+                        : item.nameEn || item.nameAr;
+                      const sku =
+                        (item as any).sku ??
+                        (item as any).identity?.sku ??
+                        item._id.slice(-6).toUpperCase();
+                      const price =
+                        item.pricing?.salePrice ?? item.pricing?.originalPrice;
+                      const orders = (hashToNumber(item._id) % 240) + 1;
+                      const revenue = price != null ? Number(price) * orders : null;
+                      const stock = getStockStatus(item);
+                      return (
+                        <tr
+                          key={item._id}
+                          className="border-b border-slate-50/80 transition-colors duration-150 hover:bg-slate-50/50"
+                        >
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200/50">
+                                {item.media?.featuredImages ||
+                                (item.media as any)?.galleryImages?.[0] ? (
+                                  <Image
+                                    src={
+                                      item.media?.featuredImages ||
+                                      (item.media as any).galleryImages[0]
+                                    }
+                                    alt={name || ""}
+                                    fill
+                                    className="object-cover"
+                                    sizes="44px"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-slate-400">
+                                    <Package className="h-5 w-5" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <Link
+                                  href={`/${locale}/admin/products-2/${item._id}`}
+                                  className="font-semibold text-slate-900 transition-colors hover:text-primary"
+                                >
+                                  {name || "—"}
+                                </Link>
+                                <p className="text-xs text-slate-500">
+                                  SKU: {sku}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5 text-xs text-slate-600">
+                            {formatCreatedAt(item.createdAt, locale)}
+                          </td>
+                          <td className="px-5 py-3.5 text-slate-700">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                                {getInitials(getSellerName(item))}
+                              </div>
+                              <span className="min-w-0 truncate">
+                                {getSellerName(item)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 ring-1 ring-sky-100">
+                              {getCategoryName(item, locale) || "—"}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className="inline-flex rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200/80">
+                              {getSubCategoryName(item, locale) || "—"}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className="inline-flex rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200/80">
+                              {getChildCategoryName(item, locale) || "—"}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 font-medium tabular-nums text-slate-900">
+                            {price != null
+                              ? `$${Number(price).toFixed(2)}`
+                              : "—"}
+                          </td>
+                          <td className="px-5 py-3.5 text-slate-700 tabular-nums">
+                            {formatNumber(orders, locale)}
+                          </td>
+                          <td className="px-5 py-3.5 font-medium tabular-nums text-slate-900">
+                            {revenue != null ? formatCurrency(revenue, locale) : "—"}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium ring-1 ring-inset ring-slate-200/80">
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${stock.dot === "green" ? "bg-emerald-500" : stock.dot === "red" ? "bg-rose-500" : "bg-amber-500"}`}
+                              />
+                              {stock.label}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={item.approved}
+                              onClick={() => handleToggleApprove(item)}
+                              disabled={approvingId === item._id}
+                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 disabled:opacity-50 ${
+                                item.approved
+                                  ? "border-emerald-500 bg-emerald-500"
+                                  : "border-slate-200 bg-slate-100"
+                              }`}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                                  item.approved
+                                    ? "translate-x-5"
+                                    : "translate-x-0.5"
+                                }`}
+                              />
+                            </button>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                >
+                                  {publishStatus[item._id] ?? "Published"}
+                                  <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="start"
+                                className="w-36 rounded-xl border-slate-200/80 shadow-lg"
+                              >
+                                <DropdownMenuItem
+                                  className="rounded-lg"
+                                  onClick={() =>
+                                    setPublishStatus((s) => ({
+                                      ...s,
+                                      [item._id]: "Published",
+                                    }))
+                                  }
+                                >
+                                  Published
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="rounded-lg"
+                                  onClick={() =>
+                                    setPublishStatus((s) => ({
+                                      ...s,
+                                      [item._id]: "Draft",
+                                    }))
+                                  }
+                                >
+                                  Draft
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-1">
+                              <Link
+                                href={`/${locale}/admin/products-2/${item._id}`}
+                                className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                                aria-label={isAr ? "تعديل" : "Edit"}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => {}}
+                                className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                                aria-label={isAr ? "نسخ" : "Copy"}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(item)}
+                                className="rounded-lg p-2 text-rose-600 transition-colors hover:bg-rose-50 hover:text-rose-700"
+                                aria-label={isAr ? "حذف" : "Delete"}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/30 px-5 py-3">
+                <Pagination
+                  currentPage={safePage}
+                  totalItems={filteredProducts.length}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

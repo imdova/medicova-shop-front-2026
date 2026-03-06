@@ -5,6 +5,7 @@ import { useAppLocale } from "@/hooks/useAppLocale";
 import { Step1CoreInfo } from "./steps/Step1CoreInfo";
 import { Step3Settings } from "./steps/Step3Settings";
 import { MediaStep } from "./steps/MediaStep";
+import { Step2PricingInventory } from "./steps/Step2PricingInventory";
 import { WizardHeader } from "./WizardHeader";
 import { useProductForm, Step } from "./useProductForm";
 import DynamicButton from "@/components/shared/Buttons/DynamicButton";
@@ -37,14 +38,20 @@ const ProductCreationWizard = ({
       label: locale === "ar" ? "البيانات الأساسية" : "Core Info",
     },
     {
-      key: "step2_media" as const,
+      key: "step2_pricing" as const,
       number: 2,
-      label: locale === "ar" ? "الصور والفيديو" : "Media",
+      label:
+        locale === "ar" ? "التسعير والوسائط" : "Pricing & Media",
     },
     {
-      key: "step3_settings" as const,
+      key: "step3_media" as const,
       number: 3,
-      label: locale === "ar" ? "الإعدادات" : "Settings",
+      label: locale === "ar" ? "المخزون والشحن" : "Inventory & Shipping",
+    },
+    {
+      key: "step4_settings" as const,
+      number: 4,
+      label: locale === "ar" ? "معاينة المنتج" : "Product Preview",
     },
   ];
 
@@ -62,9 +69,11 @@ const ProductCreationWizard = ({
     switch (currentStep) {
       case "step1_core":
         return <Step1CoreInfo {...commonProps} />;
-      case "step2_media":
+      case "step2_pricing":
         return <MediaStep {...commonProps} />;
-      case "step3_settings":
+      case "step3_media":
+        return <Step2PricingInventory {...commonProps} />;
+      case "step4_settings":
         return <Step3Settings {...commonProps} />;
       default:
         return null;

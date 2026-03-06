@@ -27,6 +27,12 @@ export async function getSellers(token?: string): Promise<Seller[]> {
       email: s.email,
     }));
   } catch (error) {
+    const msg =
+      typeof (error as any)?.message === "string" ? (error as any).message : "";
+    // Suppress expected auth-related errors to avoid console spam.
+    if (msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("invalid refresh token")) {
+      return [];
+    }
     console.error("Error fetching sellers:", error);
     return [];
   }

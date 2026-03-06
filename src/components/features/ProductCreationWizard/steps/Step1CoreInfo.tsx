@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -8,12 +8,17 @@ import {
   Check,
   RefreshCw,
   Plus,
+  Tag,
   Trash2,
   ListRestart,
   Calendar,
   Users,
   X,
   Info,
+  ImageIcon,
+  UploadCloud,
+  Video,
+  PlayCircle,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { ProductFormData } from "@/lib/validations/product-schema";
@@ -27,8 +32,11 @@ import {
 } from "@/services/categoryService";
 import { getBrands } from "@/services/brandService";
 import { getSellers } from "@/services/sellerService";
+import { getTags } from "@/services/tagService";
 import { MultiCategory, Brand } from "@/types";
 import { apiClient } from "@/lib/apiClient";
+import Image from "next/image";
+import { ProductTag } from "@/types/product";
 
 interface Step1CoreInfoProps {
   product: ProductFormData;
@@ -173,6 +181,18 @@ const SearchableSelect = ({
   );
 };
 
+const RESERVED_SPEC_KEYS = new Set(
+  [
+    "sizes",
+    "colors",
+    "variant stock",
+    "color images",
+    "shipping required",
+    "shipping fees",
+    "shipping packages",
+  ].map((s) => s.toLowerCase()),
+);
+
 export const Step1CoreInfo = ({
   product,
   onUpdate,
@@ -189,18 +209,103 @@ export const Step1CoreInfo = ({
   >([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [sellers, setSellers] = useState<any[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<ProductTag[]>([]);
+  const [tagQuery, setTagQuery] = useState("");
+  const [tagOpen, setTagOpen] = useState(false);
+  const tagBoxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const imgs = (product.images || []) as any[];
+    const created: string[] = [];
+    const urls = imgs.map((img) => {
+      if (typeof img === "string") return img;
+      const u = URL.createObjectURL(img as File);
+      created.push(u);
+      return u;
+    });
+    setImageUrls(urls);
+    return () => {
+      created.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [product.images]);
+
+  const primaryImageUrl = imageUrls[0] ?? null;
+
+  const handleUploadPrimaryImage = useCallback(
+    (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      const picked = Array.from(files);
+      const current = product.images || [];
+      onUpdate({ images: [...picked, ...current] });
+    },
+    [onUpdate, product.images],
+  );
+
+  const handleRemovePrimaryImage = useCallback(() => {
+    const current = product.images || [];
+    if (current.length === 0) return;
+    onUpdate({ images: current.slice(1) });
+  }, [onUpdate, product.images]);
+
+  const handleUploadGalleryImages = useCallback(
+    (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      const picked = Array.from(files);
+      const current = product.images || [];
+      onUpdate({ images: [...current, ...picked] });
+    },
+    [onUpdate, product.images],
+  );
+
+  const handleRemoveImageAt = useCallback(
+    (idx: number) => {
+      const current = product.images || [];
+      if (!current[idx]) return;
+      onUpdate({ images: current.filter((_, i) => i !== idx) });
+    },
+    [onUpdate, product.images],
+  );
+
+  const selectedTagIds = product.tags || [];
+  const toggleTag = useCallback(
+    (tagId: string) => {
+      const current = product.tags || [];
+      if (current.includes(tagId)) {
+        onUpdate({ tags: current.filter((id) => id !== tagId) });
+      } else {
+        onUpdate({ tags: [...current, tagId] });
+      }
+    },
+    [onUpdate, product.tags],
+  );
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (tagBoxRef.current && !tagBoxRef.current.contains(e.target as Node)) {
+        setTagOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    getTags(token).then(setAvailableTags);
+  }, [token]);
 
   useEffect(() => {
     const init = async () => {
       const [cats, brs] = await Promise.all([
-        getCategories(token),
-        getBrands(token),
+        getCategories(token).catch(() => []),
+        getBrands(token).catch(() => []),
       ]);
       setCategories(cats);
       setBrands(brs);
 
       if (userRole === "admin") {
-        const fetchedSellers = await getSellers(token);
+        const fetchedSellers = await getSellers(token).catch(() => []);
         setSellers(
           fetchedSellers.map((s) => ({
             id: s.id,
@@ -295,28 +400,43 @@ export const Step1CoreInfo = ({
     });
   };
 
-  const addSpecification = () => {
-    onUpdate({
-      specifications: [
-        ...product.specifications,
-        { keyEn: "", keyAr: "", valueEn: "", valueAr: "" },
-      ],
+  const userSpecifications = useMemo(() => {
+    const specs = (product.specifications || []) as any[];
+    return specs.filter((s) => {
+      const key = String(s?.keyEn || "").trim().toLowerCase();
+      if (!key) return false;
+      return !RESERVED_SPEC_KEYS.has(key);
     });
-  };
+  }, [product.specifications]);
 
-  const updateSpecField = (index: number, field: string, value: string) => {
-    const next = [...product.specifications];
-    if (next[index]) {
-      next[index] = { ...next[index], [field]: value };
-      onUpdate({ specifications: next });
-    }
-  };
+  const upsertSpecification = useCallback(
+    (spec: { keyEn: string; keyAr: string; valueEn: string; valueAr: string }) => {
+      const key = spec.keyEn.trim().toLowerCase();
+      const current = (product.specifications || []) as any[];
+      const next = current.filter((s) => String(s?.keyEn || "").trim().toLowerCase() !== key);
+      next.push(spec as any);
+      onUpdate({ specifications: next as any });
+    },
+    [onUpdate, product.specifications],
+  );
 
-  const removeSpecification = (index: number) => {
-    onUpdate({
-      specifications: product.specifications.filter((_, i) => i !== index),
-    });
-  };
+  const removeSpecificationByKey = useCallback(
+    (keyEn: string) => {
+      const key = keyEn.trim().toLowerCase();
+      const current = (product.specifications || []) as any[];
+      onUpdate({
+        specifications: current.filter((s) => String(s?.keyEn || "").trim().toLowerCase() !== key) as any,
+      });
+    },
+    [onUpdate, product.specifications],
+  );
+
+  const [draftSpec, setDraftSpec] = useState({
+    keyEn: "",
+    valueEn: "",
+    keyAr: "",
+    valueAr: "",
+  });
 
   return (
     <motion.div
@@ -324,24 +444,177 @@ export const Step1CoreInfo = ({
       animate={{ opacity: 1 }}
       className="px-1 py-1"
     >
-      {/* Admin Seller Selection Overlay */}
-      {userRole === "admin" && (
-        <div className="mb-4 rounded-xl border border-teal-100 bg-teal-50/10 p-4 transition-all hover:bg-teal-50/20">
-          <SearchableSelect
-            label="Assign to Seller"
-            options={sellers}
-            value={product.store || ""}
-            onChange={(id) => onUpdate({ store: id })}
-            placeholder="Search by store name or email..."
-            locale={locale}
-            icon={Users}
-          />
-        </div>
-      )}
-
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ──────────── LEFT: Main Form ──────────── */}
         <div className="space-y-6 lg:col-span-2">
+          {/* Section 1: Product Title & Description */}
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500">
+                <Info size={15} />
+              </div>
+              <h3 className="text-sm font-bold text-gray-900">
+                {locale === "ar"
+                  ? "معلومات المنتج الأساسية"
+                  : "Basic Product Information"}
+              </h3>
+            </div>
+
+            {userRole === "admin" && (
+              <div className="mb-6">
+                <SearchableSelect
+                  label={locale === "ar" ? "تعيين للبائع" : "Assign to Seller"}
+                  options={sellers}
+                  value={product.store || ""}
+                  onChange={(id) => onUpdate({ store: id })}
+                  placeholder={
+                    locale === "ar"
+                      ? "ابحث باسم المتجر أو البريد الإلكتروني..."
+                      : "Search by store name or email..."
+                  }
+                  locale={locale}
+                  icon={Users}
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {/* English Column */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label
+                    className={`${COLORS.label} ${errors["title.en"] ? "text-red-500" : ""}`}
+                  >
+                    {locale === "ar" ? "اسم المنتج (EN)" : "Product Name (EN)"}{" "}
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="e.g. Premium Antimicrobial Scrub Top"
+                    value={product.title?.en || ""}
+                    onChange={(e) =>
+                      onUpdate({
+                        title: { ...product.title, en: e.target.value },
+                        slugEn: e.target.value.toLowerCase().replace(/ /g, "-"),
+                      })
+                    }
+                    className={`h-10 rounded-lg px-3 ${errors["title.en"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
+                  />
+                  {errors["title.en"] && (
+                    <p className="text-[10px] font-medium text-red-500">
+                      {errors["title.en"]}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label
+                    className={`${COLORS.label} ${errors.slugEn ? "text-red-500" : ""}`}
+                  >
+                    Slug (EN) <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="premium-antimicrobial-scrub-top"
+                    value={product.slugEn || ""}
+                    onChange={(e) => onUpdate({ slugEn: e.target.value })}
+                    className={`h-10 rounded-lg px-3 font-mono text-xs ${errors.slugEn ? "border-red-300" : "border-gray-200"} ${COLORS.focus} bg-gray-50/30`}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label
+                    className={`${COLORS.label} ${errors["descriptions.descriptionEn"] ? "text-red-500" : ""}`}
+                  >
+                    {locale === "ar"
+                      ? "وصف المنتج (EN)"
+                      : "Product Description (EN)"}{" "}
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <Textarea
+                    placeholder="Describe the product features, materials, and medical certifications..."
+                    value={product.descriptions.descriptionEn || ""}
+                    onChange={(e) =>
+                      onUpdate({
+                        descriptions: {
+                          ...product.descriptions,
+                          descriptionEn: e.target.value,
+                        },
+                      })
+                    }
+                    className={`min-h-[120px] resize-none rounded-lg border px-3 py-2.5 ${errors["descriptions.descriptionEn"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
+                  />
+                  {errors["descriptions.descriptionEn"] && (
+                    <p className="text-[10px] font-medium text-red-500">
+                      {errors["descriptions.descriptionEn"]}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Arabic Column */}
+              <div className="space-y-4" dir="rtl">
+                <div className="space-y-1.5">
+                  <Label
+                    className={`${COLORS.label} ${errors["title.ar"] ? "text-red-500" : ""}`}
+                  >
+                    اسم المنتج (AR) <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="مثال: سكراب طبي ممتاز مضاد للميكروبات"
+                    value={product.title?.ar || ""}
+                    onChange={(e) =>
+                      onUpdate({
+                        title: { ...product.title, ar: e.target.value },
+                        slugAr: e.target.value.replace(/ /g, "-"),
+                      })
+                    }
+                    className={`h-10 rounded-lg px-3 text-right ${errors["title.ar"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
+                  />
+                  {errors["title.ar"] && (
+                    <p className="text-[10px] font-medium text-red-500">
+                      {errors["title.ar"]}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label
+                    className={`${COLORS.label} ${errors.slugAr ? "text-red-500" : ""}`}
+                  >
+                    الرابط (AR) <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="سكراب-طبي-ممتاز"
+                    value={product.slugAr || ""}
+                    onChange={(e) => onUpdate({ slugAr: e.target.value })}
+                    className={`h-10 rounded-lg px-3 text-right font-mono text-xs ${errors.slugAr ? "border-red-300" : "border-gray-200"} ${COLORS.focus} bg-gray-50/30`}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label
+                    className={`${COLORS.label} ${errors["descriptions.descriptionAr"] ? "text-red-500" : ""}`}
+                  >
+                    وصف المنتج (AR) <span className="text-red-500">*</span>
+                  </Label>
+                  <Textarea
+                    placeholder="اكتب وصفاً تفصيلياً لمميزات المنتج والمواد المستخدمة والشهادات الطبية..."
+                    value={product.descriptions.descriptionAr || ""}
+                    onChange={(e) =>
+                      onUpdate({
+                        descriptions: {
+                          ...product.descriptions,
+                          descriptionAr: e.target.value,
+                        },
+                      })
+                    }
+                    className={`min-h-[120px] resize-none rounded-lg border px-3 py-2.5 text-right ${errors["descriptions.descriptionAr"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
+                  />
+                  {errors["descriptions.descriptionAr"] && (
+                    <p className="text-[10px] font-medium text-red-500">
+                      {errors["descriptions.descriptionAr"]}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Section 1: Classification */}
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center gap-2">
@@ -484,345 +757,10 @@ export const Step1CoreInfo = ({
             </div>
           </div>
 
-          {/* Section 2: Identity & SKU */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-500">
-                <RefreshCw size={15} />
-              </div>
-              <h3 className="text-sm font-bold text-gray-900">
-                {locale === "ar" ? "الهوية والتسعير" : "Identity & Pricing"}
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-              {/* SKU */}
-              <div className="space-y-1.5">
-                <Label
-                  className={`${COLORS.label} ${errors["identity.sku"] ? "text-red-500" : ""}`}
-                >
-                  SKU <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    placeholder="e.g. PX-12345"
-                    value={product.identity.sku || ""}
-                    onChange={(e) =>
-                      onUpdate({
-                        identity: {
-                          ...product.identity,
-                          sku: e.target.value,
-                        },
-                      })
-                    }
-                    className={`h-10 rounded-lg px-3 pr-8 ${errors["identity.sku"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
-                  />
-                  <button
-                    onClick={generateSku}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-300 transition-colors hover:text-gray-600"
-                  >
-                    <RefreshCw size={14} />
-                  </button>
-                </div>
-                {errors["identity.sku"] && (
-                  <p className="text-[10px] font-medium text-red-500">
-                    {errors["identity.sku"]}
-                  </p>
-                )}
-              </div>
-
-              {/* Stock */}
-              <div className="space-y-1.5">
-                <Label
-                  className={`${COLORS.label} ${errors["inventory.stockQuantity"] ? "text-red-500" : ""}`}
-                >
-                  {locale === "ar" ? "المخزون" : "Stock"}{" "}
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={product.inventory.stockQuantity || 0}
-                  onChange={(e) =>
-                    onUpdate({
-                      inventory: {
-                        ...product.inventory,
-                        stockQuantity: parseInt(e.target.value),
-                      },
-                    })
-                  }
-                  className={`h-10 rounded-lg px-3 ${errors["inventory.stockQuantity"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
-                />
-              </div>
-
-              {/* Price */}
-              <div className="space-y-1.5">
-                <Label
-                  className={`${COLORS.label} ${errors["pricing.originalPrice"] ? "text-red-500" : ""}`}
-                >
-                  {locale === "ar" ? "السعر" : "Price"}{" "}
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  value={product.pricing.originalPrice || 0}
-                  onChange={(e) =>
-                    onUpdate({
-                      pricing: {
-                        ...product.pricing,
-                        originalPrice: parseFloat(e.target.value),
-                      },
-                    })
-                  }
-                  className={`h-10 rounded-lg px-3 ${errors["pricing.originalPrice"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
-                />
-                {errors["pricing.originalPrice"] && (
-                  <p className="text-[10px] font-medium text-red-500">
-                    {errors["pricing.originalPrice"]}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Sale & Dates Row */}
-            <div className="mt-4 grid grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <Label className={`${COLORS.label} text-teal-600`}>
-                  {locale === "ar" ? "سعر الخصم" : "Sale Price"}
-                </Label>
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  value={product.pricing.salePrice || 0}
-                  onChange={(e) =>
-                    onUpdate({
-                      pricing: {
-                        ...product.pricing,
-                        salePrice: parseFloat(e.target.value),
-                      },
-                    })
-                  }
-                  className="h-10 rounded-lg border-teal-200 bg-teal-50/10 px-3 text-sm font-semibold text-teal-600 focus:ring-1 focus:ring-teal-500"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className={COLORS.label}>
-                  {locale === "ar" ? "تاريخ البداية" : "Start Date"}
-                </Label>
-                <div className="relative">
-                  <Input
-                    type="date"
-                    value={
-                      product.pricing.startDate
-                        ? product.pricing.startDate.split("T")[0]
-                        : ""
-                    }
-                    onChange={(e) =>
-                      onUpdate({
-                        pricing: {
-                          ...product.pricing,
-                          startDate: e.target.value
-                            ? `${e.target.value}T00:00:00Z`
-                            : null,
-                        },
-                      })
-                    }
-                    className={`h-10 rounded-lg border-gray-200 px-3 pl-8 ${COLORS.focus} text-sm placeholder:text-gray-300`}
-                  />
-                  <Calendar
-                    size={14}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className={COLORS.label}>
-                  {locale === "ar" ? "تاريخ النهاية" : "End Date"}
-                </Label>
-                <div className="relative">
-                  <Input
-                    type="date"
-                    value={
-                      product.pricing.endDate
-                        ? product.pricing.endDate.split("T")[0]
-                        : ""
-                    }
-                    onChange={(e) =>
-                      onUpdate({
-                        pricing: {
-                          ...product.pricing,
-                          endDate: e.target.value
-                            ? `${e.target.value}T23:59:59Z`
-                            : null,
-                        },
-                      })
-                    }
-                    className={`h-10 rounded-lg border-gray-200 px-3 pl-8 ${COLORS.focus} text-sm placeholder:text-gray-300`}
-                  />
-                  <Calendar
-                    size={14}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: Product Title & Description */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500">
-                <Info size={15} />
-              </div>
-              <h3 className="text-sm font-bold text-gray-900">
-                {locale === "ar"
-                  ? "معلومات المنتج الأساسية"
-                  : "Basic Product Information"}
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {/* English Column */}
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label
-                    className={`${COLORS.label} ${errors["title.en"] ? "text-red-500" : ""}`}
-                  >
-                    {locale === "ar" ? "اسم المنتج (EN)" : "Product Name (EN)"}{" "}
-                    <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    placeholder="e.g. Premium Antimicrobial Scrub Top"
-                    value={product.title?.en || ""}
-                    onChange={(e) =>
-                      onUpdate({
-                        title: { ...product.title, en: e.target.value },
-                        slugEn: e.target.value.toLowerCase().replace(/ /g, "-"),
-                      })
-                    }
-                    className={`h-10 rounded-lg px-3 ${errors["title.en"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
-                  />
-                  {errors["title.en"] && (
-                    <p className="text-[10px] font-medium text-red-500">
-                      {errors["title.en"]}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    className={`${COLORS.label} ${errors.slugEn ? "text-red-500" : ""}`}
-                  >
-                    Slug (EN) <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    placeholder="premium-antimicrobial-scrub-top"
-                    value={product.slugEn || ""}
-                    onChange={(e) => onUpdate({ slugEn: e.target.value })}
-                    className={`h-10 rounded-lg px-3 font-mono text-xs ${errors.slugEn ? "border-red-300" : "border-gray-200"} ${COLORS.focus} bg-gray-50/30`}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    className={`${COLORS.label} ${errors["descriptions.descriptionEn"] ? "text-red-500" : ""}`}
-                  >
-                    {locale === "ar"
-                      ? "وصف المنتج (EN)"
-                      : "Product Description (EN)"}{" "}
-                    <span className="text-red-500">*</span>
-                  </Label>
-                  <Textarea
-                    placeholder="Describe the product features, materials, and medical certifications..."
-                    value={product.descriptions.descriptionEn || ""}
-                    onChange={(e) =>
-                      onUpdate({
-                        descriptions: {
-                          ...product.descriptions,
-                          descriptionEn: e.target.value,
-                        },
-                      })
-                    }
-                    className={`min-h-[120px] resize-none rounded-lg border px-3 py-2.5 ${errors["descriptions.descriptionEn"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
-                  />
-                  {errors["descriptions.descriptionEn"] && (
-                    <p className="text-[10px] font-medium text-red-500">
-                      {errors["descriptions.descriptionEn"]}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Arabic Column */}
-              <div className="space-y-4" dir="rtl">
-                <div className="space-y-1.5">
-                  <Label
-                    className={`${COLORS.label} ${errors["title.ar"] ? "text-red-500" : ""}`}
-                  >
-                    اسم المنتج (AR) <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    placeholder="مثال: سكراب طبي ممتاز مضاد للميكروبات"
-                    value={product.title?.ar || ""}
-                    onChange={(e) =>
-                      onUpdate({
-                        title: { ...product.title, ar: e.target.value },
-                        slugAr: e.target.value.replace(/ /g, "-"),
-                      })
-                    }
-                    className={`h-10 rounded-lg px-3 text-right ${errors["title.ar"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
-                  />
-                  {errors["title.ar"] && (
-                    <p className="text-[10px] font-medium text-red-500">
-                      {errors["title.ar"]}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    className={`${COLORS.label} ${errors.slugAr ? "text-red-500" : ""}`}
-                  >
-                    الرابط (AR) <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    placeholder="سكراب-طبي-ممتاز"
-                    value={product.slugAr || ""}
-                    onChange={(e) => onUpdate({ slugAr: e.target.value })}
-                    className={`h-10 rounded-lg px-3 text-right font-mono text-xs ${errors.slugAr ? "border-red-300" : "border-gray-200"} ${COLORS.focus} bg-gray-50/30`}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    className={`${COLORS.label} ${errors["descriptions.descriptionAr"] ? "text-red-500" : ""}`}
-                  >
-                    وصف المنتج (AR) <span className="text-red-500">*</span>
-                  </Label>
-                  <Textarea
-                    placeholder="اكتب وصفاً تفصيلياً لمميزات المنتج والمواد المستخدمة والشهادات الطبية..."
-                    value={product.descriptions.descriptionAr || ""}
-                    onChange={(e) =>
-                      onUpdate({
-                        descriptions: {
-                          ...product.descriptions,
-                          descriptionAr: e.target.value,
-                        },
-                      })
-                    }
-                    className={`min-h-[120px] resize-none rounded-lg border px-3 py-2.5 text-right ${errors["descriptions.descriptionAr"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
-                  />
-                  {errors["descriptions.descriptionAr"] && (
-                    <p className="text-[10px] font-medium text-red-500">
-                      {errors["descriptions.descriptionAr"]}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Section 4: Highlights & Specs */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Highlights */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-bold text-gray-900">
                   {locale === "ar" ? "المميزات" : "Highlights"}
@@ -882,157 +820,398 @@ export const Step1CoreInfo = ({
               </div>
             </div>
 
-            {/* Technical Specs */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
+            {/* Product Specifications */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
+              <div className="mb-4">
                 <h3 className="text-sm font-bold text-gray-900">
-                  {locale === "ar" ? "المواصفات التقنية" : "Technical Specs"}
+                  {locale === "ar" ? "مواصفات المنتج" : "Product Specifications"}
                 </h3>
-                <button
-                  onClick={addSpecification}
-                  className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-600 transition-colors hover:bg-emerald-50"
-                >
-                  <Plus size={14} />
-                  {locale === "ar" ? "إضافة" : "Add"}
-                </button>
+                <p className="mt-1 text-xs text-gray-500">
+                  {locale === "ar"
+                    ? "أضف مواصفات مفصلة للمنتج"
+                    : "Add detailed product specifications"}
+                </p>
               </div>
-              <div className="space-y-3">
-                <AnimatePresence initial={false}>
-                  {product.specifications.map((s, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="group relative rounded-xl border border-gray-100 bg-gray-50/30 p-3"
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className={COLORS.label}>
+                    {locale === "ar" ? "المفتاح (EN)" : "Key (e.g. Material)"}
+                  </Label>
+                  <Input
+                    value={draftSpec.keyEn}
+                    onChange={(e) => setDraftSpec((p) => ({ ...p, keyEn: e.target.value }))}
+                    className={`h-10 rounded-xl border-gray-200 px-3 text-sm ${COLORS.focus}`}
+                    placeholder={locale === "ar" ? "Material" : "Material"}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className={COLORS.label}>
+                    {locale === "ar" ? "القيمة (EN)" : "Value (e.g. Cotton)"}
+                  </Label>
+                  <Input
+                    value={draftSpec.valueEn}
+                    onChange={(e) => setDraftSpec((p) => ({ ...p, valueEn: e.target.value }))}
+                    className={`h-10 rounded-xl border-gray-200 px-3 text-sm ${COLORS.focus}`}
+                    placeholder={locale === "ar" ? "Cotton" : "Cotton"}
+                  />
+                </div>
+                <div className="space-y-2" dir="rtl">
+                  <Label className={COLORS.label}>{locale === "ar" ? "المفتاح (AR)" : "Key (AR)"}</Label>
+                  <Input
+                    value={draftSpec.keyAr}
+                    onChange={(e) => setDraftSpec((p) => ({ ...p, keyAr: e.target.value }))}
+                    className={`h-10 rounded-xl border-gray-200 px-3 text-sm text-right ${COLORS.focus}`}
+                    placeholder={locale === "ar" ? "مثال: الخامة" : "مثال: الخامة"}
+                  />
+                </div>
+                <div className="space-y-2" dir="rtl">
+                  <Label className={COLORS.label}>{locale === "ar" ? "القيمة (AR)" : "Value (AR)"}</Label>
+                  <Input
+                    value={draftSpec.valueAr}
+                    onChange={(e) => setDraftSpec((p) => ({ ...p, valueAr: e.target.value }))}
+                    className={`h-10 rounded-xl border-gray-200 px-3 text-sm text-right ${COLORS.focus}`}
+                    placeholder={locale === "ar" ? "مثال: قطن" : "مثال: قطن"}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const keyEn = draftSpec.keyEn.trim();
+                  const valueEn = draftSpec.valueEn.trim();
+                  if (!keyEn || !valueEn) return;
+                  upsertSpecification({
+                    keyEn,
+                    keyAr: draftSpec.keyAr.trim() || keyEn,
+                    valueEn,
+                    valueAr: draftSpec.valueAr.trim() || valueEn,
+                  });
+                  setDraftSpec({ keyEn: "", valueEn: "", keyAr: "", valueAr: "" });
+                }}
+                className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700"
+              >
+                {locale === "ar" ? "إضافة مواصفة" : "Add Specification"}
+              </button>
+
+              {userSpecifications.length ? (
+                <div className="mt-4 space-y-2">
+                  {userSpecifications.map((s: any, idx: number) => (
+                    <div
+                      key={`${s.keyEn || "spec"}-${idx}`}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2"
                     >
-                      <div className="grid grid-cols-1 gap-2">
-                        {/* EN Row */}
-                        <div className="grid grid-cols-2 gap-2">
-                          <Input
-                            placeholder="Key (EN)"
-                            value={s.keyEn}
-                            onChange={(e) =>
-                              updateSpecField(idx, "keyEn", e.target.value)
-                            }
-                            className="h-9 rounded-lg border-gray-200 bg-white px-3 text-sm font-semibold"
-                          />
-                          <Input
-                            placeholder="Value (EN)"
-                            value={s.valueEn}
-                            onChange={(e) =>
-                              updateSpecField(idx, "valueEn", e.target.value)
-                            }
-                            className="h-9 rounded-lg border-gray-200 bg-white px-3 text-sm"
-                          />
-                        </div>
-                        {/* AR Row */}
-                        <div className="grid grid-cols-2 gap-2" dir="rtl">
-                          <Input
-                            placeholder="الخاصية (AR)"
-                            value={s.keyAr}
-                            onChange={(e) =>
-                              updateSpecField(idx, "keyAr", e.target.value)
-                            }
-                            className="h-9 rounded-lg border-gray-200 bg-white px-3 text-right text-sm font-semibold"
-                          />
-                          <Input
-                            placeholder="القيمة (AR)"
-                            value={s.valueAr}
-                            onChange={(e) =>
-                              updateSpecField(idx, "valueAr", e.target.value)
-                            }
-                            className="h-9 rounded-lg border-gray-200 bg-white px-3 text-right text-sm"
-                          />
-                        </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-gray-900">{s.keyEn}</p>
+                        <p className="truncate text-xs text-gray-500">{s.valueEn}</p>
                       </div>
                       <button
-                        onClick={() => removeSpecification(idx)}
-                        className="absolute -right-2 -top-2 rounded-full bg-white p-0.5 text-gray-300 shadow-sm hover:text-red-500"
+                        type="button"
+                        onClick={() => removeSpecificationByKey(String(s.keyEn || ""))}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                        aria-label={locale === "ar" ? "حذف" : "Delete"}
                       >
-                        <X size={14} />
+                        <Trash2 size={16} />
                       </button>
-                    </motion.div>
+                    </div>
                   ))}
-                </AnimatePresence>
-                {product.specifications.length === 0 && (
-                  <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-gray-100 py-8 text-sm text-gray-300">
-                    {locale === "ar" ? "لا توجد مواصفات بعد" : "No specs yet"}
-                  </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-gray-400">
+                  {locale === "ar" ? "لا توجد مواصفات بعد." : "No specifications yet."}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
         {/* ──────────── RIGHT: Sidebar ──────────── */}
-        <div className="space-y-6 lg:col-span-1">
-          {/* Live Preview Card */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h3 className="mb-4 text-sm font-bold text-gray-900">
-              {locale === "ar" ? "معاينة مباشرة" : "Live Preview"}
-            </h3>
+        <aside className="space-y-6 lg:col-span-1">
+          {/* Upload product image (replaces Live Preview) */}
+          <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm lg:sticky lg:top-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-gray-900">
+                {locale === "ar" ? "صورة المنتج" : "Product Image"}
+              </h3>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                {locale === "ar" ? "اختياري" : "Optional"}
+              </span>
+            </div>
+
             <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50/50">
-              {/* Product image placeholder */}
-              <div className="relative flex h-48 items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                {product.pricing.salePrice > 0 && (
-                  <span className="absolute right-2 top-2 rounded-md bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                    SALE
-                  </span>
-                )}
-                <div className="text-gray-200">
-                  <svg
-                    width="48"
-                    height="48"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
-              </div>
-              <div className="space-y-2 p-3">
-                <div
-                  className={`h-3 rounded ${product.title?.en ? "bg-gray-900" : "bg-gray-200"}`}
-                  style={{ width: product.title?.en ? "auto" : "80%" }}
-                >
-                  {product.title?.en && (
-                    <p className="truncate px-1 text-xs font-bold text-white">
-                      {product.title.en}
+              <div className="relative flex h-56 items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                {primaryImageUrl ? (
+                  <Image
+                    src={primaryImageUrl}
+                    alt={product.title?.en || "Product"}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 1024px) 100vw, 420px"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-2 text-gray-400">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm">
+                      <ImageIcon size={20} />
+                    </div>
+                    <p className="text-xs font-semibold">
+                      {locale === "ar"
+                        ? "ارفع صورة المنتج"
+                        : "Upload a product image"}
                     </p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {product.pricing.originalPrice > 0 ? (
-                    <>
-                      <span className="text-sm font-bold text-gray-900">
-                        ${product.pricing.originalPrice}
-                      </span>
-                      {product.pricing.salePrice > 0 && (
-                        <span className="text-sm font-semibold text-red-500 line-through">
-                          ${product.pricing.salePrice}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="h-3 w-12 rounded bg-gray-200" />
-                      <div className="h-3 w-8 rounded bg-gray-100" />
-                    </>
-                  )}
+                    <p className="text-[11px] text-gray-400">
+                      {locale === "ar"
+                        ? "يفضل 1200×900"
+                        : "Recommended 1200×900"}
+                    </p>
+                  </div>
+                )}
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleUploadPrimaryImage(e.target.files)}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  aria-label={locale === "ar" ? "رفع صورة" : "Upload image"}
+                />
+
+                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2">
+                  <div className="inline-flex items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur">
+                    <UploadCloud size={14} className="text-gray-500" />
+                    {primaryImageUrl
+                      ? locale === "ar"
+                        ? "تغيير الصورة"
+                        : "Change image"
+                      : locale === "ar"
+                        ? "رفع صورة"
+                        : "Upload image"}
+                  </div>
+
+                  {primaryImageUrl ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleRemovePrimaryImage();
+                      }}
+                      className="rounded-lg bg-white/90 px-3 py-2 text-xs font-semibold text-rose-600 shadow-sm backdrop-blur transition-colors hover:bg-rose-50"
+                    >
+                      {locale === "ar" ? "إزالة" : "Remove"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
-            <p className="mt-3 text-center text-[11px] text-gray-400">
+
+            <p className="mt-3 text-[11px] text-gray-400">
               {locale === "ar"
-                ? "هذا هو شكل بطاقة المنتج في المتجر"
-                : "This is how your product card will appear in the marketplace."}
+                ? "ستظهر هذه الصورة كصورة رئيسية في المتجر."
+                : "This image will be used as the primary image in the store."}
             </p>
+
+            {/* Small gallery thumbnails */}
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                  {locale === "ar" ? "معرض الصور" : "Gallery"}
+                </p>
+                <span className="text-[11px] font-semibold text-gray-400">
+                  {(imageUrls.length > 0 ? imageUrls.length - 1 : 0)}/9
+                </span>
+              </div>
+
+              <div className="grid grid-cols-5 gap-2">
+                {imageUrls.slice(1, 6).map((url, i) => {
+                  const idx = i + 1;
+                  return (
+                    <div
+                      key={url + String(idx)}
+                      className="group relative aspect-square overflow-hidden rounded-lg border border-gray-100 bg-white shadow-sm"
+                    >
+                      <Image
+                        src={url}
+                        alt="Gallery"
+                        fill
+                        className="object-cover"
+                        sizes="72px"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleRemoveImageAt(idx);
+                        }}
+                        className="absolute right-1 top-1 rounded-md bg-white/90 p-1 text-gray-400 opacity-0 shadow-sm transition-opacity hover:text-rose-600 group-hover:opacity-100"
+                        aria-label={locale === "ar" ? "إزالة" : "Remove"}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                <div className="relative flex aspect-square items-center justify-center rounded-lg border border-dashed border-gray-200 bg-white text-gray-400 hover:bg-gray-50">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => handleUploadGalleryImages(e.target.files)}
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    aria-label={locale === "ar" ? "رفع صور" : "Upload images"}
+                  />
+                  <Plus size={16} />
+                </div>
+              </div>
+            </div>
+
+            {/* Product video URL */}
+            <div className="mt-5">
+              <div className="mb-2 flex items-center gap-2">
+                <Video size={16} className="text-gray-400" />
+                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                  {locale === "ar" ? "رابط فيديو المنتج" : "Product Video URL"}
+                </p>
+              </div>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300">
+                  <PlayCircle size={16} />
+                </div>
+                <Input
+                  value={product.media?.productVideo?.vedioUrl || ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      media: {
+                        ...product.media,
+                        productVideo: {
+                          ...product.media?.productVideo,
+                          vedioUrl: e.target.value,
+                        },
+                      },
+                    })
+                  }
+                  placeholder={
+                    locale === "ar"
+                      ? "رابط YouTube أو Vimeo..."
+                      : "YouTube or Vimeo URL..."
+                  }
+                  className="h-9 rounded-lg border-gray-200 pl-10 text-xs font-semibold focus:border-teal-500"
+                />
+              </div>
+            </div>
+
+            {/* Product tags */}
+            <div className="mt-5" ref={tagBoxRef}>
+              <div className="mb-2 flex items-center gap-2">
+                <Tag size={16} className="text-gray-400" />
+                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                  {locale === "ar" ? "وسوم المنتج" : "Product Tags"}
+                </p>
+              </div>
+
+              {selectedTagIds.length > 0 ? (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {selectedTagIds.map((id) => {
+                    const tag = availableTags.find((t) => t.id === id);
+                    const label =
+                      tag?.name?.[locale as "en" | "ar"] ||
+                      tag?.name?.en ||
+                      id;
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-2 rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200"
+                      >
+                        <span className="max-w-[180px] truncate">{label}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleTag(id)}
+                          className="rounded-full p-0.5 text-gray-400 transition-colors hover:bg-gray-200/60 hover:text-gray-700"
+                          aria-label={locale === "ar" ? "إزالة" : "Remove"}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mb-3 text-xs text-gray-400">
+                  {locale === "ar"
+                    ? "لا توجد وسوم محددة بعد."
+                    : "No tags selected yet."}
+                </p>
+              )}
+
+              <div className="relative">
+                <input
+                  value={tagQuery}
+                  onChange={(e) => {
+                    setTagQuery(e.target.value);
+                    setTagOpen(true);
+                  }}
+                  onFocus={() => setTagOpen(true)}
+                  className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-900 outline-none focus:border-teal-500"
+                  placeholder={
+                    locale === "ar"
+                      ? "ابحث عن وسم لإضافته..."
+                      : "Search tags to add..."
+                  }
+                />
+
+                {tagOpen ? (
+                  <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                    <div className="max-h-48 overflow-y-auto p-1.5">
+                      {availableTags
+                        .filter((t) => {
+                          const label =
+                            t.name?.[locale as "en" | "ar"] || t.name?.en || "";
+                          const q = tagQuery.trim().toLowerCase();
+                          if (!q) return !selectedTagIds.includes(t.id);
+                          return (
+                            !selectedTagIds.includes(t.id) &&
+                            label.toLowerCase().includes(q)
+                          );
+                        })
+                        .slice(0, 30)
+                        .map((t) => {
+                          const label =
+                            t.name?.[locale as "en" | "ar"] || t.name?.en || "";
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => {
+                                toggleTag(t.id);
+                                setTagQuery("");
+                                setTagOpen(false);
+                              }}
+                              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                            >
+                              <span className="truncate">{label}</span>
+                              <Plus size={14} className="text-gray-300" />
+                            </button>
+                          );
+                        })}
+
+                      {availableTags
+                        .filter((t) => !selectedTagIds.includes(t.id))
+                        .filter((t) => {
+                          const label =
+                            t.name?.[locale as "en" | "ar"] || t.name?.en || "";
+                          const q = tagQuery.trim().toLowerCase();
+                          return q ? label.toLowerCase().includes(q) : true;
+                        }).length === 0 ? (
+                        <div className="px-3 py-3 text-center text-xs text-gray-400">
+                          {locale === "ar" ? "لا توجد نتائج" : "No results"}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </div>
 
           {/* Tips for Success */}
@@ -1067,7 +1246,7 @@ export const Step1CoreInfo = ({
               ))}
             </ul>
           </div>
-        </div>
+        </aside>
       </div>
     </motion.div>
   );

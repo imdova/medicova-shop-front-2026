@@ -67,7 +67,7 @@ export async function getTags(token?: string): Promise<ProductTag[]> {
       token,
     });
 
-    console.log("DEBUG: Raw Tags API Response:", JSON.stringify(res, null, 2));
+    // Keep this endpoint quiet; it may be called before auth is ready.
 
     let items = [];
     if (res.data) {
@@ -82,6 +82,12 @@ export async function getTags(token?: string): Promise<ProductTag[]> {
 
     return items.map(mapTag);
   } catch (error) {
+    const msg =
+      typeof (error as any)?.message === "string" ? (error as any).message : "";
+    // Suppress expected auth-related errors to avoid console spam.
+    if (msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("invalid refresh token")) {
+      return [];
+    }
     console.error("Error fetching tags:", error);
     return [];
   }
