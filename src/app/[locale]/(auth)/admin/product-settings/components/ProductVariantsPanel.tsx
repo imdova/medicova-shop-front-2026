@@ -93,8 +93,11 @@ export default function ProductVariantsPanel() {
       setLoading(true);
       const data = await getVariants(token);
       if (!mounted) return;
-      setVariants(data);
-      const first = data[0];
+      const adminOnly = data.filter(
+        (v: ProductOption) => v.createdBy === "admin" && v.storeId == null,
+      );
+      setVariants(adminOnly);
+      const first = adminOnly[0];
       if (first) {
         setSelectedId(first.id);
         setDraft(fromVariant(first));

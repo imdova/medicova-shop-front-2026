@@ -26,13 +26,13 @@ import {
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { Card, CardContent } from "@/components/shared/card";
 import { Textarea } from "@/components/shared/textarea";
-import { products } from "@/data";
 import { dummyCustomers } from "@/constants/customers";
-import { formatFullName } from "@/util";
-import {
-  ImageUploader,
-  UploadedImage,
-} from "@/components/features/ImageUploader";
+import { createReview } from "@/services/reviewService";
+import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
+import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ApiProduct, getProducts } from "@/services/productService";
 
 // ---------------- Schema & Types ----------------
 const messages = {
@@ -67,43 +67,22 @@ const messages = {
 };
 
 const reviewSchema = z.object({
-  product_id: z.string().optional(),
+  product_id: z.string().min(1, "Product is required"),
   customer_id: z.string().optional(),
-  customer_name: z.string().optional(),
+  customer_name_en: z.string().optional(),
+  customer_name_ar: z.string().optional(),
   customer_email: z
     .string()
     .email(messages.invalid_email.en)
     .min(1, messages.customer_email_required.en),
   rating: z.number().min(1).max(5),
-  comment: z.string().optional(),
+  comment_en: z.string().min(1, messages.comment_en_required.en),
+  comment_ar: z.string().min(1, messages.comment_ar_required.en),
   status: z.enum(["published", "draft"]),
   created_at: z.string().min(1, messages.created_at_required.en),
 });
 
 type ReviewFormData = z.infer<typeof reviewSchema>;
-
-const dummyProducts = [
-  {
-    id: "1",
-    name: { en: "Wireless Bluetooth Headphones", ar: "سماعات بلوتوث لاسلكية" },
-    slug: "wireless-bluetooth-headphones",
-  },
-  {
-    id: "2",
-    name: { en: "Smart Watch Series 5", ar: "ساعة ذكية السلسلة 5" },
-    slug: "smart-watch-series-5",
-  },
-  {
-    id: "3",
-    name: { en: "Laptop Backpack", ar: "حقيبة كمبيوتر محمول" },
-    slug: "laptop-backpack",
-  },
-  {
-    id: "4",
-    name: { en: "USB-C Charging Cable", ar: "كابل شحن USB-C" },
-    slug: "usb-c-charging-cable",
-  },
-];
 
 const ratingOptions = [
   { value: 1, label: { en: "1 Star", ar: "1 نجمة" }, stars: "⭐" },
@@ -119,148 +98,160 @@ export default function CreateReviewPage() {
   const params = useParams();
   const productSlug = params.slug as string;
 
-  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
-  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
-  const [customerImages, setCustomerImages] = useState<UploadedImage[]>([]);
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const router = useRouter();
+
+  const [productsList, setProductsList] = useState<ApiProduct[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const form = useForm<ReviewFormData>({
     resolver: zodResolver(reviewSchema),
     defaultValues: {
       product_id: "",
       customer_id: "",
-      customer_name: "",
+      customer_name_en: "",
+      customer_name_ar: "",
       customer_email: "",
       rating: 5,
-      comment: "",
+      comment_en: "",
+      comment_ar: "",
       status: "published",
       created_at: new Date().toISOString().split("T")[0],
     },
   });
 
-  // Set product if slug is provided
+  // Fetch initial data
   useEffect(() => {
-    if (productSlug) {
-      const product = dummyProducts.find((p) => p.slug === productSlug);
-      if (product) {
-        form.setValue("product_id", product.id);
+    const fetchData = async () => {
+      if (!token) return;
+      setInitialLoading(true);
+      try {
+        const prods = await getProducts(token);
+        setProductsList(prods);
+
+        // Pre-select product if slug matches
+        if (productSlug) {
+          const product = prods.find(
+            (p: any) =>
+              (p as any).slugEn === productSlug ||
+              (p as any).slugAr === productSlug ||
+              p._id === productSlug,
+          );
+          if (product) {
+            form.setValue("product_id", product._id);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch initial data:", err);
+        toast.error(
+          locale === "ar" ? "فشل تحميل البيانات" : "Failed to load data",
+        );
+      } finally {
+        setInitialLoading(false);
       }
-    }
-  }, [productSlug, form]);
+    };
 
-  // Handle customer selection
-  const handleCustomerSelect = (customerId: string) => {
-    setSelectedCustomer(customerId);
-
-    const customer = dummyCustomers.find((c) => c.id === customerId);
-    if (customer) {
-      form.setValue("customer_id", customer.id);
-      form.setValue(
-        "customer_name",
-        formatFullName(customer.firstName, customer.lastName, locale),
-      );
-      form.setValue("customer_email", customer.email);
-
-      // clear manual image if any
-      setCustomerImages([]);
-    } else {
-      form.setValue("customer_id", "");
-      form.setValue("customer_name", "");
-      form.setValue("customer_email", "");
-    }
-  };
+    fetchData();
+  }, [token, productSlug]);
 
   const onSubmit = async (data: ReviewFormData) => {
+    if (!token) return;
+    setLoading(true);
     try {
-      console.log("Review Data:", data);
-      console.log("Uploaded Images:", uploadedImages);
-      console.log("Customer Image:", customerImages);
+      // 1. Prepare final payload as per schema
+      const payload = {
+        productId: data.product_id,
+        rate: data.rating,
+        descriptionEn: data.comment_en,
+        descriptionAr: data.comment_ar,
+        status: "system", // As per user requirement: "لو من الادمن بتكون system"
 
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append("reviewData", JSON.stringify(data));
+        // Manual/User fields
+        userName: data.customer_name_en,
+        UserEmail: data.customer_email,
+        nameEn: data.customer_name_en,
+        nameAr: data.customer_name_ar,
+        date: data.created_at,
+      };
 
-      // Attach review images
-      uploadedImages.forEach((image) => {
-        formData.append("review_images", image.file);
-      });
-
-      // Attach manual customer image (if provided)
-      if (customerImages.length > 0) {
-        formData.append("customer_image", customerImages[0].file);
-      }
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Handle successful submission
-      console.log("Review submitted successfully!");
-    } catch (error) {
+      console.log(
+        "Creating review with payload:",
+        JSON.stringify(payload, null, 2),
+      );
+      await createReview(payload, token);
+      toast.success(
+        locale === "ar"
+          ? "تم إنشاء التقييم بنجاح"
+          : "Review created successfully",
+      );
+      router.push(`/${locale}/admin/reviews`);
+    } catch (error: any) {
       console.error("Submission failed", error);
+      toast.error(
+        error.message ||
+          (locale === "ar" ? "فشل إنشاء التقييم" : "Failed to create review"),
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-  const t = {
-    en: {
-      title: "Create Review",
-      product: "Product",
-      select_product: "Select product",
-      choose_customer: "Choose from existing customers",
-      select_customer: "Select customer",
-      customer_description:
-        "Choose a customer to leave a review as them. If you want to enter the customer details manually, leave empty this field and fill the customer name and email fields below.",
-      or_enter_manually: "Or enter manually customer details:",
-      customer_name: "Customer name",
-      customer_name_en: "Customer name (English)",
-      customer_name_ar: "Customer name (Arabic)",
-      customer_email: "Customer email",
-      email_placeholder: "e.g: example@domain.com",
-      star: "Star",
-      comment: "Comment",
-      comment_en: "Comment (English)",
-      comment_ar: "Comment (Arabic)",
-      comment_required: "Comment is required",
-      status: "Status",
-      published: "Published",
-      draft: "Draft",
-      save: "Save",
-      saveExit: "Save & Exit",
-      created_at: "Created At",
-      images: "Images",
-      rating: "Rating",
-      select_rating: "Select rating",
-      customer_image: "Customer Image",
-    },
-    ar: {
-      title: "إنشاء تقييم",
-      product: "المنتج",
-      select_product: "اختر المنتج",
-      choose_customer: "اختر من العملاء الحاليين",
-      select_customer: "اختر العميل",
-      customer_description:
-        "اختر عميلاً لترك تقييم باسمه. إذا كنت تريد إدخال بيانات العميل يدوياً، اترك هذا الحقل فارغاً واملأ حقلي الاسم والبريد الإلكتروني أدناه.",
-      or_enter_manually: "أو أدخل بيانات العميل يدوياً:",
-      customer_name: "اسم العميل",
-      customer_name_en: "اسم العميل (الإنجليزية)",
-      customer_name_ar: "اسم العميل (العربية)",
-      customer_email: "البريد الإلكتروني للعميل",
-      email_placeholder: "مثال: example@domain.com",
-      star: "نجمة",
-      comment: "التعليق",
-      comment_en: "التعليق (الإنجليزية)",
-      comment_ar: "التعليق (العربية)",
-      comment_required: "التعليق مطلوب",
-      status: "الحالة",
-      published: "منشور",
-      draft: "مسودة",
-      save: "حفظ",
-      saveExit: "حفظ وخروج",
-      created_at: "تاريخ الإنشاء",
-      images: "الصور",
-      rating: "التقييم",
-      select_rating: "اختر التقييم",
-      customer_image: "صورة العميل",
-    },
-  }[locale];
+  const t = (
+    {
+      en: {
+        title: "Create Review",
+        product: "Product",
+        select_product: "Select product",
+        customer_name: "Customer name",
+        customer_name_en: "Customer name (English)",
+        customer_name_ar: "Customer name (Arabic)",
+        customer_email: "Customer email",
+        email_placeholder: "e.g: example@domain.com",
+        star: "Star",
+        comment: "Comment",
+        comment_en: "Comment (English)",
+        comment_ar: "Comment (Arabic)",
+        comment_required: "Comment is required",
+        status: "Status",
+        published: "Published",
+        draft: "Draft",
+        save: "Save",
+        saveExit: "Save & Exit",
+        created_at: "Created At",
+        images: "Images",
+        rating: "Rating",
+        select_rating: "Select rating",
+        customer_image: "Customer Image",
+      },
+      ar: {
+        title: "إنشاء تقييم",
+        product: "المنتج",
+        select_product: "اختر المنتج",
+        customer_name: "اسم العميل",
+        customer_name_en: "اسم العميل (الإنجليزية)",
+        customer_name_ar: "اسم العميل (العربية)",
+        customer_email: "البريد الإلكتروني للعميل",
+        email_placeholder: "مثال: example@domain.com",
+        star: "نجمة",
+        comment: "التعليق",
+        comment_en: "التعليق (الإنجليزية)",
+        comment_ar: "التعليق (العربية)",
+        comment_required: "التعليق مطلوب",
+        status: "الحالة",
+        published: "منشور",
+        draft: "مسودة",
+        save: "حفظ",
+        saveExit: "حفظ وخروج",
+        created_at: "تاريخ الإنشاء",
+        images: "الصور",
+        rating: "التقييم",
+        select_rating: "اختر التقييم",
+        customer_image: "صورة العميل",
+      },
+    } as any
+  )[locale];
 
   return (
     <div>
@@ -294,9 +285,11 @@ export default function CreateReviewPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {products.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.title[locale]}
+                          {productsList.map((product) => (
+                            <SelectItem key={product._id} value={product._id}>
+                              {locale === "ar"
+                                ? product.nameAr
+                                : product.nameEn}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -307,98 +300,65 @@ export default function CreateReviewPage() {
                 />
               </Card>
 
-              {/* Customer Selection */}
+              {/* Manual Customer Details */}
               <Card className="p-6">
                 <div className="mb-4">
-                  <h3 className="text-lg font-semibold">{t.choose_customer}</h3>
+                  <h3 className="text-lg font-semibold">{t.customer_name} *</h3>
                 </div>
 
-                <Select
-                  value={selectedCustomer}
-                  onValueChange={handleCustomerSelect}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.select_customer} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dummyCustomers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {formatFullName(
-                          customer.firstName,
-                          customer.lastName,
-                          locale,
-                        )}{" "}
-                        ({customer.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <p className="mt-2 text-sm text-gray-600">
-                  {t.customer_description}
-                </p>
-
-                {/* Manual Customer Details */}
-                <Card className="mt-6 p-3">
-                  <h4 className="mb-4 text-lg font-semibold">
-                    {t.or_enter_manually}
-                  </h4>
-                  <FormLabel className="text-base">
-                    {t.customer_image} *
-                  </FormLabel>
-                  <ImageUploader
-                    images={customerImages}
-                    onImagesChange={setCustomerImages}
-                    maxFiles={1}
-                    maxSize={10}
-                    language={locale}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="customer_name_en"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base">
+                          {t.customer_name_en} *
+                        </FormLabel>
+                        <FormControl>
+                          <Input placeholder={t.customer_name_en} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                  {selectedCustomer && (
-                    <p className="mt-2 text-xs text-gray-500">
-                      {locale === "ar"
-                        ? "تم اختيار عميل من القائمة — لا يمكن تحميل صورة يدوياً."
-                        : "Existing customer selected — manual upload is disabled."}
-                    </p>
-                  )}
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="customer_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">
-                            {t.customer_name} *
-                          </FormLabel>
-                          <FormControl>
-                            <Input placeholder={t.customer_name} {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="customer_email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">
-                            {t.customer_email} *
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder={t.email_placeholder}
-                              type="email"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </Card>
+                  <FormField
+                    control={form.control}
+                    name="customer_name_ar"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base">
+                          {t.customer_name_ar} *
+                        </FormLabel>
+                        <FormControl>
+                          <Input placeholder={t.customer_name_ar} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="mt-4">
+                  <FormField
+                    control={form.control}
+                    name="customer_email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base">
+                          {t.customer_email} *
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder={t.email_placeholder}
+                            type="email"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </Card>
 
               {/* Rating and Comment */}
@@ -448,18 +408,37 @@ export default function CreateReviewPage() {
                   </div>
 
                   {/* Comment */}
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <FormField
                       control={form.control}
-                      name="comment"
+                      name="comment_en"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-base">
-                            {t.comment} *
+                            {t.comment_en} *
                           </FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder={t.comment}
+                              placeholder={t.comment_en}
+                              className="min-h-[100px]"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="comment_ar"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base">
+                            {t.comment_ar} *
+                          </FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder={t.comment_ar}
                               className="min-h-[100px]"
                               {...field}
                             />
@@ -471,21 +450,6 @@ export default function CreateReviewPage() {
                   </div>
                 </div>
               </Card>
-
-              {/* Enhanced Images Section */}
-              <Card className="p-6">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold">{t.images}</h3>
-                </div>
-
-                <ImageUploader
-                  images={uploadedImages}
-                  onImagesChange={setUploadedImages}
-                  maxFiles={10}
-                  maxSize={10}
-                  language={locale}
-                />
-              </Card>
             </div>
 
             {/* Right Column - Sidebar */}
@@ -493,10 +457,21 @@ export default function CreateReviewPage() {
               {/* Save Buttons */}
               <Card className="p-4">
                 <CardContent className="space-y-2 p-0">
-                  <Button type="submit" variant="outline" className="w-full">
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    className="w-full"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
                     {t.save}
                   </Button>
-                  <Button type="submit" className="w-full">
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
                     {t.saveExit}
                   </Button>
                 </CardContent>

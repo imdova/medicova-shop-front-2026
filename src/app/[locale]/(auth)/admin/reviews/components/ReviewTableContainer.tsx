@@ -52,7 +52,7 @@ const ReviewTableContainer: React.FC<ReviewTableContainerProps> = ({
         render: (item: ReviewType) => (
           <Link
             className="flex items-center gap-2 font-bold text-gray-900 transition-colors hover:text-primary"
-            href={`/${locale}/admin/products/edit/${item.product.id}`}
+            href={`/${locale}/admin/products/details/${typeof item.product.id === "object" ? (item.product.id as any)._id || (item.product.id as any).id : item.product.id}`}
           >
             <span className="max-w-[120px] truncate text-xs">
               {item.product.title[locale]}
@@ -159,7 +159,6 @@ const ReviewTableContainer: React.FC<ReviewTableContainerProps> = ({
         minWidth={1100}
         pagination={true}
         itemsPerPage={10}
-
         headerClassName="bg-gray-50/50 text-gray-400 text-[11px] font-black uppercase tracking-wider"
         rowClassName="hover:bg-gray-50/80 transition-colors duration-300 border-b border-gray-50/50"
         solidActions={[

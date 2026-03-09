@@ -27,7 +27,14 @@ import {
 import Avatar from "@/components/shared/Avatar";
 import { Link } from "@/i18n/navigation";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { Sellers } from "@/constants/sellers";
+import { getSellerById, Seller } from "@/services/sellerService";
+import { getProducts, ApiProduct } from "@/services/productService";
+import { getCategories } from "@/services/categoryService";
+import { MultiCategory } from "@/types";
+import { useSession } from "next-auth/react";
+import { useEffect } from "react";
+import toast from "react-hot-toast";
+import { Loader2 } from "lucide-react";
 
 function formatNumber(value: number, locale: string) {
   const loc = locale === "ar" ? "ar-EG" : "en-US";
@@ -50,7 +57,8 @@ function clamp(n: number, min: number, max: number) {
 
 function hashToNumber(input: string) {
   let hash = 0;
-  for (let i = 0; i < input.length; i++) hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < input.length; i++)
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
   return hash;
 }
 
@@ -64,62 +72,98 @@ export default function SellerDetailsPage({
   const isAr = locale === "ar";
   const searchParams = useSearchParams();
   const editMode = searchParams.get("edit") === "1";
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
 
-  const seller = useMemo(() => Sellers.find((s) => String(s.id) === String(slug)) || null, [slug]);
+  const [seller, setSeller] = useState<Seller | null>(null);
+  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [categories, setCategories] = useState<MultiCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token || !slug) return;
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [sData, pData, cData] = await Promise.all([
+          getSellerById(slug, token),
+          getProducts(token),
+          getCategories(token),
+        ]);
+        setSeller(sData);
+        setCategories(cData);
+        // Filter products for this seller
+        const sellerProducts = pData.filter((p) => {
+          const sid =
+            p.sellerId ||
+            (typeof p.seller === "object"
+              ? (p.seller as any)?._id || (p.seller as any)?.id
+              : p.seller);
+          return (
+            String(sid) === String(slug) ||
+            String(p.store) === String(slug) ||
+            String(p.createdBy) === String(slug)
+          );
+        });
+        setProducts(sellerProducts);
+      } catch (err) {
+        console.error("Failed to fetch seller detail:", err);
+        toast.error(isAr ? "فشل تحميل البيانات" : "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [slug, token, isAr]);
 
   const title = seller?.name || (isAr ? "تفاصيل البائع" : "Seller Details");
 
-  const seed = useMemo(
-    () => hashToNumber(`seller:${slug}:${seller?.name || "unknown"}`),
-    [seller?.name, slug],
-  );
+  const statusTone = useMemo(() => {
+    const s = seller?.status || "active";
+    if (s === "suspended")
+      return {
+        bg: "bg-rose-50",
+        ring: "ring-rose-100",
+        text: "text-rose-700",
+        dot: "bg-rose-500",
+      };
+    if (s === "pending")
+      return {
+        bg: "bg-amber-50",
+        ring: "ring-amber-100",
+        text: "text-amber-700",
+        dot: "bg-amber-500",
+      };
+    return {
+      bg: "bg-emerald-50",
+      ring: "ring-emerald-100",
+      text: "text-emerald-700",
+      dot: "bg-emerald-500",
+    };
+  }, [seller?.status]);
 
   const statusLabel = useMemo(() => {
-    const active = seller?.isActive ?? true;
-    const pending = seed % 7 === 0;
-    if (!active) return isAr ? "موقوف" : "Suspended";
-    if (pending) return isAr ? "قيد المراجعة" : "Pending";
+    const s = seller?.status || "active";
+    if (s === "suspended") return isAr ? "موقوف" : "Suspended";
+    if (s === "pending") return isAr ? "قيد المراجعة" : "Pending";
     return isAr ? "نشط" : "Active";
-  }, [isAr, seed, seller?.isActive]);
-
-  const statusTone = useMemo(() => {
-    if (statusLabel === (isAr ? "موقوف" : "Suspended"))
-      return { bg: "bg-rose-50", ring: "ring-rose-100", text: "text-rose-700", dot: "bg-rose-500" };
-    if (statusLabel === (isAr ? "قيد المراجعة" : "Pending"))
-      return { bg: "bg-amber-50", ring: "ring-amber-100", text: "text-amber-700", dot: "bg-amber-500" };
-    return { bg: "bg-emerald-50", ring: "ring-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" };
-  }, [isAr, statusLabel]);
-
-  const joiningDate = useMemo(() => {
-    const year = 2021 + (seed % 4);
-    const month = (seed % 12) + 1;
-    const day = (seed % 26) + 1;
-    return new Date(Date.UTC(year, month - 1, day));
-  }, [seed]);
+  }, [isAr, seller?.status]);
 
   const joiningDateText = useMemo(() => {
+    const s = seller as any;
+    if (!s?.joiningDate && !s?.createdAt) return "—";
+    const date = new Date(s?.joiningDate || s?.createdAt);
     const loc = isAr ? "ar-EG" : "en-US";
-    return new Intl.DateTimeFormat(loc, { year: "numeric", month: "short", day: "2-digit" }).format(
-      joiningDate,
-    );
-  }, [isAr, joiningDate]);
+    return new Intl.DateTimeFormat(loc, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+    }).format(date);
+  }, [isAr, seller]);
 
-  const lifetimeSales = useMemo(() => {
-    const base = (seller?.customers ?? 500) * 140 + (seller?.sales ?? 200) * 860;
-    const wobble = (seed % 50000) * 1.25;
-    return Math.round((base + wobble) / 10) * 10;
-  }, [seed, seller?.customers, seller?.sales]);
-
-  const currentRating = useMemo(() => {
-    const base = seller?.rating ? 3.6 + seller.rating * 0.22 : 4.2;
-    const wobble = ((seed % 7) - 3) * 0.08;
-    return clamp(base + wobble, 3.6, 5);
-  }, [seed, seller?.rating]);
-
-  const totalProducts = useMemo(() => {
-    const base = (seller?.products ?? 10) * 28;
-    return base + (seed % 120);
-  }, [seed, seller?.products]);
+  const lifetimeSales = seller?.sales || 0;
+  const currentRating = seller?.rating || 0;
+  const totalProducts = products.length || seller?.productsCount || 0;
 
   const verifiedLabel = useMemo(() => {
     if (isAr) return "موزّع طبي موثّق";
@@ -133,74 +177,125 @@ export default function SellerDetailsPage({
   const [productPage, setProductPage] = useState(1);
 
   const productCatalog = useMemo(() => {
-    const categories = [
-      { id: "protective", label: isAr ? "معدات وقاية" : "Protective Gear" },
-      { id: "diagnostics", label: isAr ? "تشخيص" : "Diagnostics" },
-      { id: "cardiology", label: isAr ? "قلب" : "Cardiology" },
-      { id: "orthopedics", label: isAr ? "عظام" : "Orthopedics" },
-    ];
+    return products.map((p) => {
+      const name = isAr ? p.nameAr : p.nameEn;
+      const sku = p.sku || p.identity?.sku || `SKU-${p._id.slice(-6)}`;
+      const price = p.salePrice || p.pricing?.salePrice || p.price || 0;
+      const stock = p.inventory?.stockQuantity || p.stock || 0;
+      const img =
+        p.media?.featuredImages ||
+        (p.media?.galleryImages && p.media.galleryImages[0]) ||
+        "";
+      const stockPct = clamp(Math.round((stock / 100) * 100), 0, 100);
 
-    const names = [
-      isAr ? "قفازات نيتريل (علبة 100)" : "Nitril Medical Gloves (Box 100)",
-      isAr ? "مقياس حرارة رقمي" : "Digital Infrared Thermometer",
-      isAr ? "جهاز ضغط أوتوماتيك - برو" : "Automatic BP Monitor - Pro",
-      isAr ? "كمامة N95 (علبة 20)" : "N95 Face Mask (Box 20)",
-      isAr ? "ميزان حرارة أذن" : "Ear Thermometer",
-      isAr ? "سماعة طبية - بريميوم" : "Stethoscope - Premium",
-      isAr ? "قناع أكسجين" : "Oxygen Mask",
-      isAr ? "حزام داعم للركبة" : "Knee Support Brace",
-      isAr ? "جهاز قياس سكر" : "Glucometer Kit",
-      isAr ? "قسطرة طبية" : "Medical Catheter",
-      isAr ? "ضمادات معقمة" : "Sterile Bandages",
-      isAr ? "مقص جراحي" : "Surgical Scissors",
-    ];
+      const categoryObj =
+        typeof p.category === "object"
+          ? {
+              id: p.category?._id || p.category?.id,
+              label: isAr ? p.category.nameAr : p.category.nameEn,
+            }
+          : {
+              id: String(p.category),
+              label: String(p.category),
+            };
 
-    const images = [
-      "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1581595219315-a187dd40c322?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1584516150909-c43483ee7932?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?auto=format&fit=crop&w=400&q=80",
-    ];
-
-    return Array.from({ length: totalProducts }, (_, idx) => {
-      const s = hashToNumber(`${seed}:${idx}:${slug}`);
-      const cat = categories[s % categories.length];
-      const name = names[idx % names.length];
-      const sku = `SKU: MT-${String(8000 + (s % 9000))}-${String.fromCharCode(65 + (s % 20))}`;
-      const stock = 10 + (s % 2000);
-      const price = Math.round((12 + (s % 160) + (s % 99) / 100) * 100) / 100;
-      const img = images[s % images.length];
-      const stockPct = clamp(Math.round((stock / 2000) * 100), 5, 100);
-      return { id: `p-${idx + 1}`, name, sku, category: cat, stock, stockPct, price, img };
+      return {
+        id: p._id,
+        name,
+        sku,
+        category: categoryObj.label
+          ? categoryObj
+          : { id: "misc", label: isAr ? "غير مصنف" : "Uncategorized" },
+        stock,
+        stockPct,
+        price,
+        img,
+      };
     });
-  }, [isAr, seed, slug, totalProducts]);
+  }, [isAr, products]);
 
   const filteredProducts = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
     return productCatalog.filter((p) => {
-      const categoryOk = productCategory === "all" ? true : p.category.id === productCategory;
+      const categoryOk =
+        productCategory === "all" ? true : p.category.id === productCategory;
       if (!categoryOk) return false;
       if (!q) return true;
-      return p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
+      return (
+        p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+      );
     });
   }, [productCatalog, productCategory, productQuery]);
 
   const itemsPerPage = 6;
-  const totalProductPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
+  const totalProductPages = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / itemsPerPage),
+  );
   const safeProductPage = clamp(productPage, 1, totalProductPages);
   const productStartIndex = (safeProductPage - 1) * itemsPerPage;
-  const productRows = filteredProducts.slice(productStartIndex, productStartIndex + itemsPerPage);
+  const productRows = filteredProducts.slice(
+    productStartIndex,
+    productStartIndex + itemsPerPage,
+  );
 
   const tabs = useMemo(
     () =>
       [
-        { id: "products" as const, label: isAr ? "المنتجات" : "Products", icon: Tag },
-        { id: "orders" as const, label: isAr ? "سجل الطلبات" : "Order History", icon: FileText },
-        { id: "payouts" as const, label: isAr ? "المدفوعات" : "Payouts", icon: Wallet },
-        { id: "docs" as const, label: isAr ? "مستندات التحقق" : "Verification Docs", icon: ShieldCheck },
+        {
+          id: "products" as const,
+          label: isAr ? "المنتجات" : "Products",
+          icon: Tag,
+        },
+        {
+          id: "orders" as const,
+          label: isAr ? "سجل الطلبات" : "Order History",
+          icon: FileText,
+        },
+        {
+          id: "payouts" as const,
+          label: isAr ? "المدفوعات" : "Payouts",
+          icon: Wallet,
+        },
+        {
+          id: "docs" as const,
+          label: isAr ? "مستندات التحقق" : "Verification Docs",
+          icon: ShieldCheck,
+        },
       ] satisfies Array<{ id: TabId; label: string; icon: React.ElementType }>,
     [isAr],
   );
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F3F6F4]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+          <p className="text-sm font-bold text-slate-500">
+            {isAr ? "جاري تحميل بيانات البائع..." : "Loading seller data..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!seller) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F3F6F4]">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-slate-900">
+            {isAr ? "البائع غير موجود" : "Seller Not Found"}
+          </h1>
+          <Link
+            href="/admin/sellers"
+            className="mt-4 inline-block text-emerald-600 hover:underline"
+          >
+            {isAr ? "العودة لقائمة البائعين" : "Back to Sellers"}
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in min-h-screen bg-[#F3F6F4] p-4 duration-700 md:p-8">
@@ -221,10 +316,12 @@ export default function SellerDetailsPage({
               <div className="relative">
                 <Avatar
                   className="h-16 w-16 rounded-2xl border border-white shadow-sm ring-1 ring-slate-100"
-                  imageUrl={seller?.image}
+                  imageUrl={seller?.profileImage || seller?.storeLogo}
                   name={seller?.name || "Seller"}
                 />
-                <span className={`absolute -bottom-1 -left-1 h-4 w-4 rounded-full ${statusTone.dot} ring-2 ring-white`} />
+                <span
+                  className={`absolute -bottom-1 -left-1 h-4 w-4 rounded-full ${statusTone.dot} ring-2 ring-white`}
+                />
               </div>
 
               <div className="min-w-0">
@@ -300,14 +397,6 @@ export default function SellerDetailsPage({
               </button>
             </div>
           </div>
-
-          {editMode ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-900">
-              {isAr
-                ? "وضع التعديل (واجهة فقط) — اربط حقول API لاحقاً."
-                : "Edit mode (UI only) — connect to API later."}
-            </div>
-          ) : null}
         </div>
 
         {/* KPI cards */}
@@ -352,7 +441,10 @@ export default function SellerDetailsPage({
                     ? "bg-indigo-50 text-indigo-700 ring-indigo-100"
                     : "bg-slate-50 text-slate-700 ring-slate-100";
             return (
-              <div key={c.label} className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+              <div
+                key={c.label}
+                className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
@@ -365,7 +457,9 @@ export default function SellerDetailsPage({
                       {c.sub}
                     </div>
                   </div>
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ${tone}`}>
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ${tone}`}
+                  >
                     <Icon className="h-5 w-5" />
                   </div>
                 </div>
@@ -392,11 +486,11 @@ export default function SellerDetailsPage({
                     {isAr ? "عنوان النشاط" : "Business Address"}
                   </div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">
-                    882 Healthcare Plaza, Suite 400
+                    {seller?.address || (isAr ? "غير متوفر" : "Not specified")}
                     <br />
-                    Medical District, {seller?.city || "Cairo"}, IL 60612
+                    {seller?.city}, {seller?.state}
                     <br />
-                    {seller?.country || "Egypt"}
+                    {seller?.country}
                   </div>
                 </div>
 
@@ -406,7 +500,9 @@ export default function SellerDetailsPage({
                       {isAr ? "الرقم الضريبي" : "Tax ID / EIN"}
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-700">
-                      {String(120000000 + (seed % 900000000)).replace(/(\d{2})(\d{7})(\d)/, "$1-$2$3")}
+                      {String(
+                        120000000 + (hashToNumber(slug) % 900000000),
+                      ).replace(/(\d{2})(\d{7})(\d)/, "$1-$2$3")}
                     </div>
                   </div>
                   <div>
@@ -425,18 +521,18 @@ export default function SellerDetailsPage({
                   </div>
                   <div className="mt-3 flex items-center gap-3">
                     <div className="h-10 w-10 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-                      <img
-                        src="https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=160&q=80"
-                        alt="Contact"
+                      <Avatar
+                        imageUrl={seller?.profileImage}
+                        name={seller?.name}
                         className="h-full w-full object-cover"
                       />
                     </div>
                     <div className="min-w-0">
                       <div className="truncate text-sm font-extrabold text-slate-900">
-                        {isAr ? "سارة ميلر" : "Sarah J. Miller"}
+                        {seller?.name}
                       </div>
                       <div className="text-xs font-semibold text-slate-500">
-                        {isAr ? "مدير عمليات المبيعات" : "Head of Sales Operations"}
+                        {isAr ? "البائع" : "Seller"}
                       </div>
                     </div>
                   </div>
@@ -444,13 +540,13 @@ export default function SellerDetailsPage({
                   <div className="mt-3 space-y-2 text-sm">
                     <div className="flex items-center gap-2 text-slate-700">
                       <Phone className="h-4 w-4 text-slate-400" />
-                      <span className="font-semibold">+1 (555) 123-4567</span>
+                      <span className="font-semibold">
+                        {seller?.phone || seller?.storePhone || "—"}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-700">
                       <Mail className="h-4 w-4 text-slate-400" />
-                      <span className="font-semibold">
-                        s.miller@{(seller?.name || "medicova").toLowerCase().replace(/\s+/g, "")}.com
-                      </span>
+                      <span className="font-semibold">{seller?.email}</span>
                     </div>
                   </div>
                 </div>
@@ -493,7 +589,9 @@ export default function SellerDetailsPage({
                         onClick={() => setTab(t.id)}
                         className={[
                           "relative inline-flex items-center gap-2 pb-3 text-sm font-extrabold transition",
-                          active ? "text-emerald-700" : "text-slate-500 hover:text-slate-700",
+                          active
+                            ? "text-emerald-700"
+                            : "text-slate-500 hover:text-slate-700",
                         ].join(" ")}
                       >
                         <Icon className="h-4 w-4" />
@@ -519,7 +617,9 @@ export default function SellerDetailsPage({
                             setProductQuery(e.target.value);
                             setProductPage(1);
                           }}
-                          placeholder={isAr ? "ابحث عن منتج..." : "Search products..."}
+                          placeholder={
+                            isAr ? "ابحث عن منتج..." : "Search products..."
+                          }
                           className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50/40 pl-10 pr-4 text-sm font-semibold text-slate-800 outline-none ring-emerald-100 focus:bg-white focus:ring-2"
                         />
                       </div>
@@ -534,11 +634,14 @@ export default function SellerDetailsPage({
                             }}
                             className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 shadow-sm outline-none transition hover:bg-slate-50"
                           >
-                            <option value="all">{isAr ? "كل الفئات" : "All Categories"}</option>
-                            <option value="protective">{isAr ? "معدات وقاية" : "Protective Gear"}</option>
-                            <option value="diagnostics">{isAr ? "تشخيص" : "Diagnostics"}</option>
-                            <option value="cardiology">{isAr ? "قلب" : "Cardiology"}</option>
-                            <option value="orthopedics">{isAr ? "عظام" : "Orthopedics"}</option>
+                            <option value="all">
+                              {isAr ? "كل الفئات" : "All Categories"}
+                            </option>
+                            {categories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {isAr ? cat.title.ar : cat.title.en}
+                              </option>
+                            ))}
                           </select>
                         </div>
                         <button
@@ -556,20 +659,37 @@ export default function SellerDetailsPage({
                         <table className="w-full min-w-[860px] text-left text-sm">
                           <thead>
                             <tr className="bg-slate-50/60 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                              <th className="px-5 py-3">{isAr ? "المنتج" : "Product"}</th>
-                              <th className="px-5 py-3">{isAr ? "الفئة" : "Category"}</th>
-                              <th className="px-5 py-3">{isAr ? "المخزون" : "Stock"}</th>
-                              <th className="px-5 py-3">{isAr ? "السعر" : "Price"}</th>
-                              <th className="px-5 py-3">{isAr ? "إجراءات" : "Actions"}</th>
+                              <th className="px-5 py-3">
+                                {isAr ? "المنتج" : "Product"}
+                              </th>
+                              <th className="px-5 py-3">
+                                {isAr ? "الفئة" : "Category"}
+                              </th>
+                              <th className="px-5 py-3">
+                                {isAr ? "المخزون" : "Stock"}
+                              </th>
+                              <th className="px-5 py-3">
+                                {isAr ? "السعر" : "Price"}
+                              </th>
+                              <th className="px-5 py-3">
+                                {isAr ? "إجراءات" : "Actions"}
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
                             {productRows.map((p) => (
-                              <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50/40">
+                              <tr
+                                key={p.id}
+                                className="border-t border-slate-100 hover:bg-slate-50/40"
+                              >
                                 <td className="px-5 py-4">
                                   <div className="flex items-center gap-3">
                                     <div className="h-10 w-12 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-                                      <img src={p.img} alt={p.name} className="h-full w-full object-cover" />
+                                      <img
+                                        src={p.img}
+                                        alt={p.name}
+                                        className="h-full w-full object-cover"
+                                      />
                                     </div>
                                     <div className="min-w-0">
                                       <div className="truncate text-sm font-extrabold text-slate-900">
@@ -617,8 +737,13 @@ export default function SellerDetailsPage({
                             ))}
                             {productRows.length === 0 ? (
                               <tr>
-                                <td colSpan={5} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">
-                                  {isAr ? "لا توجد منتجات" : "No products found"}
+                                <td
+                                  colSpan={5}
+                                  className="px-5 py-10 text-center text-sm font-semibold text-slate-500"
+                                >
+                                  {isAr
+                                    ? "لا توجد منتجات"
+                                    : "No products found"}
                                 </td>
                               </tr>
                             ) : null}
@@ -642,14 +767,21 @@ export default function SellerDetailsPage({
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => setProductPage((p) => clamp(p - 1, 1, totalProductPages))}
+                            onClick={() =>
+                              setProductPage((p) =>
+                                clamp(p - 1, 1, totalProductPages),
+                              )
+                            }
                             disabled={safeProductPage === 1}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                             aria-label={isAr ? "السابق" : "Previous"}
                           >
                             ‹
                           </button>
-                          {Array.from({ length: Math.min(3, totalProductPages) }, (_, i) => i + 1).map((n) => (
+                          {Array.from(
+                            { length: Math.min(3, totalProductPages) },
+                            (_, i) => i + 1,
+                          ).map((n) => (
                             <button
                               key={n}
                               type="button"
@@ -666,7 +798,11 @@ export default function SellerDetailsPage({
                           ))}
                           <button
                             type="button"
-                            onClick={() => setProductPage((p) => clamp(p + 1, 1, totalProductPages))}
+                            onClick={() =>
+                              setProductPage((p) =>
+                                clamp(p + 1, 1, totalProductPages),
+                              )
+                            }
                             disabled={safeProductPage === totalProductPages}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                             aria-label={isAr ? "التالي" : "Next"}
@@ -732,4 +868,3 @@ export default function SellerDetailsPage({
     </div>
   );
 }
-

@@ -12,6 +12,8 @@ import {
   Seller,
   deleteSeller,
 } from "@/services/sellerService";
+import { getCategories } from "@/services/categoryService";
+import { MultiCategory } from "@/types";
 import { toast } from "react-hot-toast";
 import { getProducts, ApiProduct } from "@/services/productService";
 import { useSession } from "next-auth/react";
@@ -51,7 +53,9 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
     | "suspended";
   const page = Number(searchParams.get("page") || "1") || 1;
   const [q, setQ] = useState(searchParams.get("q") || "");
+  const categoryId = searchParams.get("categoryId") || "";
   const [sellers, setSellers] = useState<Seller[]>([]);
+  const [categories, setCategories] = useState<MultiCategory[]>([]);
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const { data: session } = useSession();
@@ -61,12 +65,14 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
     if (!token) return;
     setLoading(true);
     try {
-      const [sellersData, productsData] = await Promise.all([
+      const [sellersData, productsData, catsData] = await Promise.all([
         getAdminSellers(token),
         getProducts(token),
+        getCategories(token),
       ]);
       setSellers(sellersData);
       setProducts(productsData);
+      setCategories(catsData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     } finally {
@@ -111,16 +117,29 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
       const sellerCode =
         s.sellerCode || `#SEL-${String(81000 + (seed % 9000))}`;
 
-      const totalSales = s.sales || s.totalSales || 0;
+      const totalSales = Number(s.sales || 0);
 
       // Calculate dynamic products count from products list
-      const dynamicProductsCount = products.filter(
-        (p) =>
-          p.sellerId === s.id ||
-          (typeof p.seller === "object" && (p.seller as any)?._id === s.id),
-      ).length;
+      const dynamicProductsCount = products.filter((p) => {
+        const productSellerId =
+          p.sellerId ||
+          (typeof p.seller === "object"
+            ? p.seller?._id || (p.seller as any)?.id
+            : p.seller);
 
-      const productsCount = dynamicProductsCount || s.productsCount || 0;
+        // Match against seller ID
+        if (productSellerId === s.id) return true;
+
+        // Fallback match: if product.store or product.createdBy matches s.id
+        if (p.store === s.id || p.createdBy === s.id) return true;
+
+        return false;
+      }).length;
+
+      const productsCount = Math.max(
+        dynamicProductsCount,
+        s.productsCount || 0,
+      );
 
       return {
         ...s,
@@ -128,6 +147,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
         sellerCode,
         totalSales,
         productsCount,
+        commission: Number(s.commission || 0),
       };
     });
   }, [sellers, products]);
@@ -147,6 +167,12 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
     const query = q.trim().toLowerCase();
     return derived.filter((s) => {
       if (status !== "" && s.derivedStatus !== status) return false;
+      if (
+        categoryId !== "" &&
+        s.category !== categoryId &&
+        s.category?._id !== categoryId
+      )
+        return false;
       if (!query) return true;
       return (
         s.name.toLowerCase().includes(query) ||
@@ -189,7 +215,10 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
             title: isAr ? "أفضل المؤدين" : "Top Performers",
             value: loading
               ? "..."
-              : formatNumber(Math.max(0, counts.active - 1), locale),
+              : formatNumber(
+                  derived.filter((s) => (s.rating || 0) >= 4).length,
+                  locale,
+                ),
             iconBg: "bg-emerald-50",
             iconTone: "text-emerald-700",
           },
@@ -198,7 +227,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
             value: loading
               ? "..."
               : formatCurrency(
-                  derived.reduce((sum, s) => sum + s.totalSales * 0.06, 0),
+                  derived.reduce((sum, s) => sum + (s.commission || 0), 0),
                   locale,
                 ),
             iconBg: "bg-emerald-50",
@@ -240,13 +269,18 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            <select
+              value={categoryId}
+              onChange={(e) => setParam("categoryId", e.target.value)}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition hover:bg-slate-50"
             >
-              <Filter className="h-4 w-4" />
-              {isAr ? "فلتر" : "Filter"}
-            </button>
+              <option value="">{isAr ? "كل الفئات" : "All Categories"}</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {isAr ? c.title.ar : c.title.en}
+                </option>
+              ))}
+            </select>
 
             <div className="flex items-center rounded-2xl bg-slate-50 p-1 ring-1 ring-slate-200">
               {[
@@ -434,6 +468,20 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                           <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
                             {formatNumber(s.totalSales ?? 0, locale)}{" "}
                             {isAr ? "جنيه" : "EGP"} {isAr ? "مبيعات" : "sales"}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-[10px] font-bold text-emerald-600">
+                              {formatCurrency(s.commission || 0, locale)}{" "}
+                              {isAr ? "عمولة" : "comm."}
+                            </div>
+                            {s.rating > 0 && (
+                              <div className="flex items-center gap-0.5 text-amber-500">
+                                <Star className="h-2.5 w-2.5 fill-current" />
+                                <span className="text-[10px] font-bold">
+                                  {s.rating}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>

@@ -631,6 +631,12 @@
     },
     "pricing": {
       "title": "Pricing & Inventory",
+      "priceLabels": {
+        "price": "Base Price ($)",
+        "salePrice": "Sale Price ($)",
+        "saleStart": "Sale Start",
+        "saleEnd": "Sale End"
+      },
       "priceLabel": "Base Price ($)",
       "salePrice": "Sale Price ($)",
       "selectColor": "Select Color",
@@ -800,6 +806,15 @@
       "brand": "Brand",
       "status": "Status"
     },
+    "product": "Product",
+    "user": "User",
+    "rating": "Rating",
+    "comment": "Comment",
+    "createdAt": "Created At",
+    "create": "Create Review",
+    "view": "View",
+    "approve": "Approve",
+    "reject": "Reject",
     "joinDate": "Join Date",
     "type": "Type",
     "sales": "Total Sales",
@@ -826,8 +841,6 @@
     "terrible": "Terrible",
     "published": "Published",
     "rejectedStatus": "Rejected",
-    "approve": "Approve",
-    "reject": "Reject",
     "manageShipments": "Manage and track all shipments and delivery operations",
     "shippingAmount": "Shipping Amount",
     "codStatus": "COD Status",

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { Link } from "@/i18n/navigation";
@@ -10,6 +10,7 @@ import { Switch } from "@/components/shared/switch";
 import {
   Check,
   ChevronRight,
+  ChevronDown,
   Plus,
   Search,
   Store,
@@ -17,6 +18,13 @@ import {
   User,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { cn } from "@/util";
+import { useSession } from "next-auth/react";
+import { getProducts, ApiProduct } from "@/services/productService";
+import { getCustomers, ApiCustomer } from "@/services/customerService";
+import { createOrder, CreateOrderPayload } from "@/services/orderService";
+import { Loader2 } from "lucide-react";
+import { useRouter } from "@/i18n/navigation";
 
 type Customer = {
   id: string;
@@ -41,7 +49,7 @@ function formatMoney(value: number, locale: string) {
   const loc = locale === "ar" ? "ar-EG" : "en-US";
   return new Intl.NumberFormat(loc, {
     style: "currency",
-    currency: "USD",
+    currency: "EGP",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
@@ -50,72 +58,98 @@ function formatMoney(value: number, locale: string) {
 export default function AddNewOrderPage() {
   const locale = useAppLocale();
   const isArabic = locale === "ar";
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const router = useRouter();
+
+  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [customers, setCustomers] = useState<ApiCustomer[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const [customerQuery, setCustomerQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>({
-    id: "CUST-90210",
-    name: isArabic ? "City General Hospital" : "City General Hospital",
-    dept: isArabic ? "قسم المشتريات" : "Procurement Dept.",
-    city: isArabic ? "New York, NY" : "New York, NY",
-    phone: "(555) 123-4567",
-  });
+  const [selectedCustomer, setSelectedCustomer] = useState<ApiCustomer | null>(
+    null,
+  );
+  const [isCustomerMenuOpen, setIsCustomerMenuOpen] = useState(false);
+  const customerMenuRef = useRef<HTMLDivElement>(null);
 
-  const [items, setItems] = useState<LineItem[]>([
-    {
-      id: "scrubs",
-      name: "Advanced Anti-Microbial Medical Scrubs",
-      sku: "MED-SCRB-442",
-      price: 48,
-      image: "/images/products/norton.png",
-      color: "Navy Blue",
-      size: "Small",
-      qty: 25,
-    },
-    {
-      id: "coat",
-      name: "Classic Professional Lab Coat",
-      sku: "MED-COAT-012",
-      price: 65,
-      image: "/images/products/photoshop.png",
-      color: "Unisex",
-      size: "L",
-      qty: 1,
-    },
-  ]);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        customerMenuRef.current &&
+        !customerMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsCustomerMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const [items, setItems] = useState<LineItem[]>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    const fetchData = async () => {
+      setLoadingData(true);
+      try {
+        const [pData, cData] = await Promise.all([
+          getProducts(token),
+          getCustomers(token),
+        ]);
+        setProducts(pData);
+        setCustomers(cData);
+      } catch (err) {
+        console.error("Failed to fetch order creation data:", err);
+        toast.error(isArabic ? "فشل تحميل البيانات" : "Failed to load data");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchData();
+  }, [token, isArabic]);
+
+  const catalog = useMemo(() => {
+    return products.map((p) => {
+      const price =
+        p.pricing?.salePrice ||
+        p.pricing?.sale_price ||
+        p.sale_price ||
+        p.salePrice ||
+        p.pricing?.originalPrice ||
+        p.pricing?.original_price ||
+        p.originalPrice ||
+        p.original_price ||
+        p.price ||
+        0;
+      return {
+        id: p._id,
+        name:
+          (isArabic ? p.nameAr : p.nameEn) ||
+          p.nameEn ||
+          p.nameAr ||
+          "Unnamed Product",
+        sku: p.sku || p.identity?.sku || `SKU-${p._id.slice(-6)}`,
+        price: Number(price),
+        sellerId:
+          p.sellerId ||
+          (typeof p.seller === "object" ? (p.seller as any)?._id : p.seller) ||
+          null,
+        image:
+          p.media?.featuredImages ||
+          (p.media?.galleryImages && p.media.galleryImages[0]) ||
+          "/images/placeholder.jpg",
+        colors: ["Standard"],
+        sizes: ["Standard"],
+      };
+    });
+  }, [products, isArabic]);
 
   const [draft, setDraft] = useState<
     Record<string, { color: string; size: string; qty: number }>
-  >({
-    scrubs: { color: "Navy Blue", size: "Small", qty: 1 },
-    coat: { color: "Unisex", size: "L", qty: 1 },
-  });
-
-  const [taxExempt, setTaxExempt] = useState(true);
-
-  const catalog = useMemo(
-    () => [
-      {
-        id: "scrubs",
-        name: "Advanced Anti-Microbial Medical Scrubs",
-        sku: "MED-SCRB-442",
-        price: 48,
-        image: "/images/products/norton.png",
-        colors: ["Navy Blue", "Olive", "Black"],
-        sizes: ["Small", "Medium", "Large"],
-      },
-      {
-        id: "coat",
-        name: "Classic Professional Lab Coat",
-        sku: "MED-COAT-012",
-        price: 65,
-        image: "/images/products/photoshop.png",
-        colors: ["Unisex", "Women", "Men"],
-        sizes: ["S", "M", "L", "XL"],
-      },
-    ],
-    [],
-  );
+  >({});
 
   const filteredCatalog = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
@@ -125,17 +159,6 @@ export default function AddNewOrderPage() {
       return hay.includes(q);
     });
   }, [catalog, productQuery]);
-
-  const subtotal = useMemo(
-    () => items.reduce((acc, it) => acc + it.price * it.qty, 0),
-    [items],
-  );
-  const shipping = useMemo(() => (items.length ? 45 : 0), [items.length]);
-  const tax = useMemo(
-    () => (taxExempt ? 0 : subtotal * 0.08),
-    [subtotal, taxExempt],
-  );
-  const total = subtotal + shipping + tax;
 
   const addToOrder = (id: string) => {
     const p = catalog.find((x) => x.id === id);
@@ -168,11 +191,111 @@ export default function AddNewOrderPage() {
 
   const removeCustomer = () => setSelectedCustomer(null);
 
-  const onCreate = () => {
-    toast.success(
-      isArabic ? "تم إنشاء الطلب (واجهة فقط)" : "Order created (UI only)",
+  const filteredCustomers = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase();
+    if (!q) return customers.slice(0, 10);
+    return customers.filter(
+      (c) =>
+        `${c.firstName || ""} ${c.lastName || ""}`.toLowerCase().includes(q) ||
+        (c.email || "").toLowerCase().includes(q),
     );
+  }, [customers, customerQuery]);
+
+  const [taxExempt, setTaxExempt] = useState(false);
+
+  // ... (subtotal, shipping, tax, total memos remain same logic)
+  const subtotal = useMemo(
+    () => items.reduce((acc, it) => acc + it.price * it.qty, 0),
+    [items],
+  );
+  const shipping = useMemo(() => (items.length ? 50 : 0), [items.length]); // Fixed shipping
+  const tax = useMemo(
+    () => (taxExempt ? 0 : subtotal * 0.14), // Egyptian VAT is 14%
+    [subtotal, taxExempt],
+  );
+  const total = subtotal + shipping + tax;
+
+  const onCreate = async () => {
+    if (!selectedCustomer) {
+      toast.error(isArabic ? "يرجى اختيار عميل" : "Please select a customer");
+      return;
+    }
+    if (items.length === 0) {
+      toast.error(
+        isArabic
+          ? "يرجى إضافة منتج واحد على الأقل"
+          : "Please add at least one item",
+      );
+      return;
+    }
+
+    if (!token) {
+      toast.error(
+        isArabic
+          ? "جلسة العمل منتهية، يرجى إعادة تسجيل الدخول"
+          : "Session expired, please login again",
+      );
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // For Admins, we usually need to specify a sellerId.
+      // We'll take it from the first item for now, or default to null if it's a multi-seller order (though API might reject it)
+      const firstItemSellerId =
+        items.length > 0
+          ? catalog.find((p) => p.id === items[0].id)?.sellerId
+          : null;
+
+      const payload: CreateOrderPayload = {
+        customerId: selectedCustomer._id,
+        sellerId: firstItemSellerId,
+        items: items.map((it) => ({
+          productId: it.id,
+          productName: it.name,
+          productNameAr: it.name, // Fallback if not available
+          sku: it.sku,
+          quantity: it.qty,
+          unitPrice: it.price,
+          discount: 0,
+          subtotal: it.price * it.qty,
+          productImage: it.image,
+          size: it.size === "Standard" ? null : it.size,
+        })),
+        subtotal,
+        discountAmount: 0,
+        shippingCost: shipping,
+        tax,
+        total,
+        paymentMethod: "Cash on Delivery",
+        paymentStatus: "pending",
+      };
+
+      await createOrder(payload, token);
+      toast.success(
+        isArabic ? "تم إنشاء الطلب بنجاح" : "Order created successfully",
+      );
+      router.push("/admin/orders");
+    } catch (err) {
+      console.error("Order creation failed:", err);
+      toast.error(isArabic ? "فشل إنشاء الطلب" : "Failed to create order");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loadingData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+          <p className="text-sm font-bold text-slate-500">
+            {isArabic ? "جاري تحميل البيانات..." : "Loading data..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in min-h-screen bg-[#F8FAFC] p-4 duration-700 md:p-8">
@@ -209,8 +332,10 @@ export default function AddNewOrderPage() {
             <button
               type="button"
               onClick={onCreate}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              disabled={submitting}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
             >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {isArabic ? "إنشاء الطلب" : "Create Order"}
             </button>
           </div>
@@ -235,71 +360,141 @@ export default function AddNewOrderPage() {
                   {isArabic ? "بحث عن عميل" : "Search Customer"}
                 </div>
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <div className="relative flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      value={customerQuery}
-                      onChange={(e) => setCustomerQuery(e.target.value)}
-                      placeholder={
-                        isArabic
-                          ? "اسم المستشفى، رقم، أو جهة اتصال"
-                          : "Hospital name, ID, or contact"
-                      }
-                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                    />
+                  <div ref={customerMenuRef} className="relative flex-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomerMenuOpen(!isCustomerMenuOpen)}
+                      className={cn(
+                        "flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10",
+                        isCustomerMenuOpen &&
+                          "border-emerald-500 ring-2 ring-emerald-500/10",
+                        !selectedCustomer && "text-slate-400",
+                      )}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <User
+                          className={cn(
+                            "h-4 w-4",
+                            selectedCustomer
+                              ? "text-emerald-600"
+                              : "text-slate-400",
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            "truncate",
+                            selectedCustomer && "font-bold text-slate-900",
+                          )}
+                        >
+                          {selectedCustomer
+                            ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`
+                            : isArabic
+                              ? "اختر عميلاً..."
+                              : "Select a customer..."}
+                        </span>
+                      </div>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 text-slate-400 transition-transform duration-200",
+                          isCustomerMenuOpen && "rotate-180",
+                        )}
+                      />
+                    </button>
+
+                    {isCustomerMenuOpen && (
+                      <div className="animate-in fade-in zoom-in-95 pointer-events-auto absolute left-0 right-0 top-full z-30 mt-2 max-h-[400px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5 duration-200">
+                        <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/80 p-3 backdrop-blur-md">
+                          <div className="relative">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                            <Input
+                              value={customerQuery}
+                              onChange={(e) => setCustomerQuery(e.target.value)}
+                              autoFocus
+                              placeholder={
+                                isArabic
+                                  ? "بحث بالاسم أو البريد..."
+                                  : "Search name or email..."
+                              }
+                              className="h-9 rounded-lg border-slate-200 bg-slate-50 pl-9 text-sm focus:bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="custom-scrollbar max-h-[300px] overflow-auto p-1.5">
+                          {filteredCustomers.length > 0 ? (
+                            filteredCustomers.map((cust) => (
+                              <button
+                                key={cust._id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCustomer(cust);
+                                  setIsCustomerMenuOpen(false);
+                                  setCustomerQuery("");
+                                }}
+                                className={cn(
+                                  "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50",
+                                  selectedCustomer?._id === cust._id &&
+                                    "bg-emerald-50/50",
+                                )}
+                              >
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <div
+                                    className={cn(
+                                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors",
+                                      selectedCustomer?._id === cust._id
+                                        ? "bg-emerald-100 text-emerald-700"
+                                        : "bg-slate-100 text-slate-500",
+                                    )}
+                                  >
+                                    <User className="h-4.5 w-4.5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div
+                                      className={cn(
+                                        "truncate text-sm font-bold",
+                                        selectedCustomer?._id === cust._id
+                                          ? "text-emerald-900"
+                                          : "text-slate-900",
+                                      )}
+                                    >
+                                      {cust.firstName} {cust.lastName}
+                                    </div>
+                                    <div className="truncate text-[11px] font-medium text-slate-500">
+                                      {cust.email}
+                                    </div>
+                                  </div>
+                                </div>
+                                {selectedCustomer?._id === cust._id && (
+                                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500">
+                                    <Check className="h-3 w-3 text-white" />
+                                  </div>
+                                )}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                              <User className="h-8 w-8 text-slate-200" />
+                              <p className="mt-2 text-xs font-semibold text-slate-400">
+                                {isArabic
+                                  ? "لا يوجد عملاء مطابخين"
+                                  : "No customers found"}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-100"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-50/50 px-4 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100/50 transition hover:bg-emerald-100"
                   >
                     <Plus className="h-4 w-4" />
-                    {isArabic ? "إضافة عميل جديد" : "Add New Customer"}
+                    {isArabic
+                      ? "طلب جديد لبائع غير مسجل"
+                      : "Unregistered Customer"}
                   </button>
                 </div>
-
-                {selectedCustomer ? (
-                  <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-700 ring-1 ring-emerald-100">
-                          <Store className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-extrabold text-slate-900">
-                            {selectedCustomer.name}
-                          </div>
-                          <div className="mt-0.5 text-xs font-semibold text-slate-500">
-                            ID: {selectedCustomer.id} • {selectedCustomer.dept}
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-3 text-xs font-semibold text-slate-500">
-                            <span className="inline-flex items-center gap-1">
-                              <User className="h-3.5 w-3.5" />
-                              {selectedCustomer.city}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <Truck className="h-3.5 w-3.5" />
-                              {selectedCustomer.phone}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={removeCustomer}
-                        className="text-xs font-semibold text-slate-500 hover:underline"
-                      >
-                        {isArabic ? "إزالة" : "Remove"}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
-                    {isArabic
-                      ? "لم يتم اختيار عميل بعد."
-                      : "No customer selected yet."}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -558,9 +753,14 @@ export default function AddNewOrderPage() {
                 <Button
                   type="button"
                   onClick={onCreate}
-                  className="mt-4 h-12 w-full rounded-xl bg-emerald-600 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700"
+                  disabled={submitting}
+                  className="mt-4 h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  <Check className="h-4 w-4" />
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
                   {isArabic ? "تأكيد الطلب" : "Confirm Order"}
                 </Button>
                 <Button

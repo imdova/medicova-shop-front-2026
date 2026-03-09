@@ -24,6 +24,7 @@ export interface Seller {
   status?: "active" | "pending" | "suspended";
   rating?: number;
   sellerCode?: string;
+  commission?: number;
 }
 
 export async function getSellers(token?: string): Promise<Seller[]> {
@@ -108,11 +109,12 @@ export async function getAdminSellers(token?: string): Promise<Seller[]> {
       storeLogo: s.storeLogo || s.brandLogo || "",
       dateOfBirth: s.dateOfBirth || "",
       phone: s.phone || s.phoneNumber || s.mobile,
-      sales: s.sales || s.totalSales || 0,
-      productsCount: s.productsCount || s.products?.length || 0,
+      sales: Number((s.sales && typeof s.sales === "object" ? s.sales.total : s.sales) || s.totalSales || 0),
+      commission: Number(s.commission || 0),
+      productsCount: Number(s.productsCount || s.products?.length || s.productIds?.length || 0),
       category: s.category || s.brandName || "",
       status: s.status || (s.active === false ? "suspended" : "active"),
-      rating: s.rating || s.rate || 0,
+      rating: Number(s.rating || s.rate || 0),
       sellerCode: s.sellerCode || s.code || `#SEL-${(s._id || s.id || "").slice(-4)}`,
     }));
   } catch (error) {
@@ -143,14 +145,30 @@ export async function getSellerById(
     const data = (res as any)?.data || res;
     if (!data) return null;
     return {
-      id: data.id || data._id,
-      name:
-        data.name ||
-        (data.firstName
-          ? `${data.firstName} ${data.lastName || ""}`.trim()
-          : data.email),
-      storeName: data.storeName || data.store_name || data.name,
+      id: data._id || data.id,
+      firstName: data.firstName || "",
+      lastName: data.lastName || "",
+      name: data.fullName || (data.firstName ? `${data.firstName} ${data.lastName || ""}`.trim() : data.email),
+      storeName: data.storeName || data.brandName || data.store_name || data.name,
+      storePhone: data.storePhone || "",
       email: data.email,
+      isActive: data.active !== false,
+      city: data.city || "",
+      state: data.state || "",
+      country: data.country || "",
+      zipCode: data.zipCode || "",
+      address: data.address || "",
+      profileImage: data.profileImage || data.image || data.avatar || "",
+      storeLogo: data.storeLogo || data.brandLogo || "",
+      dateOfBirth: data.dateOfBirth || "",
+      phone: data.phone || data.phoneNumber || data.mobile,
+      sales: Number((data.sales && typeof data.sales === "object" ? data.sales.total : data.sales) || data.totalSales || 0),
+      commission: Number(data.commission || 0),
+      productsCount: Number(data.productsCount || data.products?.length || data.productIds?.length || 0),
+      category: data.category || data.brandName || "",
+      status: data.status || (data.active === false ? "suspended" : "active"),
+      rating: Number(data.rating || data.rate || 0),
+      sellerCode: data.sellerCode || data.code || `#SEL-${(data._id || data.id || "").slice(-4)}`,
     };
   } catch (error) {
     console.error(`Error fetching seller ${id}:`, error);

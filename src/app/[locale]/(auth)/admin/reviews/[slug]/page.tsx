@@ -19,11 +19,17 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Loading from "@/app/[locale]/loading";
-import { dummyReviews } from "@/constants/reviews";
 import { formatFullName, getTimeAgo } from "@/util";
 import { ReviewType } from "@/types/product";
 import { formatDate } from "@/util/dateUtils";
 import NotFound from "@/app/[locale]/not-found";
+import {
+  getReviewById,
+  deleteReview,
+  updateReview,
+} from "@/services/reviewService";
+import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
 
 // Define the proper interfaces based on your ReviewType
 
@@ -39,6 +45,8 @@ export default function ViewReviewPage() {
   const locale = useAppLocale();
   const params = useParams();
   const reviewSlug = params.slug as string;
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
 
   const [review, setReview] = useState<ReviewType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,15 +56,12 @@ export default function ViewReviewPage() {
   // Fetch review data when component mounts or slug changes
   useEffect(() => {
     const loadReviewData = async () => {
-      if (!reviewSlug) return;
+      if (!reviewSlug || !token) return;
 
       setIsLoading(true);
       try {
-        // Simulate API call delay
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        const foundReview = dummyReviews.find((r) => r.id === reviewSlug);
-        setReview(foundReview ?? null);
+        const data = await getReviewById(reviewSlug, token);
+        setReview(data);
       } catch (error) {
         console.error("Failed to load review data:", error);
       } finally {
@@ -65,14 +70,15 @@ export default function ViewReviewPage() {
     };
 
     loadReviewData();
-  }, [reviewSlug]);
+  }, [reviewSlug, token]);
 
   const handleSubmitReply = async () => {
-    if (!replyText.trim() || !review) return;
+    if (!replyText.trim() || !review || !token) return;
 
     setIsSubmittingReply(true);
     try {
-      // Simulate API call
+      // API for replies might not exist, but let's assume updateReview for now if possible
+      // For now we just simulate since the user didn't specify the reply API
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const newReply: Reply = {
@@ -88,7 +94,7 @@ export default function ViewReviewPage() {
       });
 
       setReplyText("");
-      console.log("Reply submitted successfully");
+      toast.success(locale === "ar" ? "تم إرسال الرد" : "Reply submitted");
     } catch (error) {
       console.error("Failed to submit reply:", error);
     } finally {
@@ -97,18 +103,41 @@ export default function ViewReviewPage() {
   };
 
   const handleDeleteReview = async () => {
-    if (!review) return;
+    if (!review || !token) return;
 
-    if (confirm("Are you sure you want to delete this review?")) {
+    if (
+      confirm(
+        locale === "ar"
+          ? "هل أنت متأكد من حذف هذا التقييم؟"
+          : "Are you sure you want to delete this review?",
+      )
+    ) {
       try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        console.log("Review deleted successfully");
-        // In a real app, you would redirect to reviews list
+        await deleteReview(review.id, token);
+        toast.success(
+          locale === "ar" ? "تم الحذف بنجاح" : "Deleted successfully",
+        );
         window.history.back();
       } catch (error) {
         console.error("Failed to delete review:", error);
+        toast.error(locale === "ar" ? "فشل الحذف" : "Failed to delete");
       }
+    }
+  };
+
+  const handleToggleStatus = async () => {
+    if (!review || !token) return;
+    const newStatus =
+      review.status.en === "Published" ? "rejected" : "published";
+    try {
+      await updateReview(review.id, { status: newStatus }, token);
+      const data = await getReviewById(review.id, token);
+      setReview(data);
+      toast.success(locale === "ar" ? "تم تحديث الحالة" : "Status updated");
+    } catch (err) {
+      toast.error(
+        locale === "ar" ? "فشل تحديث الحالة" : "Failed to update status",
+      );
     }
   };
 
@@ -263,20 +292,23 @@ export default function ViewReviewPage() {
 
                   {/* Product Info */}
                   <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
-                    <Image
-                      src={review.product.images[0]}
-                      alt={review.product.title[locale]}
-                      width={50}
-                      height={50}
-                      className="h-16 w-16 rounded-md object-cover"
-                    />
+                    {review.product.images &&
+                    review.product.images.length > 0 &&
+                    review.product.images[0] ? (
+                      <Image
+                        src={review.product.images[0]}
+                        alt={review.product.title[locale]}
+                        width={50}
+                        height={50}
+                        className="h-16 w-16 rounded-md object-cover"
+                      />
+                    ) : (
+                      <div className="h-16 w-16 rounded-md bg-gray-200" />
+                    )}
                     <div>
                       <h4 className="font-medium">
                         {review.product.title[locale]}
                       </h4>
-                      <p className="text-sm text-gray-600">
-                        ${review.product.price}
-                      </p>
                     </div>
                   </div>
                   <div className="mt-4 flex justify-end gap-2">
@@ -288,8 +320,8 @@ export default function ViewReviewPage() {
                       <Trash2 className="mr-2 h-4 w-4" />
                       {t.delete_review}
                     </Button>
-                    <Button variant="outline">
-                      {review.status["en"] === "Published"
+                    <Button variant="outline" onClick={handleToggleStatus}>
+                      {review.status.en === "Published"
                         ? t.unpublished
                         : t.publish}
                     </Button>

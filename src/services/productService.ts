@@ -159,7 +159,7 @@ export async function createProduct(payload: CreateProductPayload, token?: strin
 export async function getProducts(token?: string): Promise<ApiProduct[]> {
   try {
     const res = await apiClient({
-      endpoint: "/products",
+      endpoint: "/products?limit=1000",
       method: "GET",
       token,
     });
