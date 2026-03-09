@@ -82,6 +82,8 @@ function mapVariant(item: any): ProductOption {
     isRequired: !!item.isRequired,
     createdAt: item.createdAt || new Date().toISOString(),
     option_values: unifiedOptions,
+    createdBy: item.createdBy,
+    storeId: item.store || item.storeId || null,
   };
 }
 

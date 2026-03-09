@@ -266,6 +266,8 @@ export type ProductOption = {
   isRequired: boolean;
   createdAt: string;
   option_values: OptionValue[];
+  createdBy?: "admin" | "seller" | string;
+  storeId?: string | null;
 };
 
 // Type definition for Product Inventory
@@ -398,13 +400,25 @@ export interface Shipment {
 
 export interface ReviewType {
   id: string;
-  product: Product;
-  user: Customer;
+  product: {
+    id: string;
+    title: LocalizedTitle;
+    images: string[];
+    price?: number;
+  };
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    avatar?: string;
+  };
   rating: number;
   comment: string;
   images: string[];
-  status: { en: "Published" | "Pending" | "Rejected"; ar: string };
+  status: { en: string; ar: string };
   createdAt: string;
+  reviewType?: "manual" | "system";
   replies?: {
     id: string;
     admin_name: string;

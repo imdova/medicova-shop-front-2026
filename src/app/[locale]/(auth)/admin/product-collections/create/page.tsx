@@ -98,6 +98,8 @@ export default function CreateCollectionPage() {
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const [productQuery, setProductQuery] = useState("");
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -246,6 +248,20 @@ export default function CreateCollectionPage() {
     }
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const onSubmit = async (data: CollectionFormData) => {
     setIsUploading(true);
     try {
@@ -379,6 +395,7 @@ export default function CreateCollectionPage() {
   const addProduct = (p: Product) => {
     setSelectedProducts((prev) => [...prev, p]);
     setProductQuery("");
+    setIsDropdownOpen(false);
   };
 
   const removeProduct = (id: string) => {
@@ -554,11 +571,12 @@ export default function CreateCollectionPage() {
                   </div>
 
                   <div className="mt-5">
-                    <div className="relative">
+                    <div className="relative" ref={wrapperRef}>
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <input
                         value={productQuery}
                         onChange={(e) => setProductQuery(e.target.value)}
+                        onFocus={() => setIsDropdownOpen(true)}
                         placeholder={
                           isAr
                             ? "ابحث في مخزونك بواسطة SKU أو الاسم أو الفئة..."
@@ -567,7 +585,7 @@ export default function CreateCollectionPage() {
                         className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/40 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                       />
 
-                      {filteredProducts.length > 0 ? (
+                      {isDropdownOpen && filteredProducts.length > 0 && (
                         <div className="scroll-bar-minimal absolute z-10 mt-1 max-h-[400px] w-full overflow-y-auto rounded-md border bg-white shadow-lg">
                           {filteredProducts.map((product, idx) => {
                             const title = isAr
@@ -612,13 +630,17 @@ export default function CreateCollectionPage() {
                             );
                           })}
                         </div>
-                      ) : productQuery.length >= 2 ? (
-                        <div className="scroll-bar-minimal absolute z-10 mt-1 w-full rounded-md border bg-white p-4 text-center text-gray-500 shadow-lg">
-                          {isAr
-                            ? "لم يتم العثور على منتجات"
-                            : "No products found"}
-                        </div>
-                      ) : null}
+                      )}
+
+                      {isDropdownOpen &&
+                        productQuery.length >= 2 &&
+                        filteredProducts.length === 0 && (
+                          <div className="scroll-bar-minimal absolute z-10 mt-1 w-full rounded-md border bg-white p-4 text-center text-gray-500 shadow-lg">
+                            {isAr
+                              ? "لم يتم العثور على منتجات"
+                              : "No products found"}
+                          </div>
+                        )}
                     </div>
 
                     {selectedProducts.length > 0 ? (

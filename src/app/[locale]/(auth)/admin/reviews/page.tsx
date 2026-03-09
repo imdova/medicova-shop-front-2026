@@ -4,7 +4,20 @@ import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { Star, MessageSquare, ShieldCheck, Activity } from "lucide-react";
+import {
+  Star,
+  MessageSquare,
+  ShieldCheck,
+  Activity,
+  Loader2,
+} from "lucide-react";
+import { useSession } from "next-auth/react";
+import {
+  getAllReviews,
+  updateReview,
+  deleteReview,
+} from "@/services/reviewService";
+import toast from "react-hot-toast";
 
 // Types & Data
 import { ReviewType } from "@/types/product";
@@ -33,23 +46,78 @@ export default function ReviewsPage() {
   const isArabic = locale === "ar";
   const router = useRouter();
 
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+
+  const [reviews, setReviews] = useState<ExtendedReviewType[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [isOpen, setIsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<string>("all");
 
-  // Mix of manual and system reviews for dummy data
-  const extendedReviews: ExtendedReviewType[] = useMemo(
-    () =>
-      dummyReviews.map((review, index) => ({
-        ...review,
-        reviewType: index % 3 === 0 ? "system" : "manual",
-      })),
-    [],
-  );
+  const fetchReviews = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await getAllReviews(token);
+      setReviews(data as ExtendedReviewType[]);
+    } catch (err) {
+      console.error("Failed to fetch reviews:", err);
+      toast.error(isArabic ? "فشل تحميل التقييمات" : "Failed to load reviews");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchReviews();
+  }, [token]);
+
+  const handleApprove = async (id: string) => {
+    if (!token) return;
+    try {
+      await updateReview(id, { status: "published" }, token);
+      toast.success(isArabic ? "تم قبول التقييم" : "Review approved");
+      fetchReviews();
+    } catch (err) {
+      toast.error(isArabic ? "فشل قبول التقييم" : "Failed to approve review");
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    if (!token) return;
+    try {
+      await updateReview(id, { status: "rejected" }, token);
+      toast.success(isArabic ? "تم رفض التقييم" : "Review rejected");
+      fetchReviews();
+    } catch (err) {
+      toast.error(isArabic ? "فشل رفض التقييم" : "Failed to reject review");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!token) return;
+    if (
+      !confirm(
+        isArabic
+          ? "هل أنت متأكد من الحذف؟"
+          : "Are you sure you want to delete?",
+      )
+    )
+      return;
+    try {
+      await deleteReview(id, token);
+      toast.success(isArabic ? "تم حذف التقييم" : "Review deleted");
+      fetchReviews();
+    } catch (err) {
+      toast.error(isArabic ? "فشل حذف التقييم" : "Failed to delete review");
+    }
+  };
 
   const filteredReviews = useMemo(() => {
-    return extendedReviews.filter((review) => {
+    return reviews.filter((review) => {
       // Search filter
       const matchesSearch =
         !searchQuery ||
@@ -69,28 +137,28 @@ export default function ReviewsPage() {
 
       return true;
     });
-  }, [extendedReviews, searchQuery, activeTab, locale]);
+  }, [reviews, searchQuery, activeTab, locale]);
 
   const reviewTypeCounts = useMemo(
     () =>
-      extendedReviews.reduce(
+      reviews.reduce(
         (acc, review) => {
           acc[review.reviewType] = (acc[review.reviewType] || 0) + 1;
           return acc;
         },
         { manual: 0, system: 0 },
       ),
-    [extendedReviews],
+    [reviews],
   );
 
   const statusCounts = useMemo(
     () =>
-      extendedReviews.reduce((acc: Record<string, number>, review) => {
+      reviews.reduce((acc: Record<string, number>, review) => {
         const status = review.status[locale];
         acc[status] = (acc[status] || 0) + 1;
         return acc;
       }, {}),
-    [extendedReviews, locale],
+    [reviews, locale],
   );
 
   const predefinedFilters: DynamicFilterItem[] = [
@@ -184,7 +252,7 @@ export default function ReviewsPage() {
               <Activity className="size-4" />
               {t("allReviews")}
               <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px]">
-                {extendedReviews.length}
+                {reviews.length}
               </span>
             </TabsTrigger>
             <TabsTrigger
@@ -215,34 +283,52 @@ export default function ReviewsPage() {
         </div>
 
         <TabsContent value="all" className="mt-0 focus-visible:outline-none">
-          <ReviewTableContainer
-            locale={locale}
-            data={filteredReviews}
-            onApprove={(r) => console.log("approve", r.id)}
-            onReject={(r) => console.log("reject", r.id)}
-            onDelete={(r) => console.log("delete", r.id)}
-            onView={(r) => router.push(`/${locale}/admin/reviews/${r.id}`)}
-          />
+          {loading ? (
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <ReviewTableContainer
+              locale={locale}
+              data={filteredReviews}
+              onApprove={(r) => handleApprove(r.id)}
+              onReject={(r) => handleReject(r.id)}
+              onDelete={(r) => handleDelete(r.id)}
+              onView={(r) => router.push(`/${locale}/admin/reviews/${r.id}`)}
+            />
+          )}
         </TabsContent>
         <TabsContent value="manual" className="mt-0 focus-visible:outline-none">
-          <ReviewTableContainer
-            locale={locale}
-            data={filteredReviews}
-            onApprove={(r) => console.log("approve", r.id)}
-            onReject={(r) => console.log("reject", r.id)}
-            onDelete={(r) => console.log("delete", r.id)}
-            onView={(r) => router.push(`/${locale}/admin/reviews/${r.id}`)}
-          />
+          {loading ? (
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <ReviewTableContainer
+              locale={locale}
+              data={filteredReviews}
+              onApprove={(r) => handleApprove(r.id)}
+              onReject={(r) => handleReject(r.id)}
+              onDelete={(r) => handleDelete(r.id)}
+              onView={(r) => router.push(`/${locale}/admin/reviews/${r.id}`)}
+            />
+          )}
         </TabsContent>
         <TabsContent value="system" className="mt-0 focus-visible:outline-none">
-          <ReviewTableContainer
-            locale={locale}
-            data={filteredReviews}
-            onApprove={(r) => console.log("approve", r.id)}
-            onReject={(r) => console.log("reject", r.id)}
-            onDelete={(r) => console.log("delete", r.id)}
-            onView={(r) => router.push(`/${locale}/admin/reviews/${r.id}`)}
-          />
+          {loading ? (
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <ReviewTableContainer
+              locale={locale}
+              data={filteredReviews}
+              onApprove={(r) => handleApprove(r.id)}
+              onReject={(r) => handleReject(r.id)}
+              onDelete={(r) => handleDelete(r.id)}
+              onView={(r) => router.push(`/${locale}/admin/reviews/${r.id}`)}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -100,3 +100,35 @@ export async function deleteOrder(id: string, token?: string) {
   });
 }
 
+export interface CreateOrderPayload {
+  customerId: string;
+  sellerId?: string | null;
+  items: Array<{
+    productId: string | null;
+    productName: string;
+    productNameAr: string;
+    sku: string;
+    quantity: number;
+    size: string | null;
+    unitPrice: number;
+    discount: number;
+    subtotal: number;
+    productImage: string;
+  }>;
+  subtotal: number;
+  discountAmount: number;
+  shippingCost: number;
+  tax: number;
+  total: number;
+  paymentMethod: string;
+  paymentStatus: "paid" | "pending" | "refunded";
+}
+
+export async function createOrder(payload: CreateOrderPayload, token?: string) {
+  return apiClient({
+    endpoint: "/orders",
+    method: "POST",
+    body: payload as any,
+    token,
+  });
+}

@@ -7,6 +7,10 @@ import { Label } from "@/components/shared/label";
 import { ProductFormData } from "@/lib/validations/product-schema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useSession } from "next-auth/react";
+import { getVariants } from "@/services/variantService";
+import { ProductOption } from "@/types/product";
+
 interface Step2PricingInventoryProps {
   product: ProductFormData;
   onUpdate: (updates: Partial<ProductFormData>) => void;
@@ -19,12 +23,9 @@ const COLORS = {
   label: "text-sm font-semibold text-gray-800",
 };
 
-type SizeOption = { id: string; label: string };
 type ColorOption = { id: string; nameEn: string; nameAr: string; hex: string };
 type VariantStockEntry = {
-  size?: string;
-  color?: string;
-  colorHex?: string;
+  options: Record<string, string>; // e.g. { "Color": "Red", "Material": "Cotton" }
   stock: number;
 };
 type ColorImageEntry = {
@@ -42,16 +43,6 @@ type ShippingPackage = {
   widthCm?: number;
   heightCm?: number;
 };
-
-const SIZE_OPTIONS: SizeOption[] = [
-  { id: "XS", label: "XS" },
-  { id: "S", label: "S" },
-  { id: "M", label: "M" },
-  { id: "L", label: "L" },
-  { id: "XL", label: "XL" },
-  { id: "XXL", label: "XXL" },
-  { id: "XXXL", label: "XXXL" },
-];
 
 const COLOR_OPTIONS: ColorOption[] = [
   { id: "red", nameEn: "Red", nameAr: "أحمر", hex: "#ef4444" },
@@ -77,6 +68,9 @@ export const Step2PricingInventory = ({
   locale,
 }: Step2PricingInventoryProps) => {
   const isAr = locale === "ar";
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken as string | undefined;
+
   const objectUrlCacheRef = useRef<Map<File, string>>(new Map());
 
   useEffect(() => {
@@ -104,18 +98,6 @@ export const Step2PricingInventory = ({
     onUpdate({ identity: { ...product.identity, sku: `PX-${randomPart}` } });
   }, [onUpdate, product.identity]);
 
-  const parsedSizes = useMemo(() => {
-    const spec = (product.specifications || []).find(
-      (s) => (s?.keyEn || "").toLowerCase() === "sizes",
-    );
-    const raw = (spec?.valueEn || "").trim();
-    if (!raw) return [] as string[];
-    return raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }, [product.specifications]);
-
   const parsedColors = useMemo(() => {
     const spec = (product.specifications || []).find(
       (s) => (s?.keyEn || "").toLowerCase() === "colors",
@@ -133,6 +115,92 @@ export const Step2PricingInventory = ({
       })
       .filter((c) => c.name);
   }, [product.specifications]);
+
+  const selectedColors = useMemo(() => {
+    return parsedColors.map((c) => {
+      const preset = COLOR_OPTIONS.find(
+        (p) => p.nameEn.toLowerCase() === c.name.toLowerCase(),
+      );
+      return {
+        name: c.name,
+        hex: c.hex || preset?.hex || "#9ca3af",
+      };
+    });
+  }, [parsedColors]);
+
+  const [adminVariants, setAdminVariants] = useState<ProductOption[]>([]);
+  const [loadingVariants, setLoadingVariants] = useState(false);
+
+  useEffect(() => {
+    const fetchAdminVariants = async () => {
+      if (!token) return;
+      setLoadingVariants(true);
+      try {
+        const allVariants = await getVariants(token);
+        const filtered = allVariants.filter(
+          (v) => v.createdBy === "admin" && v.storeId == null,
+        );
+        setAdminVariants(filtered);
+      } catch (err) {
+        console.error("Failed to fetch admin variants:", err);
+      } finally {
+        setLoadingVariants(false);
+      }
+    };
+    fetchAdminVariants();
+  }, [token]);
+
+  const getParsedVariantValues = useCallback(
+    (variantNameEn: string) => {
+      const spec = (product.specifications || []).find(
+        (s) => (s?.keyEn || "").toLowerCase() === variantNameEn.toLowerCase(),
+      );
+      const raw = (spec?.valueEn || "").trim();
+      if (!raw) return [] as string[];
+      return raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    },
+    [product.specifications],
+  );
+
+  const getVariantCombinations = useMemo(() => {
+    // 1) Collect all active option sets
+    const activeOptions: Array<{ key: string; values: string[] }> = [];
+
+    // Colors
+    if (selectedColors.length) {
+      activeOptions.push({
+        key: "Colors",
+        values: selectedColors.map((c) => c.name),
+      });
+    }
+
+    // Admin Variants
+    adminVariants.forEach((v: any) => {
+      const vals = getParsedVariantValues(v.name.en);
+      if (vals.length) {
+        activeOptions.push({ key: v.name.en, values: vals });
+      }
+    });
+
+    if (activeOptions.length === 0) return [];
+
+    // 2) Cartesian product
+    let combinations: Array<Record<string, string>> = [{}];
+    activeOptions.forEach((opt: any) => {
+      const next: Array<Record<string, string>> = [];
+      combinations.forEach((combo) => {
+        opt.values.forEach((val: string) => {
+          next.push({ ...combo, [opt.key]: val });
+        });
+      });
+      combinations = next;
+    });
+
+    return combinations;
+  }, [selectedColors, adminVariants, getParsedVariantValues]);
 
   const specs = product.specifications || [];
   const getSpecByKey = useCallback(
@@ -236,19 +304,6 @@ export const Step2PricingInventory = ({
     return map;
   }, [parsedColorImages]);
 
-  const selectedSizes = parsedSizes;
-  const selectedColors = useMemo(() => {
-    return parsedColors.map((c) => {
-      const preset = COLOR_OPTIONS.find(
-        (p) => p.nameEn.toLowerCase() === c.name.toLowerCase(),
-      );
-      return {
-        name: c.name,
-        hex: c.hex || preset?.hex || "#9ca3af",
-      };
-    });
-  }, [parsedColors]);
-
   const variantStockSpec = useMemo(() => {
     return (product.specifications || []).find(
       (s) => (s?.keyEn || "").toLowerCase() === "variant stock",
@@ -263,9 +318,7 @@ export const Step2PricingInventory = ({
       if (!Array.isArray(parsed)) return [] as VariantStockEntry[];
       return parsed
         .map((x: any) => ({
-          size: typeof x?.size === "string" ? x.size : undefined,
-          color: typeof x?.color === "string" ? x.color : undefined,
-          colorHex: typeof x?.colorHex === "string" ? x.colorHex : undefined,
+          options: typeof x?.options === "object" ? x.options : {},
           stock: Number.isFinite(Number(x?.stock)) ? Number(x.stock) : 0,
         }))
         .filter((x: VariantStockEntry) => x.stock >= 0);
@@ -277,68 +330,53 @@ export const Step2PricingInventory = ({
   const variantStockMap = useMemo(() => {
     const map = new Map<string, VariantStockEntry>();
     for (const e of parsedVariantStock) {
-      const key = `${e.size || ""}__${e.color || ""}`;
+      // Create a stable key from options
+      const keys = Object.keys(e.options).sort();
+      const key = keys.map((k) => `${k}:${e.options[k]}`).join("|");
       map.set(key, e);
     }
     return map;
   }, [parsedVariantStock]);
 
   const variantStockTotal = useMemo(() => {
-    let total = 0;
-    parsedVariantStock.forEach((e) => {
-      total += Number.isFinite(e.stock) ? e.stock : 0;
-    });
-    return total;
+    return parsedVariantStock.reduce(
+      (sum, x) => sum + (Number.isFinite(x.stock) ? x.stock : 0),
+      0,
+    );
   }, [parsedVariantStock]);
 
   const upsertSpecs = useCallback(
-    (updates: {
-      sizes?: string[];
-      colors?: Array<{ nameEn: string; nameAr: string; hex: string }>;
-    }) => {
-      const next = (product.specifications || []).filter((s) => {
+    (updates: { colors?: ColorOption[] }) => {
+      const vals = updates;
+      let next = (product.specifications || []).filter((s) => {
         const k = (s?.keyEn || "").toLowerCase();
-        if (k === "sizes" && updates.sizes) return false;
-        if (k === "colors" && updates.colors) return false;
+        if (k === "colors" && vals.colors) return false;
         return true;
       });
 
-      if (updates.sizes) {
-        const sizes = updates.sizes;
-        if (sizes.length) {
-          next.push({
-            keyEn: "Sizes",
-            keyAr: "المقاسات",
-            valueEn: sizes.join(", "),
-            valueAr: sizes.join(", "),
-          });
-        }
-      }
-
-      if (updates.colors) {
-        const colors = updates.colors;
-        if (colors.length) {
+      if (vals.colors) {
+        if (vals.colors.length) {
           next.push({
             keyEn: "Colors",
             keyAr: "الألوان",
-            valueEn: colors.map((c) => `${c.nameEn}|${c.hex}`).join("; "),
-            valueAr: colors
+            valueEn: vals.colors.map((c) => `${c.nameEn}|${c.hex}`).join("; "),
+            valueAr: vals.colors
               .map((c) => `${c.nameAr || c.nameEn}|${c.hex}`)
               .join("; "),
           });
         }
       }
 
-      // If a variant-stock spec exists, prune entries to the new sizes/colors set
-      const nextSizes = updates.sizes ?? selectedSizes;
+      // If a variant-stock spec exists, prune entries to the new colors set
       const nextColorNames = (
-        updates.colors ??
+        vals.colors ??
         selectedColors.map((c) => ({
           nameEn: c.name,
           nameAr: c.name,
           hex: c.hex,
         }))
       ).map((c) => c.nameEn);
+
       const existingVariantSpec = (product.specifications || []).find(
         (s) => (s?.keyEn || "").toLowerCase() === "variant stock",
       );
@@ -348,11 +386,13 @@ export const Step2PricingInventory = ({
           const parsed = JSON.parse(existingRaw);
           if (Array.isArray(parsed)) {
             const pruned: VariantStockEntry[] = parsed.filter((x: any) => {
-              const size = typeof x?.size === "string" ? x.size : "";
-              const color = typeof x?.color === "string" ? x.color : "";
-              const sizeOk = !size || nextSizes.includes(size);
-              const colorOk = !color || nextColorNames.includes(color);
-              return sizeOk && colorOk;
+              const options = x?.options || {};
+              // For now, we only prune based on Colors if colors are updated.
+              // Admin variant pruning happens when those selections change.
+              if (vals.colors && options["Colors"]) {
+                return nextColorNames.includes(options["Colors"]);
+              }
+              return true;
             });
             next.push({
               keyEn: "Variant Stock",
@@ -368,21 +408,19 @@ export const Step2PricingInventory = ({
 
       onUpdate({ specifications: next });
     },
-    [onUpdate, product.specifications, selectedColors, selectedSizes],
+    [onUpdate, product.specifications, selectedColors],
   );
 
   const setVariantStockEntries = useCallback(
     (entries: VariantStockEntry[]) => {
       const cleaned = entries
         .map((e) => ({
-          size: e.size || undefined,
-          color: e.color || undefined,
-          colorHex: e.colorHex || undefined,
+          options: e.options || {},
           stock: Number.isFinite(e.stock)
             ? Math.max(0, Math.floor(e.stock))
             : 0,
         }))
-        .filter((e) => (e.size || e.color) && e.stock >= 0);
+        .filter((e) => Object.keys(e.options).length > 0 && e.stock >= 0);
 
       const next = (product.specifications || []).filter(
         (s) => (s?.keyEn || "").toLowerCase() !== "variant stock",
@@ -426,9 +464,6 @@ export const Step2PricingInventory = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variantStockTotal, parsedVariantStock.length]);
 
-  const [sizeModalOpen, setSizeModalOpen] = useState(false);
-  const [tempSizes, setTempSizes] = useState<Set<string>>(new Set());
-
   const [colorModalOpen, setColorModalOpen] = useState(false);
   const [tempColors, setTempColors] = useState<
     Map<string, { nameEn: string; nameAr: string; hex: string }>
@@ -442,9 +477,22 @@ export const Step2PricingInventory = ({
   const [customColorHex, setCustomColorHex] = useState("#000000");
   const [customColorName, setCustomColorName] = useState("");
 
-  const openSizeModal = () => {
-    setTempSizes(new Set(parsedSizes));
-    setSizeModalOpen(true);
+  const [variantModalOpen, setVariantModalOpen] = useState(false);
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
+  const [tempVariantValues, setTempVariantValues] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const activeVariant = useMemo(
+    () => adminVariants.find((v) => v.id === activeVariantId) || null,
+    [adminVariants, activeVariantId],
+  );
+
+  const openVariantModal = (v: ProductOption) => {
+    const existing = getParsedVariantValues(v.name.en);
+    setTempVariantValues(new Set(existing));
+    setActiveVariantId(v.id);
+    setVariantModalOpen(true);
   };
 
   const openColorModal = () => {
@@ -481,7 +529,7 @@ export const Step2PricingInventory = ({
   };
 
   const distributionEnabled = parsedVariantStock.length > 0;
-  const canDistribute = selectedSizes.length > 0 && selectedColors.length > 0;
+  const canDistribute = selectedColors.length > 0;
 
   const [draftPackage, setDraftPackage] = useState<ShippingPackage>({
     id: "",
@@ -504,8 +552,8 @@ export const Step2PricingInventory = ({
               </h3>
               <p className="mt-1 text-xs text-gray-500">
                 {isAr
-                  ? "إدارة المخزون والمقاسات والألوان."
-                  : "Manage stock levels, sizes and colors."}
+                  ? "إدارة المخزون والألوان."
+                  : "Manage stock levels and colors."}
               </p>
             </div>
           </div>
@@ -544,8 +592,8 @@ export const Step2PricingInventory = ({
               {distributionEnabled ? (
                 <p className="text-[11px] font-medium text-gray-500">
                   {isAr
-                    ? "يتم حساب المخزون تلقائيًا من توزيع المقاسات/الألوان."
-                    : "Stock is auto-calculated from size/color distribution."}
+                    ? "يتم حساب المخزون تلقائيًا من توزيع الألوان."
+                    : "Stock is auto-calculated from color distribution."}
                 </p>
               ) : null}
             </div>
@@ -583,59 +631,6 @@ export const Step2PricingInventory = ({
                 </p>
               ) : null}
             </div>
-          </div>
-
-          {/* Sizes */}
-          <div className="mt-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold text-gray-900">
-                  {isAr ? "المقاسات" : "Sizes"}
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {isAr
-                    ? "اختر المقاسات المتاحة للمنتج."
-                    : "Select available sizes."}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={openSizeModal}
-                className="inline-flex h-9 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/30 px-3 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-              >
-                <Plus className="h-4 w-4" />
-                {isAr ? "إضافة مقاس" : "Add Size"}
-              </button>
-            </div>
-
-            {parsedSizes.length ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {parsedSizes.map((s) => (
-                  <span
-                    key={s}
-                    className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-100"
-                  >
-                    {s}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        upsertSpecs({
-                          sizes: parsedSizes.filter((x) => x !== s),
-                        })
-                      }
-                      className="rounded-full p-0.5 text-emerald-700 transition-colors hover:bg-emerald-100"
-                      aria-label={isAr ? "حذف" : "Remove"}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-xs text-gray-400">
-                {isAr ? "لا توجد مقاسات محددة بعد." : "No sizes selected yet."}
-              </p>
-            )}
           </div>
 
           {/* Colors */}
@@ -709,6 +704,7 @@ export const Step2PricingInventory = ({
                                 p.nameEn.toLowerCase() === r.name.toLowerCase(),
                             );
                             return {
+                              id: preset?.id || r.name,
                               nameEn: preset?.nameEn || r.name,
                               nameAr: preset?.nameAr || r.name,
                               hex: r.hex || preset?.hex || "#6b7280",
@@ -732,19 +728,83 @@ export const Step2PricingInventory = ({
             )}
           </div>
 
+          {/* Admin Variants (Dynamic) */}
+          {adminVariants.map((v) => {
+            const values = getParsedVariantValues(v.name.en);
+            return (
+              <div key={v.id} className="mt-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">
+                      {isAr ? v.name.ar : v.name.en}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {isAr
+                        ? `اختر ${v.name.ar} المتاحة.`
+                        : `Select available ${v.name.en.toLowerCase()}.`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openVariantModal(v)}
+                    className="inline-flex h-9 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/30 px-3 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {isAr ? `إضافة ${v.name.ar}` : `Add ${v.name.en}`}
+                  </button>
+                </div>
+
+                {values.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {values.map((val) => (
+                      <span
+                        key={val}
+                        className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-100"
+                      >
+                        {val}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = values.filter((x) => x !== val);
+                            upsertSpec({
+                              keyEn: v.name.en,
+                              keyAr: v.name.ar,
+                              valueEn: next.join(", "),
+                              valueAr: next.join(", "),
+                            });
+                          }}
+                          className="rounded-full p-0.5 text-emerald-700 transition-colors hover:bg-emerald-100"
+                          aria-label={isAr ? "حذف" : "Remove"}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-gray-400">
+                    {isAr
+                      ? `لا توجد ${v.name.ar} محددة بعد.`
+                      : `No ${v.name.en.toLowerCase()} selected yet.`}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+
           {/* Variant stock distribution */}
           <div className="mt-6 border-t pt-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-sm font-bold text-gray-900">
                   {isAr
-                    ? "توزيع المخزون حسب المقاس واللون"
-                    : "Stock distribution by size & color"}
+                    ? "توزيع المخزون حسب اللون"
+                    : "Stock distribution by color"}
                 </p>
                 <p className="mt-1 text-xs text-gray-500">
                   {isAr
-                    ? "حدد كمية المخزون لكل تركيبة (مقاس + لون). سيتم جمعها تلقائيًا في كمية المخزون."
-                    : "Set stock for each (Size + Color) combination. Total will be summed automatically."}
+                    ? "حدد كمية المخزون لكل لون. سيتم جمعها تلقائيًا في كمية المخزون."
+                    : "Set stock for each color. Total will be summed automatically."}
                 </p>
               </div>
 
@@ -781,16 +841,12 @@ export const Step2PricingInventory = ({
                         Math.floor(product.inventory.stockQuantity || 0),
                       );
                       let first = true;
-                      selectedSizes.forEach((size) => {
-                        selectedColors.forEach((color) => {
-                          const stock = first ? seedTotal : 0;
-                          first = false;
-                          initial.push({
-                            size,
-                            color: color.name,
-                            colorHex: color.hex,
-                            stock,
-                          });
+                      getVariantCombinations.forEach((combo) => {
+                        const stock = first ? seedTotal : 0;
+                        first = false;
+                        initial.push({
+                          options: combo,
+                          stock,
                         });
                       });
                       setVariantStockEntries(initial);
@@ -806,102 +862,70 @@ export const Step2PricingInventory = ({
             {!canDistribute ? (
               <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/40 p-3 text-xs font-medium text-amber-800">
                 {isAr
-                  ? "لتفعيل التوزيع، قم باختيار مقاسات وألوان أولاً."
-                  : "To enable distribution, please select both sizes and colors first."}
+                  ? "لتفعيل التوزيع، قم باختيار الألوان أولاً."
+                  : "To enable distribution, please select colors first."}
               </div>
             ) : null}
 
             {distributionEnabled && canDistribute ? (
               <div className="mt-4 overflow-x-auto">
-                <div className="min-w-[720px] rounded-2xl border border-gray-200 bg-white">
-                  <div
-                    className="grid grid-cols-[160px_repeat(var(--cols),1fr)] items-center border-b border-gray-200 bg-gray-50/60 px-3 py-3 text-xs font-bold text-gray-700"
-                    style={{ ["--cols" as any]: selectedColors.length }}
-                  >
-                    <div className="px-2">{isAr ? "المقاس" : "Size"}</div>
-                    {selectedColors.map((c) => (
-                      <div
-                        key={c.name}
-                        className="flex items-center gap-2 px-2"
-                      >
-                        <span
-                          className={`h-3.5 w-3.5 rounded-full ring-1 ${c.hex.toLowerCase() === "#ffffff" ? "ring-gray-200" : "ring-black/5"}`}
-                          style={{ backgroundColor: c.hex }}
-                        />
-                        <span className="truncate">{c.name}</span>
-                      </div>
-                    ))}
+                <div className="min-w-[540px] rounded-2xl border border-gray-200 bg-white">
+                  <div className="grid grid-cols-[1fr_160px] items-center border-b border-gray-200 bg-gray-50/60 px-3 py-3 text-xs font-bold text-gray-700">
+                    <div className="px-2">
+                      {isAr ? "التركيبة" : "Combination"}
+                    </div>
+                    <div className="px-2">{isAr ? "المخزون" : "Stock"}</div>
                   </div>
 
                   <div className="divide-y divide-gray-200">
-                    {selectedSizes.map((size) => (
-                      <div
-                        key={size}
-                        className="grid grid-cols-[160px_repeat(var(--cols),1fr)] items-center px-3 py-3"
-                        style={{ ["--cols" as any]: selectedColors.length }}
-                      >
-                        <div className="px-2 text-sm font-bold text-gray-900">
-                          {size}
+                    {getVariantCombinations.map((combo) => {
+                      const keys = Object.keys(combo).sort();
+                      const key = keys.map((k) => `${k}:${combo[k]}`).join("|");
+                      const current = variantStockMap.get(key)?.stock ?? 0;
+
+                      // Display string: "Red / Cotton / Large"
+                      const displayParts = keys.map((k) => combo[k]);
+                      const displayStr = displayParts.join(" / ");
+
+                      return (
+                        <div
+                          key={key}
+                          className="grid grid-cols-[1fr_160px] items-center px-3 py-3"
+                        >
+                          <div className="px-2 text-sm font-bold text-gray-900">
+                            {displayStr}
+                          </div>
+                          <div className="px-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              value={current}
+                              onChange={(e) => {
+                                const nextValue = Math.max(
+                                  0,
+                                  parseInt(e.target.value || "0"),
+                                );
+                                const nextEntries: VariantStockEntry[] = [];
+
+                                getVariantCombinations.forEach((c) => {
+                                  const cKeys = Object.keys(c).sort();
+                                  const cKey = cKeys
+                                    .map((k) => `${k}:${c[k]}`)
+                                    .join("|");
+                                  let stock =
+                                    variantStockMap.get(cKey)?.stock ?? 0;
+                                  if (cKey === key) stock = nextValue;
+                                  nextEntries.push({ options: c, stock });
+                                });
+
+                                setVariantStockEntries(nextEntries);
+                              }}
+                              className="h-10 rounded-xl border-gray-200 px-3 text-sm"
+                            />
+                          </div>
                         </div>
-                        {selectedColors.map((c) => {
-                          const key = `${size}__${c.name}`;
-                          const current = variantStockMap.get(key)?.stock ?? 0;
-                          return (
-                            <div key={key} className="px-2">
-                              <Input
-                                type="number"
-                                min={0}
-                                value={current}
-                                onChange={(e) => {
-                                  const nextValue = Math.max(
-                                    0,
-                                    parseInt(e.target.value || "0"),
-                                  );
-                                  const nextEntries: VariantStockEntry[] = [];
-                                  const seen = new Set<string>();
-
-                                  // Start from current grid (not from parsedVariantStock to avoid losing zeros)
-                                  selectedSizes.forEach((s) => {
-                                    selectedColors.forEach((col) => {
-                                      const k = `${s}__${col.name}`;
-                                      let stock =
-                                        variantStockMap.get(k)?.stock ?? 0;
-                                      if (k === key) stock = nextValue;
-                                      const entry: VariantStockEntry = {
-                                        size: s,
-                                        color: col.name,
-                                        colorHex: col.hex,
-                                        stock,
-                                      };
-                                      nextEntries.push(entry);
-                                      seen.add(k);
-                                    });
-                                  });
-
-                                  // Preserve any existing entries that are still valid but not in current grid (shouldn't happen)
-                                  parsedVariantStock.forEach((old) => {
-                                    const k = `${old.size || ""}__${old.color || ""}`;
-                                    const sizeOk = old.size
-                                      ? selectedSizes.includes(old.size)
-                                      : false;
-                                    const colorOk = old.color
-                                      ? selectedColors.some(
-                                          (x) => x.name === old.color,
-                                        )
-                                      : false;
-                                    if (!seen.has(k) && sizeOk && colorOk)
-                                      nextEntries.push(old);
-                                  });
-
-                                  setVariantStockEntries(nextEntries);
-                                }}
-                                className="h-10 rounded-xl border-gray-200 px-3 text-sm"
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1191,95 +1215,6 @@ export const Step2PricingInventory = ({
           </div>
         </div>
       </div>
-
-      {/* Size Modal */}
-      {sizeModalOpen ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setSizeModalOpen(false)}
-            aria-label={isAr ? "إغلاق" : "Close"}
-          />
-          <div className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-extrabold text-gray-900">
-                  {isAr ? "اختر المقاسات" : "Select Size"}
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  {isAr
-                    ? "اختر المقاسات المتاحة لمنتجك"
-                    : "Select sizes for your product"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSizeModalOpen(false)}
-                className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-700"
-                aria-label={isAr ? "إغلاق" : "Close"}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="mt-5">
-              <p className="text-sm font-bold text-gray-900">
-                {isAr ? "المقاسات المتاحة" : "Available Sizes"}
-              </p>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {SIZE_OPTIONS.map((opt) => {
-                  const checked = tempSizes.has(opt.id);
-                  return (
-                    <label
-                      key={opt.id}
-                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm transition-colors hover:bg-gray-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const next = new Set(tempSizes);
-                          if (e.target.checked) next.add(opt.id);
-                          else next.delete(opt.id);
-                          setTempSizes(next);
-                        }}
-                        className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-200"
-                      />
-                      <span className="text-sm font-bold text-gray-900">
-                        {opt.label}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setSizeModalOpen(false)}
-                className="h-10 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                {isAr ? "إلغاء" : "Cancel"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const selected = Array.from(tempSizes);
-                  upsertSpecs({ sizes: selected });
-                  setSizeModalOpen(false);
-                }}
-                className="h-10 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
-              >
-                {isAr
-                  ? `إضافة المقاسات المحددة (${tempSizes.size})`
-                  : `Add Selected Sizes (${tempSizes.size})`}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {/* Color Modal */}
       {colorModalOpen ? (
@@ -1581,8 +1516,7 @@ export const Step2PricingInventory = ({
                     });
                   }
 
-                  // prune existing variant-stock to current sizes/colors
-                  const nextSizes = selectedSizes;
+                  // prune existing variant-stock to current colors
                   const nextColorNames = selected.map((c) => c.nameEn);
                   const existingVariantSpec = (
                     product.specifications || []
@@ -1598,14 +1532,11 @@ export const Step2PricingInventory = ({
                       if (Array.isArray(parsed)) {
                         const pruned: VariantStockEntry[] = parsed.filter(
                           (x: any) => {
-                            const size =
-                              typeof x?.size === "string" ? x.size : "";
                             const color =
                               typeof x?.color === "string" ? x.color : "";
-                            const sizeOk = !size || nextSizes.includes(size);
                             const colorOk =
                               !color || nextColorNames.includes(color);
-                            return sizeOk && colorOk;
+                            return colorOk;
                           },
                         );
                         nextSpecsBase.push({
@@ -1703,6 +1634,104 @@ export const Step2PricingInventory = ({
                 {isAr
                   ? `إضافة الألوان المحددة (${tempColors.size})`
                   : `Add Selected Colors (${tempColors.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Admin Variant Selection Modal */}
+      {variantModalOpen && activeVariant ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setVariantModalOpen(false)}
+            aria-label={isAr ? "إغلاق" : "Close"}
+          />
+          <div className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-extrabold text-gray-900">
+                  {isAr
+                    ? `اختر ${activeVariant.name.ar}`
+                    : `Select ${activeVariant.name.en}`}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {isAr
+                    ? `اختر ${activeVariant.name.ar} المتاحة لمنتجك`
+                    : `Select ${activeVariant.name.en.toLowerCase()} for your product`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVariantModalOpen(false)}
+                className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-700"
+                aria-label={isAr ? "إغلاق" : "Close"}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <p className="text-sm font-bold text-gray-900">
+                {isAr ? "الخيارات المتاحة" : "Available Options"}
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {activeVariant.option_values.map((opt) => {
+                  const label =
+                    (opt.label as any)[locale] || opt.label.en || "";
+                  const checked = tempVariantValues.has(label);
+                  return (
+                    <label
+                      key={opt.id}
+                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm transition-colors hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const next = new Set(tempVariantValues);
+                          if (e.target.checked) next.add(label);
+                          else next.delete(label);
+                          setTempVariantValues(next);
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-200"
+                      />
+                      <span className="text-sm font-bold text-gray-900">
+                        {label}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setVariantModalOpen(false)}
+                className="h-10 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const selected = Array.from(tempVariantValues);
+                  upsertSpec({
+                    keyEn: activeVariant.name.en,
+                    keyAr: activeVariant.name.ar,
+                    valueEn: selected.join(", "),
+                    valueAr: selected.join(", "),
+                  });
+                  setVariantModalOpen(false);
+                }}
+                className="h-10 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+              >
+                {isAr
+                  ? `إضافة الخيارات المحددة (${tempVariantValues.size})`
+                  : `Add Selected Options (${tempVariantValues.size})`}
               </button>
             </div>
           </div>
