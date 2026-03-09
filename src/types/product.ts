@@ -461,35 +461,58 @@ export interface ProductCollection {
 
 export type DiscountType = "fixed" | "percentage" | "shipping";
 export type DiscountStatus = "active" | "expired" | "scheduled";
+export type DiscountMethod = "automatic_discount" | "discount_code";
+export type DiscountEligibility = "all_customers" | "specific_customer_segments" | "specific_customers";
+export type DiscountAppliesTo = "all_products" | "specific_products" | "specific_categories" | "specific_subcategories" | "minimum_amount" | string;
 
 export interface Discount {
-  id: string;
-  couponCode: string;
-  type: "coupon" | "promotion";
-  value: number;
-  description?: string;
+  id: string; // Maps to _id in API
+  _id?: string;
+  sellerId: {
+    _id: string;
+    firstName?: string;
+    lastName?: string;
+    brandName?: string;
+    email?: string;
+  } | string;
+  discountName: string;
+  method: DiscountMethod;
+  discountCode: string;
+  discountType: DiscountType;
+  discountValue: number;
+  appliesTo: DiscountAppliesTo;
+  productIds: string[];
+  categoryIds: string[];
+  subcategoryIds: string[];
+  availableOnAllSalesChannels: boolean;
+  eligibility: DiscountEligibility;
+  customerSegmentIds: string[];
+  customerIds: string[];
   startDate: string;
+  startTime: string;
   endDate: string;
-  status: DiscountStatus;
-  store: string;
-  canUseWithPromotion: boolean;
-  isPromotion?: boolean;
-  usageLimit?: number;
-  usedCount?: number;
-  // merged extras
-  discountType: "fixed" | "percentage" | "shipping";
-  applyFor:
-    | "all_orders"
-    | "specific_products"
-    | "specific_categories"
-    | "minimum_amount";
-  canUseWithFlashSale: boolean;
-  isUnlimited: boolean;
-  applyViaUrl: boolean;
-  displayAtCheckout: boolean;
-  neverExpired: boolean;
-  // New fields for conditional apply_for
+  endTime: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+
+  // Legacy/UI Compatibility fields (Keep for transition)
+  couponCode: string; // Required by existing UI
+  type: "coupon" | "promotion"; // Required by existing UI
+  value: number; // Required by existing UI
+  description?: string;
+  status?: DiscountStatus;
+  store?: string;
+  applyFor?: DiscountAppliesTo;
+  canUseWithPromotion?: boolean;
+  canUseWithFlashSale?: boolean;
+  isUnlimited?: boolean;
+  applyViaUrl?: boolean;
+  displayAtCheckout?: boolean;
+  neverExpired?: boolean;
   minimumAmount?: number;
   selectedProducts?: string[];
   selectedCategories?: string[];
+  usageLimit?: number;
+  usedCount?: number;
 }

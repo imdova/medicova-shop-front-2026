@@ -42,10 +42,14 @@ const DiscountTableContainer: React.FC<DiscountTableContainerProps> = ({
               <span
                 className={`rounded-lg px-2 py-0.5 text-xs font-black tracking-widest ${item.status === "expired" ? "bg-gray-100 text-gray-400 line-through" : "bg-primary/10 text-primary"}`}
               >
-                {item.couponCode}
+                {item.couponCode || item.discountCode}
               </span>
               <button
-                onClick={() => navigator.clipboard.writeText(item.couponCode)}
+                onClick={() =>
+                  navigator.clipboard.writeText(
+                    item.couponCode || item.discountCode,
+                  )
+                }
                 className="text-gray-300 transition-colors hover:text-primary"
               >
                 <Clipboard size={12} />
@@ -53,16 +57,19 @@ const DiscountTableContainer: React.FC<DiscountTableContainerProps> = ({
             </div>
             <p className="text-[10px] font-medium leading-tight text-gray-500">
               {item.discountType === "fixed" &&
-                t("fixedCouponDesc").replace("{value}", item.value.toFixed(2))}
+                t("fixedCouponDesc").replace(
+                  "{value}",
+                  (item.value ?? item.discountValue ?? 0).toFixed(2),
+                )}
               {item.discountType === "percentage" &&
                 t("percentageCouponDesc").replace(
                   "{value}",
-                  item.value.toString(),
+                  (item.value ?? item.discountValue ?? 0).toString(),
                 )}
               {item.discountType === "shipping" &&
                 t("shippingCouponDesc").replace(
                   "{value}",
-                  item.value.toFixed(2),
+                  (item.value ?? item.discountValue ?? 0).toFixed(2),
                 )}
             </p>
           </div>
@@ -91,16 +98,20 @@ const DiscountTableContainer: React.FC<DiscountTableContainerProps> = ({
         render: (item: Discount) => (
           <div className="flex flex-col text-[10px] font-bold text-gray-400">
             <span>
-              {new Date(item.startDate).toLocaleDateString(
-                locale === "ar" ? "ar-EG" : "en-US",
-                { month: "short", day: "numeric", year: "numeric" },
-              )}
+              {item.startDate
+                ? new Date(item.startDate).toLocaleDateString(
+                    locale === "ar" ? "ar-EG" : "en-US",
+                    { month: "short", day: "numeric", year: "numeric" },
+                  )
+                : "—"}
             </span>
             <span className="text-primary/60">
-              {new Date(item.endDate).toLocaleDateString(
-                locale === "ar" ? "ar-EG" : "en-US",
-                { month: "short", day: "numeric", year: "numeric" },
-              )}
+              {item.endDate
+                ? new Date(item.endDate).toLocaleDateString(
+                    locale === "ar" ? "ar-EG" : "en-US",
+                    { month: "short", day: "numeric", year: "numeric" },
+                  )
+                : "—"}
             </span>
           </div>
         ),
@@ -110,7 +121,10 @@ const DiscountTableContainer: React.FC<DiscountTableContainerProps> = ({
         header: t("store"),
         render: (item: Discount) => (
           <span className="text-[10px] font-black uppercase tracking-wider text-gray-900">
-            {item.store}
+            {item.store ||
+              (typeof item.sellerId === "object"
+                ? item.sellerId.brandName || item.sellerId.firstName
+                : "—")}
           </span>
         ),
       },
@@ -118,7 +132,7 @@ const DiscountTableContainer: React.FC<DiscountTableContainerProps> = ({
         key: "status",
         header: t("status"),
         render: (item: Discount) => {
-          const status = item.status;
+          const status = item.status || "active";
           const colors: Record<string, string> = {
             active: "bg-emerald-50 text-emerald-600 border-emerald-100",
             expired: "bg-rose-50 text-rose-600 border-rose-100",
