@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { LanguageType } from "@/util/translations";
 import { Link } from "@/i18n/navigation";
 import {
@@ -13,9 +11,13 @@ import {
   Receipt,
   ShoppingCart,
   TrendingUp,
+  Loader2,
 } from "lucide-react";
 
 import { orders, Order } from "../constants";
+import { getOrders, deleteOrder, ApiOrder } from "@/services/orderService";
+import { useSession } from "next-auth/react";
+import { toast } from "react-hot-toast";
 
 export default function OrdersListPanel({
   locale = "en",
@@ -30,6 +32,48 @@ export default function OrdersListPanel({
   const [orderTypeFilter, setOrderTypeFilter] = useState("b2b-b2c");
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
+
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const [ordersData, setOrdersData] = useState<ApiOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchOrders = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await getOrders(token);
+      setOrdersData(data);
+    } catch (err) {
+      console.error("Failed to fetch orders:", err);
+      toast.error(isArabic ? "فشل في تحميل الطلبات" : "Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, isArabic]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  const handleDelete = async (id: string) => {
+    if (!token) return;
+    if (
+      !window.confirm(
+        isArabic
+          ? "هل أنت متأكد من حذف هذا الطلب؟"
+          : "Are you sure you want to delete this order?",
+      )
+    )
+      return;
+    try {
+      await deleteOrder(id, token);
+      toast.success(isArabic ? "تم حذف الطلب" : "Order deleted");
+      fetchOrders();
+    } catch (err) {
+      toast.error(isArabic ? "فشل في حذف الطلب" : "Failed to delete order");
+    }
+  };
 
   function hashToNumber(input: string) {
     let hash = 0;
@@ -69,19 +113,11 @@ export default function OrdersListPanel({
     }).format(d);
   }
 
-  const sellerOptions = useMemo(() => {
-    const unique = Array.from(new Set(orders.map((o) => o.seller))).filter(
-      Boolean,
-    );
-    return unique.slice(0, 12);
-  }, []);
-
   const enriched = useMemo(() => {
-    return orders.map((o) => {
-      const h = hashToNumber(`order:${o.id}:${o.seller}`);
-      const orderIdLabel = o.id.startsWith("#")
-        ? o.id
-        : `#HM-${o.id.replace(/\D+/g, "") || (9000 + (h % 999)).toString()}`;
+    return ordersData.map((o) => {
+      const h = hashToNumber(`order:${o._id}:${o.orderNumber}`);
+      const orderIdLabel =
+        o.orderNumber || `#HM-${o._id.substring(o._id.length - 4)}`;
       const customerSubtitle =
         h % 4 === 0
           ? isArabic
@@ -99,41 +135,41 @@ export default function OrdersListPanel({
                 ? "إدارة العمليات"
                 : "Operations";
 
-      const paymentStatus =
-        o.status === "Returned"
-          ? "refunded"
-          : o.status === "Pending" || o.payment.method === "cash"
-            ? "pending"
-            : "paid";
-
-      const fulfillmentStatus =
-        o.status === "Delivered"
-          ? "delivered"
-          : o.status === "For Delivery"
-            ? "shipped"
-            : o.status === "Packaging" || o.status === "Pending"
-              ? "processing"
-              : o.status === "Cancelled" || o.status === "Returned"
-                ? "cancelled"
-                : "processing";
+      const paymentStatus = o.paymentStatus;
+      const fulfillmentStatus = o.status;
 
       const orderType = h % 3 === 0 ? "b2b" : "b2c";
 
-      const totalNumber = parseAmount(o.total);
-      const totalUSD = totalNumber ? totalNumber / 50 : 0; // stable conversion for nicer USD scale
+      const totalNumber = o.total;
+      const totalUSD = totalNumber ? totalNumber / 50 : 0;
 
       return {
         ...o,
+        id: o._id,
         orderIdLabel,
+        customerName:
+          `${o.customerId?.firstName || ""} ${o.customerId?.lastName || ""}`.trim() ||
+          "Unknown",
+        customerLocation: isArabic ? "مصر" : "Egypt", // Location not directly in schema top-level
         customerSubtitle,
         paymentStatus,
         fulfillmentStatus,
         orderType,
         totalUSD,
-        dateLabel: formatDateLabel(o.date),
+        dateLabel: formatDateLabel(
+          new Date(o.createdAt).toLocaleDateString("en-GB"),
+        ),
+        sellerName: isArabic ? "ميديكوفا" : "Medicova", // Seller object not in this schema sample as expected
       };
     });
-  }, [isArabic, locale]);
+  }, [isArabic, ordersData]);
+
+  const sellerOptions = useMemo(() => {
+    const unique = Array.from(
+      new Set(enriched.map((o) => o.sellerName)),
+    ).filter(Boolean);
+    return unique.slice(0, 12);
+  }, [enriched]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -142,11 +178,11 @@ export default function OrdersListPanel({
         !q ||
         o.orderIdLabel.toLowerCase().includes(q) ||
         o.id.toLowerCase().includes(q) ||
-        o.customer.name.toLowerCase().includes(q) ||
-        o.customer.location.toLowerCase().includes(q) ||
-        o.seller.toLowerCase().includes(q);
+        o.customerName.toLowerCase().includes(q) ||
+        o.customerLocation.toLowerCase().includes(q) ||
+        o.sellerName.toLowerCase().includes(q);
       const sellerOk =
-        sellerFilter === "all" ? true : o.seller === sellerFilter;
+        sellerFilter === "all" ? true : o.sellerName === sellerFilter;
       const fulfillmentOk =
         fulfillmentFilter === "any"
           ? true
@@ -376,205 +412,225 @@ export default function OrdersListPanel({
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                <th className="px-5 py-3">
-                  {isArabic ? "رقم الطلب" : "Order ID"}
-                </th>
-                <th className="px-5 py-3">
-                  {isArabic ? "العميل" : "Customer"}
-                </th>
-                <th className="px-5 py-3">{isArabic ? "البائع" : "Seller"}</th>
-                <th className="px-5 py-3">{isArabic ? "التاريخ" : "Date"}</th>
-                <th className="px-5 py-3">{isArabic ? "الإجمالي" : "Total"}</th>
-                <th className="px-5 py-3">{isArabic ? "الدفع" : "Payment"}</th>
-                <th className="px-5 py-3">
-                  {isArabic ? "التجهيز" : "Fulfillment"}
-                </th>
-                <th className="px-5 py-3 text-right">
-                  {isArabic ? "الإجراءات" : "Actions"}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((o) => {
-                const paymentTone =
-                  o.paymentStatus === "paid"
-                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
-                    : o.paymentStatus === "pending"
-                      ? "bg-amber-50 text-amber-700 ring-1 ring-amber-100"
-                      : "bg-rose-50 text-rose-700 ring-1 ring-rose-100";
-
-                const fulfillmentTone =
-                  o.fulfillmentStatus === "delivered"
-                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
-                    : o.fulfillmentStatus === "shipped"
-                      ? "bg-sky-50 text-sky-700 ring-1 ring-sky-100"
-                      : o.fulfillmentStatus === "processing"
-                        ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
+      {!loading && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                  <th className="px-5 py-3">
+                    {isArabic ? "رقم الطلب" : "Order ID"}
+                  </th>
+                  <th className="px-5 py-3">
+                    {isArabic ? "العميل" : "Customer"}
+                  </th>
+                  <th className="px-5 py-3">
+                    {isArabic ? "البائع" : "Seller"}
+                  </th>
+                  <th className="px-5 py-3">{isArabic ? "التاريخ" : "Date"}</th>
+                  <th className="px-5 py-3">
+                    {isArabic ? "الإجمالي" : "Total"}
+                  </th>
+                  <th className="px-5 py-3">
+                    {isArabic ? "الدفع" : "Payment"}
+                  </th>
+                  <th className="px-5 py-3">
+                    {isArabic ? "التجهيز" : "Fulfillment"}
+                  </th>
+                  <th className="px-5 py-3 text-right">
+                    {isArabic ? "الإجراءات" : "Actions"}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((o) => {
+                  const paymentTone =
+                    o.paymentStatus === "paid"
+                      ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+                      : o.paymentStatus === "pending"
+                        ? "bg-amber-50 text-amber-700 ring-1 ring-amber-100"
                         : "bg-rose-50 text-rose-700 ring-1 ring-rose-100";
 
-                const slug = encodeURIComponent(o.id.replace(/^#/, ""));
+                  const fulfillmentTone =
+                    o.fulfillmentStatus === "delivered"
+                      ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+                      : o.fulfillmentStatus === "shipped"
+                        ? "bg-sky-50 text-sky-700 ring-1 ring-sky-100"
+                        : o.fulfillmentStatus === "processing"
+                          ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
+                          : "bg-rose-50 text-rose-700 ring-1 ring-rose-100";
 
-                return (
-                  <tr
-                    key={o.id}
-                    className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40"
-                  >
-                    <td className="px-5 py-4">
-                      <Link
-                        href={`/admin/orders/${slug}`}
-                        className="font-extrabold text-slate-900 underline-offset-4 hover:text-emerald-700 hover:underline"
-                      >
-                        {o.orderIdLabel}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="font-extrabold text-slate-900">
-                        {o.customer.name}
-                      </div>
-                      <div className="text-xs font-semibold text-slate-500">
-                        {o.customerSubtitle}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 text-sm font-semibold text-slate-700">
-                      {o.seller}
-                    </td>
-                    <td className="px-5 py-4 text-sm font-semibold text-slate-600">
-                      {o.dateLabel}
-                    </td>
-                    <td className="px-5 py-4 text-sm font-extrabold text-slate-900">
-                      {formatMoneyUSD(o.totalUSD)}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${paymentTone}`}
-                      >
-                        {o.paymentStatus === "paid"
-                          ? isArabic
-                            ? "مدفوع"
-                            : "Paid"
-                          : o.paymentStatus === "pending"
-                            ? isArabic
-                              ? "معلق"
-                              : "Pending"
-                            : isArabic
-                              ? "مسترجع"
-                              : "Refunded"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${fulfillmentTone}`}
-                      >
-                        {o.fulfillmentStatus === "shipped"
-                          ? isArabic
-                            ? "تم الشحن"
-                            : "Shipped"
-                          : o.fulfillmentStatus === "processing"
-                            ? isArabic
-                              ? "قيد المعالجة"
-                              : "Processing"
-                            : o.fulfillmentStatus === "delivered"
-                              ? isArabic
-                                ? "تم التسليم"
-                                : "Delivered"
-                              : isArabic
-                                ? "ملغي"
-                                : "Cancelled"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-end gap-2">
+                  const slug = encodeURIComponent(o.id.replace(/^#/, ""));
+
+                  return (
+                    <tr
+                      key={o.id}
+                      className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40"
+                    >
+                      <td className="px-5 py-4">
                         <Link
                           href={`/admin/orders/${slug}`}
-                          className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                          aria-label="View order"
+                          className="font-extrabold text-slate-900 underline-offset-4 hover:text-emerald-700 hover:underline"
                         >
-                          <Eye className="h-4 w-4" />
+                          {o.orderIdLabel}
                         </Link>
-                        <button
-                          type="button"
-                          onClick={() => console.log("message", o.id)}
-                          className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                          aria-label="Message"
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="font-extrabold text-slate-900">
+                          {o.customerName}
+                        </div>
+                        <div className="text-xs font-semibold text-slate-500">
+                          {o.customerSubtitle}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-sm font-semibold text-slate-700">
+                        {o.sellerName}
+                      </td>
+                      <td className="px-5 py-4 text-sm font-semibold text-slate-600">
+                        {o.dateLabel}
+                      </td>
+                      <td className="px-5 py-4 text-sm font-extrabold text-slate-900">
+                        {formatMoneyUSD(o.totalUSD)}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${paymentTone}`}
                         >
-                          <Mail className="h-4 w-4" />
-                        </button>
+                          {o.paymentStatus === "paid"
+                            ? isArabic
+                              ? "مدفوع"
+                              : "Paid"
+                            : o.paymentStatus === "pending"
+                              ? isArabic
+                                ? "معلق"
+                                : "Pending"
+                              : isArabic
+                                ? "مسترجع"
+                                : "Refunded"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${fulfillmentTone}`}
+                        >
+                          {o.fulfillmentStatus === "shipped"
+                            ? isArabic
+                              ? "تم الشحن"
+                              : "Shipped"
+                            : o.fulfillmentStatus === "processing"
+                              ? isArabic
+                                ? "قيد المعالجة"
+                                : "Processing"
+                              : o.fulfillmentStatus === "delivered"
+                                ? isArabic
+                                  ? "تم التسليم"
+                                  : "Delivered"
+                                : isArabic
+                                  ? "ملغي"
+                                  : "Cancelled"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/admin/orders/${slug}`}
+                            className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                            aria-label="View order"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(o.id)}
+                            className="rounded-xl p-2 text-rose-500 transition hover:bg-rose-50"
+                            aria-label="Delete order"
+                          >
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {pageRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-5 py-10 text-center">
+                      <div className="text-sm font-extrabold text-slate-900">
+                        {isArabic ? "لا توجد طلبات" : "No orders found"}
+                      </div>
+                      <div className="mt-1 text-sm font-medium text-slate-500">
+                        {isArabic
+                          ? "جرّب تغيير الفلاتر."
+                          : "Try changing filters."}
                       </div>
                     </td>
                   </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm font-medium text-slate-500">
+              {isArabic
+                ? `عرض ${showFrom} إلى ${showTo} من ${filtered.length} نتيجة`
+                : `Showing ${showFrom} to ${showTo} of ${filtered.length} results`}
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isArabic ? "السابق" : "Previous"}
+              </button>
+              {Array.from({ length: Math.min(4, totalPages) }).map((_, idx) => {
+                const p = idx + 1;
+                const active = p === safePage;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPage(p)}
+                    className={[
+                      "h-9 w-9 rounded-xl text-sm font-extrabold shadow-sm transition",
+                      active
+                        ? "bg-emerald-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                    ].join(" ")}
+                  >
+                    {p}
+                  </button>
                 );
               })}
-
-              {pageRows.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center">
-                    <div className="text-sm font-extrabold text-slate-900">
-                      {isArabic ? "لا توجد طلبات" : "No orders found"}
-                    </div>
-                    <div className="mt-1 text-sm font-medium text-slate-500">
-                      {isArabic
-                        ? "جرّب تغيير الفلاتر."
-                        : "Try changing filters."}
-                    </div>
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm font-medium text-slate-500">
-            {isArabic
-              ? `عرض ${showFrom} إلى ${showTo} من ${filtered.length} نتيجة`
-              : `Showing ${showFrom} to ${showTo} of ${filtered.length} results`}
-          </div>
-
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              disabled={safePage <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isArabic ? "السابق" : "Previous"}
-            </button>
-            {Array.from({ length: Math.min(4, totalPages) }).map((_, idx) => {
-              const p = idx + 1;
-              const active = p === safePage;
-              return (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPage(p)}
-                  className={[
-                    "h-9 w-9 rounded-xl text-sm font-extrabold shadow-sm transition",
-                    active
-                      ? "bg-emerald-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                  ].join(" ")}
-                >
-                  {p}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              disabled={safePage >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isArabic ? "التالي" : "Next"}
-            </button>
+              <button
+                type="button"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isArabic ? "التالي" : "Next"}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
