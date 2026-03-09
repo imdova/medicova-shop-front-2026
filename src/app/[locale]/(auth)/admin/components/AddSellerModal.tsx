@@ -17,31 +17,30 @@ import { LanguageType } from "@/util/translations";
 import { useTranslations } from "next-intl";
 import { City, Country } from "@/types";
 import { motion } from "framer-motion";
+import { createSellerByAdmin } from "@/services/sellerService";
+import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { uploadImage } from "@/lib/uploadService";
 
 type AddSellerFormData = {
-  first_name: string;
-  last_name: string;
+  profileImage: FileList | null;
+  firstName: string;
+  lastName: string;
   email: string;
+  dateOfBirth: string;
   phone: string;
-  phone_code: string;
-  brand_name: string;
-  brand_type: string;
+  storeName: string;
+  storePhone: string;
   country: string;
   city: string;
+  state: string;
+  zipCode: string;
   address: string;
-  logo: FileList | null;
+  storeLogo: FileList | null;
+  password: string;
 };
-
-const brandOptions = [
-  { id: "all", name: { en: "All Brands", ar: "كل العلامات التجارية" } },
-  { id: "apple", name: { en: "Apple", ar: "آبل" } },
-  { id: "samsung", name: { en: "Samsung", ar: "سامسونج" } },
-  { id: "xiaomi", name: { en: "Xiaomi", ar: "شاومي" } },
-  { id: "huawei", name: { en: "Huawei", ar: "هواوي" } },
-  { id: "oppo", name: { en: "Oppo", ar: "أوبو" } },
-  { id: "sony", name: { en: "Sony", ar: "سوني" } },
-  { id: "lg", name: { en: "LG", ar: "إل جي" } },
-];
 
 const EGYPT_CITIES: City[] = [
   { id: "EG-cairo", code: "cairo", name: { en: "Cairo", ar: "القاهرة" } },
@@ -146,13 +145,17 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
   setIsModalOpen,
   locale = "en",
 }) => {
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [profilePreview, setProfilePreview] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const t = useTranslations("admin");
   const isRTL = locale === "ar";
+  const router = useRouter();
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
 
   const methods = useForm<AddSellerFormData>({
     defaultValues: {
-      brand_type: "all",
       country: "EG",
       city: "EG-cairo",
     },
@@ -165,24 +168,85 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
     watch,
   } = methods;
 
-  const logoFile = watch("logo");
+  const profileFile = watch("profileImage");
+  const logoFile = watch("storeLogo");
+
+  useEffect(() => {
+    if (profileFile && profileFile.length > 0) {
+      const file = profileFile[0];
+      const reader = new FileReader();
+      reader.onload = (e) => setProfilePreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  }, [profileFile]);
 
   useEffect(() => {
     if (logoFile && logoFile.length > 0) {
       const file = logoFile[0];
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setPreviewImage(e.target?.result as string);
-      };
+      reader.onload = (e) => setLogoPreview(e.target?.result as string);
       reader.readAsDataURL(file);
     }
   }, [logoFile]);
 
-  const onSubmit: SubmitHandler<AddSellerFormData> = (data) => {
-    console.log("Brand approval submitted:", data);
-    setIsModalOpen(false);
-    reset();
-    setPreviewImage(null);
+  const onSubmit: SubmitHandler<AddSellerFormData> = async (data) => {
+    setIsSubmitting(true);
+    try {
+      // 1. Upload images if they exist
+      let profileImageUrl = "";
+      let storeLogoUrl = "";
+
+      if (data.profileImage && data.profileImage.length > 0) {
+        profileImageUrl = await uploadImage(
+          data.profileImage[0],
+          "profile",
+          token,
+        );
+      }
+
+      if (data.storeLogo && data.storeLogo.length > 0) {
+        storeLogoUrl = await uploadImage(data.storeLogo[0], "brand", token);
+      }
+
+      // 2. Prepare payload matching the exact requested schema
+      const payload = {
+        profileImage: profileImageUrl,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        dateOfBirth: data.dateOfBirth,
+        phone: data.phone,
+        storeName: data.storeName,
+        storePhone: data.storePhone,
+        country: data.country,
+        city: data.city,
+        state: data.state,
+        zipCode: data.zipCode,
+        address: data.address,
+        storeLogo: storeLogoUrl,
+        password: data.password,
+      };
+
+      await createSellerByAdmin(payload, token);
+      toast.success(
+        locale === "ar"
+          ? "تم إضافة البائع بنجاح"
+          : "Seller created successfully",
+      );
+      setIsModalOpen(false);
+      reset();
+      setProfilePreview(null);
+      setLogoPreview(null);
+      router.refresh();
+    } catch (error: any) {
+      console.error("Failed to create seller:", error);
+      toast.error(
+        error.message ||
+          (locale === "ar" ? "فشل في إضافة البائع" : "Failed to create seller"),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -192,7 +256,8 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
         onClose={() => {
           setIsModalOpen(false);
           reset();
-          setPreviewImage(null);
+          setProfilePreview(null);
+          setLogoPreview(null);
         }}
         title=""
         size="lg"
@@ -240,25 +305,72 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
                 </div>
               </div>
 
+              <div className="space-y-4">
+                <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                  {t("profileImage")}
+                </label>
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                  <label className="group relative flex h-40 w-full cursor-pointer flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-slate-200 bg-slate-50/50 transition-all hover:border-primary hover:bg-white sm:w-1/2">
+                    <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-white shadow-xl shadow-slate-200/50 ring-1 ring-slate-100 transition-transform duration-500 group-hover:rotate-6 group-hover:scale-110">
+                      <Plus size={24} className="text-primary" />
+                    </div>
+                    <span className="text-sm font-black text-gray-900">
+                      {t("addImage")}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      {...register("profileImage")}
+                    />
+                  </label>
+
+                  {profilePreview && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="group/preview relative h-40 w-full overflow-hidden rounded-[32px] border-4 border-white shadow-2xl shadow-slate-200/50 sm:w-1/2"
+                    >
+                      <Image
+                        fill
+                        src={profilePreview}
+                        alt="Profile Preview"
+                        className="object-cover transition-transform duration-700 group-hover/preview:scale-110"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfilePreview(null);
+                          methods.setValue("profileImage", null);
+                        }}
+                        className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full bg-white/90 text-rose-500 shadow-xl backdrop-blur-sm transition-all hover:bg-rose-500 hover:text-white"
+                      >
+                        <X size={18} />
+                      </button>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                 <div className="space-y-3">
                   <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
                     {t("firstName")}
                   </label>
                   <input
-                    {...register("first_name", {
+                    {...register("firstName", {
                       required: t("requiredField"),
                     })}
                     placeholder={t("firstNamePlaceholder")}
                     className="ring-primary/10 w-full rounded-2xl border border-slate-100 bg-slate-50/50 p-5 text-sm font-bold outline-none transition-all placeholder:text-gray-300 focus:border-primary focus:bg-white focus:ring-[6px]"
                   />
-                  {errors.first_name && (
+                  {errors.firstName && (
                     <motion.p
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       className="ml-1 text-[10px] font-bold text-rose-500"
                     >
-                      {errors.first_name.message}
+                      {errors.firstName.message}
                     </motion.p>
                   )}
                 </div>
@@ -267,19 +379,19 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
                     {t("lastName")}
                   </label>
                   <input
-                    {...register("last_name", {
+                    {...register("lastName", {
                       required: t("requiredField"),
                     })}
                     placeholder={t("lastNamePlaceholder")}
                     className="ring-primary/10 w-full rounded-2xl border border-slate-100 bg-slate-50/50 p-5 text-sm font-bold outline-none transition-all placeholder:text-gray-300 focus:border-primary focus:bg-white focus:ring-[6px]"
                   />
-                  {errors.last_name && (
+                  {errors.lastName && (
                     <motion.p
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       className="ml-1 text-[10px] font-bold text-rose-500"
                     >
-                      {errors.last_name.message}
+                      {errors.lastName.message}
                     </motion.p>
                   )}
                 </div>
@@ -314,6 +426,34 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
                 </div>
                 <div className="space-y-3">
                   <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                    {t("password")}
+                  </label>
+                  <input
+                    type="password"
+                    {...register("password", {
+                      required: t("requiredField"),
+                    })}
+                    placeholder={t("passwordPlaceholder")}
+                    className="ring-primary/10 w-full rounded-2xl border border-slate-100 bg-slate-50/50 p-5 text-sm font-bold outline-none transition-all placeholder:text-gray-300 focus:border-primary focus:bg-white focus:ring-[6px]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+                <div className="space-y-3">
+                  <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                    {t("dateOfBirth")}
+                  </label>
+                  <input
+                    type="date"
+                    {...register("dateOfBirth", {
+                      required: t("requiredField"),
+                    })}
+                    className="ring-primary/10 w-full rounded-2xl border border-slate-100 bg-slate-50/50 p-5 text-sm font-bold outline-none transition-all placeholder:text-gray-300 focus:border-primary focus:bg-white focus:ring-[6px]"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
                     {t("phone")}
                   </label>
                   <PhoneInput name="phone" required />
@@ -335,34 +475,71 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
                 </div>
               </div>
 
+              <div className="space-y-4">
+                <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                  {t("storeLogo")}
+                </label>
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                  <label className="group relative flex h-40 w-full cursor-pointer flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-slate-200 bg-slate-50/50 transition-all hover:border-primary hover:bg-white sm:w-1/2">
+                    <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-white shadow-xl shadow-slate-200/50 ring-1 ring-slate-100 transition-transform duration-500 group-hover:rotate-6 group-hover:scale-110">
+                      <Plus size={24} className="text-primary" />
+                    </div>
+                    <span className="text-sm font-black text-gray-900">
+                      {t("addImage")}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      {...register("storeLogo", {
+                        required: t("requiredField"),
+                      })}
+                    />
+                  </label>
+
+                  {logoPreview && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="group/preview relative h-40 w-full overflow-hidden rounded-[32px] border-4 border-white shadow-2xl shadow-slate-200/50 sm:w-1/2"
+                    >
+                      <Image
+                        fill
+                        src={logoPreview}
+                        alt="Store Logo Preview"
+                        className="object-cover transition-transform duration-700 group-hover/preview:scale-110"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLogoPreview(null);
+                          methods.setValue("storeLogo", null);
+                        }}
+                        className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full bg-white/90 text-rose-500 shadow-xl backdrop-blur-sm transition-all hover:bg-rose-500 hover:text-white"
+                      >
+                        <X size={18} />
+                      </button>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                 <div className="space-y-3">
                   <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
-                    {t("brandName")}
+                    {t("storeName")}
                   </label>
                   <input
-                    {...register("brand_name")}
-                    placeholder={t("brandNamePlaceholder")}
+                    {...register("storeName", { required: t("requiredField") })}
+                    placeholder={t("storeNamePlaceholder")}
                     className="ring-primary/10 w-full rounded-2xl border border-slate-100 bg-slate-50/50 p-5 text-sm font-bold outline-none transition-all placeholder:text-gray-300 focus:border-primary focus:bg-white focus:ring-[6px]"
                   />
                 </div>
                 <div className="space-y-3">
                   <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
-                    {t("brandType")}
+                    {t("storePhone")}
                   </label>
-                  <Controller
-                    name="brand_type"
-                    control={methods.control}
-                    render={({ field }) => (
-                      <Dropdown
-                        options={brandOptions}
-                        selected={field.value ?? ""}
-                        onSelect={field.onChange}
-
-                        className="ring-primary/10 rounded-2xl border-slate-100 bg-slate-50/50 p-5 focus-within:border-primary focus-within:bg-white focus-within:ring-[6px]"
-                      />
-                    )}
-                  />
+                  <PhoneInput name="storePhone" required />
                 </div>
               </div>
 
@@ -379,7 +556,6 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
                         options={DEFAULT_COUNTRIES}
                         selected={field.value ?? ""}
                         onSelect={field.onChange}
-
                         className="ring-primary/10 rounded-2xl border-slate-100 bg-slate-50/50 p-5 focus-within:border-primary focus-within:bg-white focus-within:ring-[6px]"
                       />
                     )}
@@ -397,10 +573,32 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
                         options={EGYPT_CITIES}
                         selected={field.value ?? ""}
                         onSelect={field.onChange}
-
                         className="ring-primary/10 rounded-2xl border-slate-100 bg-slate-50/50 p-5 focus-within:border-primary focus-within:bg-white focus-within:ring-[6px]"
                       />
                     )}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+                <div className="space-y-3">
+                  <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                    {t("state")}
+                  </label>
+                  <input
+                    {...register("state", { required: t("requiredField") })}
+                    placeholder={t("statePlaceholder")}
+                    className="ring-primary/10 w-full rounded-2xl border border-slate-100 bg-slate-50/50 p-5 text-sm font-bold outline-none transition-all placeholder:text-gray-300 focus:border-primary focus:bg-white focus:ring-[6px]"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                    {t("zipCode")}
+                  </label>
+                  <input
+                    {...register("zipCode", { required: t("requiredField") })}
+                    placeholder={t("zipCodePlaceholder")}
+                    className="ring-primary/10 w-full rounded-2xl border border-slate-100 bg-slate-50/50 p-5 text-sm font-bold outline-none transition-all placeholder:text-gray-300 focus:border-primary focus:bg-white focus:ring-[6px]"
                   />
                 </div>
               </div>
@@ -415,80 +613,6 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
                   className="ring-primary/10 w-full rounded-2xl border border-slate-100 bg-slate-50/50 p-5 text-sm font-bold outline-none transition-all placeholder:text-gray-300 focus:border-primary focus:bg-white focus:ring-[6px]"
                 />
               </div>
-
-              <div className="space-y-4">
-                <label className="ml-1 text-[11px] font-black uppercase tracking-widest text-gray-500">
-                  {t("brandLogo")}
-                </label>
-                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                  <label className="group relative flex h-40 w-full cursor-pointer flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-slate-200 bg-slate-50/50 transition-all hover:border-primary hover:bg-white sm:w-1/2">
-                    <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-white shadow-xl shadow-slate-200/50 ring-1 ring-slate-100 transition-transform duration-500 group-hover:rotate-6 group-hover:scale-110">
-                      <Plus size={24} className="text-primary" />
-                    </div>
-                    <span className="text-sm font-black text-gray-900">
-                      {t("addImage")}
-                    </span>
-                    <span className="mt-1 text-[10px] font-bold text-gray-400">
-                      {t("imageRequirements")}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      {...register("logo", {
-                        required: t("requiredField"),
-                        validate: {
-                          fileSize: (files) =>
-                            !files ||
-                            files[0]?.size <= 5 * 1024 * 1024 ||
-                            t("fileSizeError"),
-                          fileType: (files) =>
-                            !files ||
-                            ["image/jpeg", "image/png"].includes(
-                              files[0]?.type,
-                            ) ||
-                            t("fileTypeError"),
-                        },
-                      })}
-                    />
-                  </label>
-
-                  {previewImage && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="group/preview relative h-40 w-full overflow-hidden rounded-[32px] border-4 border-white shadow-2xl shadow-slate-200/50 sm:w-1/2"
-                    >
-                      <Image
-                        fill
-                        src={previewImage}
-                        alt="Preview"
-                        className="object-cover transition-transform duration-700 group-hover/preview:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity group-hover/preview:opacity-100"></div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPreviewImage(null);
-                          reset({ ...watch(), logo: null });
-                        }}
-                        className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full bg-white/90 text-rose-500 shadow-xl backdrop-blur-sm transition-all hover:bg-rose-500 hover:text-white active:scale-95"
-                      >
-                        <X size={18} />
-                      </button>
-                    </motion.div>
-                  )}
-                </div>
-                {errors.logo && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="ml-1 text-[10px] font-bold text-rose-500"
-                  >
-                    {errors.logo.message}
-                  </motion.p>
-                )}
-              </div>
             </section>
 
             {/* Actions */}
@@ -502,9 +626,13 @@ const AddSellerModal: FC<AddSellerModalProps> = ({
               </button>
               <button
                 type="submit"
-                className="group relative w-full overflow-hidden rounded-2xl bg-[#31533A] px-8 py-5 text-sm font-black text-white shadow-2xl shadow-emerald-900/20 transition-all hover:brightness-110 active:scale-95 sm:w-2/3"
+                disabled={isSubmitting}
+                className="group relative w-full overflow-hidden rounded-2xl bg-[#31533A] px-8 py-5 text-sm font-black text-white shadow-2xl shadow-emerald-900/20 transition-all hover:brightness-110 active:scale-95 disabled:pointer-events-none disabled:opacity-70 sm:w-2/3"
               >
-                <span className="relative z-10">{t("create")}</span>
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {t("create")}
+                </span>
                 <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:translate-x-full"></div>
               </button>
             </div>

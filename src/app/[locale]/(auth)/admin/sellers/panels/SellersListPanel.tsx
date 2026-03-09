@@ -5,8 +5,16 @@ import { LanguageType } from "@/util/translations";
 import Avatar from "@/components/shared/Avatar";
 import { Link } from "@/i18n/navigation";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Eye, Filter, Pencil, Search, Star } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Filter, Pencil, Search, Star, Loader2, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getAdminSellers,
+  Seller,
+  deleteSeller,
+} from "@/services/sellerService";
+import { toast } from "react-hot-toast";
+import { getProducts, ApiProduct } from "@/services/productService";
+import { useSession } from "next-auth/react";
 
 function hashToNumber(input: string) {
   let hash = 0;
@@ -36,47 +44,93 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const status = (searchParams.get("status") || "active") as
+  const status = (searchParams.get("status") || "") as
+    | ""
     | "active"
     | "pending"
     | "suspended";
   const page = Number(searchParams.get("page") || "1") || 1;
   const [q, setQ] = useState(searchParams.get("q") || "");
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
 
-  const derived = useMemo(() => {
-    const categories = [
-      isAr ? "مستلزمات طبية" : "Medical Supplies",
-      isAr ? "معدات" : "Equipments",
-      isAr ? "ملابس طبية" : "Scrubs & Apparel",
-      isAr ? "أدوية" : "Pharmaceuticals",
-    ];
+  const fetchData = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const [sellersData, productsData] = await Promise.all([
+        getAdminSellers(token),
+        getProducts(token),
+      ]);
+      setSellers(sellersData);
+      setProducts(productsData);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return Sellers.map((s) => {
-      const seed = hashToNumber(`${s.id}-${s.name}`);
-      const derivedStatus: "active" | "pending" | "suspended" = s.isActive
-        ? seed % 7 === 0
-          ? "pending"
-          : "active"
-        : "suspended";
+  useEffect(() => {
+    fetchData();
+  }, [token]);
 
-      const category = categories[seed % categories.length];
-      const sellerCode = `#SEL-${String(81000 + (seed % 9000))}`;
-      const totalSales = Math.round((8000 + (seed % 52000)) * 100) / 100;
-      const rating = Math.max(
-        0,
-        Math.min(5, (s.rating ? 3.6 + s.rating * 0.22 : 0) + (seed % 7) / 10),
+  const handleDelete = async (id: string, name: string) => {
+    if (
+      !window.confirm(
+        isAr
+          ? `هل أنت متأكد من حذف البائع ${name}؟`
+          : `Are you sure you want to delete seller ${name}?`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteSeller(id, token);
+      toast.success(
+        isAr ? "تم حذف البائع بنجاح" : "Seller deleted successfully",
       );
+      fetchData(); // Refresh list
+    } catch (error) {
+      console.error("Failed to delete seller:", error);
+      toast.error(isAr ? "فشل حذف البائع" : "Failed to delete seller");
+    }
+  };
+  const derived = useMemo(() => {
+    return sellers.map((s: any) => {
+      const seed = hashToNumber(`${s.id}-${s.name}`);
+
+      // Dynamic priority
+      const derivedStatus: "active" | "pending" | "suspended" =
+        s.status || (s.isActive === false ? "suspended" : "active");
+
+      const sellerCode =
+        s.sellerCode || `#SEL-${String(81000 + (seed % 9000))}`;
+
+      const totalSales = s.sales || s.totalSales || 0;
+
+      // Calculate dynamic products count from products list
+      const dynamicProductsCount = products.filter(
+        (p) =>
+          p.sellerId === s.id ||
+          (typeof p.seller === "object" && (p.seller as any)?._id === s.id),
+      ).length;
+
+      const productsCount = dynamicProductsCount || s.productsCount || 0;
 
       return {
         ...s,
         derivedStatus,
-        category,
         sellerCode,
         totalSales,
-        rating,
+        productsCount,
       };
     });
-  }, [isAr]);
+  }, [sellers, products]);
 
   const counts = useMemo(() => {
     return derived.reduce(
@@ -92,7 +146,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return derived.filter((s) => {
-      if (status && s.derivedStatus !== status) return false;
+      if (status !== "" && s.derivedStatus !== status) return false;
       if (!query) return true;
       return (
         s.name.toLowerCase().includes(query) ||
@@ -121,28 +175,32 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
         {[
           {
             title: isAr ? "إجمالي البائعين" : "Total Sellers",
-            value: formatNumber(counts.total, locale),
+            value: loading ? "..." : formatNumber(counts.total, locale),
             iconBg: "bg-emerald-50",
             iconTone: "text-emerald-700",
           },
           {
             title: isAr ? "توثيق قيد الانتظار" : "Pending Verifications",
-            value: formatNumber(counts.pending, locale),
+            value: loading ? "..." : formatNumber(counts.pending, locale),
             iconBg: "bg-amber-50",
             iconTone: "text-amber-700",
           },
           {
             title: isAr ? "أفضل المؤدين" : "Top Performers",
-            value: formatNumber(Math.max(0, counts.active - 1), locale),
+            value: loading
+              ? "..."
+              : formatNumber(Math.max(0, counts.active - 1), locale),
             iconBg: "bg-emerald-50",
             iconTone: "text-emerald-700",
           },
           {
             title: isAr ? "إجمالي العمولة" : "Total Commission",
-            value: formatCurrency(
-              derived.reduce((sum, s) => sum + s.totalSales * 0.06, 0),
-              locale,
-            ),
+            value: loading
+              ? "..."
+              : formatCurrency(
+                  derived.reduce((sum, s) => sum + s.totalSales * 0.06, 0),
+                  locale,
+                ),
             iconBg: "bg-emerald-50",
             iconTone: "text-emerald-700",
           },
@@ -193,6 +251,11 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
             <div className="flex items-center rounded-2xl bg-slate-50 p-1 ring-1 ring-slate-200">
               {[
                 {
+                  id: "",
+                  label: isAr ? "كل البائعين" : "All Sellers",
+                  count: counts.total,
+                },
+                {
                   id: "active",
                   label: isAr ? "نشط" : "Active",
                   count: counts.active,
@@ -211,7 +274,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => setParam("status", t.id)}
+                  onClick={() => setParam("status", t.id as any)}
                   className={[
                     "inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-extrabold transition",
                     status === t.id
@@ -228,7 +291,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                         : "bg-white text-slate-600 ring-1 ring-slate-200",
                     ].join(" ")}
                   >
-                    {t.count}
+                    {loading ? "..." : t.count}
                   </span>
                 </button>
               ))}
@@ -243,162 +306,170 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead>
               <tr className="bg-slate-50/60 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                <th className="px-5 py-3">
+                <th className="whitespace-nowrap px-5 py-3">
                   {isAr ? "اسم البائع" : "Seller Name"}
                 </th>
-                <th className="px-5 py-3">
-                  {isAr ? "بيانات التواصل" : "Contact Info"}
+                <th className="whitespace-nowrap px-5 py-3">
+                  {isAr ? "بايانات التواصل" : "Contact Info"}
                 </th>
-                <th className="px-5 py-3">{isAr ? "الموقع" : "Location"}</th>
-                <th className="px-5 py-3">{isAr ? "الأداء" : "Performance"}</th>
-                <th className="px-5 py-3">{isAr ? "الفئة" : "Category"}</th>
-                <th className="px-5 py-3">{isAr ? "الحالة" : "Status"}</th>
-                <th className="px-5 py-3">{isAr ? "التقييم" : "Rating"}</th>
-                <th className="px-5 py-3">{isAr ? "إجراءات" : "Actions"}</th>
+                <th className="whitespace-nowrap px-5 py-3">
+                  {isAr ? "الموقع" : "Location"}
+                </th>
+                <th className="whitespace-nowrap px-5 py-3">
+                  {isAr ? "الأداء" : "Performance"}
+                </th>
+                <th className="whitespace-nowrap px-5 py-3">
+                  {isAr ? "الحالة" : "Status"}
+                </th>
+                <th className="whitespace-nowrap px-5 py-3">
+                  {isAr ? "إجراءات" : "Actions"}
+                </th>
               </tr>
             </thead>
             <tbody>
-              {pageRows.map((s) => {
-                const statusBadge =
-                  s.derivedStatus === "active"
-                    ? {
-                        bg: "bg-emerald-50",
-                        ring: "ring-emerald-100",
-                        text: "text-emerald-700",
-                        label: isAr ? "نشط" : "Active",
-                      }
-                    : s.derivedStatus === "pending"
-                      ? {
-                          bg: "bg-amber-50",
-                          ring: "ring-amber-100",
-                          text: "text-amber-700",
-                          label: isAr ? "قيد الانتظار" : "Pending",
-                        }
-                      : {
-                          bg: "bg-rose-50",
-                          ring: "ring-rose-100",
-                          text: "text-rose-700",
-                          label: isAr ? "موقوف" : "Suspended",
-                        };
-
-                return (
-                  <tr
-                    key={s.id}
-                    className="border-t border-slate-100 hover:bg-slate-50/40"
-                  >
-                    <td className="px-5 py-4">
-                      <Link
-                        href={`/admin/sellers/${encodeURIComponent(s.id)}`}
-                        className="group flex items-center gap-3"
-                        title={
-                          isAr ? "فتح تفاصيل البائع" : "Open seller details"
-                        }
-                      >
-                        <Avatar
-                          className="h-11 w-11 rounded-2xl border border-white shadow-sm ring-1 ring-slate-100"
-                          imageUrl={s.image}
-                          name={s.name}
-                        />
-                        <div className="min-w-0">
-                          <div className="block truncate text-sm font-extrabold text-slate-900 underline-offset-4 group-hover:text-emerald-700 group-hover:underline">
-                            {s.name}
-                          </div>
-                          <div className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                            ID: {s.sellerCode}
-                          </div>
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                        <span className="text-slate-300">☎</span>
-                        <span>01X-XXXX-XXXX</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-                        <span className="text-slate-300">⌁</span>
-                        <span className="line-clamp-1">
-                          {s.city}, {s.country}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-extrabold text-slate-900">
-                            {formatNumber(s.sales ?? 0, locale)}{" "}
-                            {isAr ? "جنيه" : "EGP"}
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 ring-1 ring-emerald-100">
-                            <span className="text-emerald-600">↗</span>
-                            +12%
-                          </span>
-                        </div>
-                        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                          {formatNumber(s.products ?? 0, locale)}{" "}
-                          {isAr ? "منتجات" : "products"}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="inline-flex rounded-xl bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
-                        {s.category}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold ${statusBadge.bg} ${statusBadge.text} ring-1 ${statusBadge.ring}`}
-                      >
-                        <span
-                          className={`h-2 w-2 rounded-full ${statusBadge.text.replace("text", "bg")}`}
-                        />
-                        {statusBadge.label}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      {s.rating > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-sm font-extrabold text-slate-900">
-                          <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                          {s.rating.toFixed(1)}
-                        </span>
-                      ) : (
-                        <span className="text-xs font-semibold text-slate-400">
-                          {isAr ? "لا يوجد تقييم" : "No ratings yet"}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/admin/sellers/${encodeURIComponent(s.id)}`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
-                          aria-label={isAr ? "عرض" : "View"}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        <Link
-                          href={`/admin/sellers/${encodeURIComponent(s.id)}?edit=1`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
-                          aria-label={isAr ? "تعديل" : "Edit"}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {pageRows.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-20 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+                      <p className="text-sm font-bold text-slate-500">
+                        {isAr ? "جاري تحميل البيانات..." : "Loading sellers..."}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : pageRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={8}
-                    className="px-5 py-10 text-center text-sm font-semibold text-slate-500"
+                    className="px-5 py-20 text-center text-sm font-semibold text-slate-500"
                   >
-                    {isAr ? "لا توجد نتائج" : "No results"}
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Search className="h-10 w-10 text-slate-200" />
+                      <p>{isAr ? "لا توجد نتائج" : "No results found"}</p>
+                    </div>
                   </td>
                 </tr>
-              ) : null}
+              ) : (
+                pageRows.map((s: any) => {
+                  const statusBadge =
+                    s.derivedStatus === "active"
+                      ? {
+                          bg: "bg-emerald-50",
+                          ring: "ring-emerald-100",
+                          text: "text-emerald-700",
+                          label: isAr ? "نشط" : "Active",
+                        }
+                      : s.derivedStatus === "pending"
+                        ? {
+                            bg: "bg-amber-50",
+                            ring: "ring-amber-100",
+                            text: "text-amber-700",
+                            label: isAr ? "قيد الانتظار" : "Pending",
+                          }
+                        : {
+                            bg: "bg-rose-50",
+                            ring: "ring-rose-100",
+                            text: "text-rose-700",
+                            label: isAr ? "موقوف" : "Suspended",
+                          };
+
+                  return (
+                    <tr
+                      key={s.id}
+                      className="border-t border-slate-100 hover:bg-slate-50/40"
+                    >
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <Link
+                          href={`/admin/sellers/${encodeURIComponent(s.id)}`}
+                          className="group flex items-center gap-3"
+                          title={
+                            isAr ? "فتح تفاصيل البائع" : "Open seller details"
+                          }
+                        >
+                          <Avatar
+                            className="h-11 w-11 rounded-2xl border border-white shadow-sm ring-1 ring-slate-100"
+                            imageUrl={s.image}
+                            name={s.name}
+                          />
+                          <div className="min-w-0">
+                            <div className="block text-sm font-extrabold text-slate-900 underline-offset-4 group-hover:text-emerald-700 group-hover:underline">
+                              {s.name}
+                            </div>
+                            <div className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                              ID: {s.sellerCode}
+                            </div>
+                          </div>
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                            <span className="text-slate-300">✉</span>
+                            <span>{s.email}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                            <span className="text-slate-300">☎</span>
+                            <span>{s.phone || "N/A"}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                          <span className="text-slate-300">⌁</span>
+                          <span>
+                            {s.city}, {s.country}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <div className="space-y-1">
+                          <Link
+                            href={`/${locale}/admin/products?sellerId=${s.id}`}
+                            className="text-sm font-extrabold text-slate-900 hover:text-emerald-700 hover:underline"
+                          >
+                            {formatNumber(s.productsCount ?? 0, locale)}{" "}
+                            {isAr ? "منتجات" : "products"}
+                          </Link>
+                          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                            {formatNumber(s.totalSales ?? 0, locale)}{" "}
+                            {isAr ? "جنيه" : "EGP"} {isAr ? "مبيعات" : "sales"}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold ${statusBadge.bg} ${statusBadge.text} ring-1 ${statusBadge.ring}`}
+                        >
+                          <span
+                            className={`h-2 w-2 rounded-full ${statusBadge.text.replace("text", "bg")}`}
+                          />
+                          {statusBadge.label}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/admin/sellers/${encodeURIComponent(s.id)}?edit=1`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+                            aria-label={isAr ? "تعديل" : "Edit"}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(s.id, s.name)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-100 bg-white text-rose-500 transition hover:bg-rose-50"
+                            aria-label={isAr ? "حذف" : "Delete"}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

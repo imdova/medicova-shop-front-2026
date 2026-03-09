@@ -2,9 +2,28 @@ import { apiClient } from "@/lib/apiClient";
 
 export interface Seller {
   id: string;
+  firstName?: string;
+  lastName?: string;
   name: string;
-  store_name?: string;
+  storeName?: string;
+  storePhone?: string;
   email: string;
+  phone?: string;
+  isActive?: boolean;
+  city?: string;
+  state?: string;
+  country?: string;
+  zipCode?: string;
+  address?: string;
+  profileImage?: string;
+  storeLogo?: string;
+  dateOfBirth?: string;
+  sales?: number;
+  productsCount?: number;
+  category?: string;
+  status?: "active" | "pending" | "suspended";
+  rating?: number;
+  sellerCode?: string;
 }
 
 export async function getSellers(token?: string): Promise<Seller[]> {
@@ -44,8 +63,8 @@ export async function getSellers(token?: string): Promise<Seller[]> {
 
     return sellersArr.map((s: any) => ({
       id: s.id || s._id,
-      name: s.name || s.firstName ? `${s.firstName} ${s.lastName || ""}`.trim() : s.email,
-      store_name: s.store_name || s.name,
+      name: s.name || (s.firstName ? `${s.firstName} ${s.lastName || ""}`.trim() : s.email),
+      storeName: s.storeName || s.store_name || s.name,
       email: s.email,
     }));
   } catch (error) {
@@ -58,6 +77,57 @@ export async function getSellers(token?: string): Promise<Seller[]> {
     console.error("Error fetching sellers:", error);
     return [];
   }
+}
+
+export async function getAdminSellers(token?: string): Promise<Seller[]> {
+  try {
+    const res = await apiClient<any>({
+      endpoint: "/users/all-sellers?limit=1000",
+      method: "GET",
+      token,
+    });
+    
+    const rawData = (res as any)?.data || res;
+    const sellers: any[] = rawData.sellers || (Array.isArray(rawData) ? rawData : []);
+
+    return sellers.map((s: any) => ({
+      id: s._id || s.id,
+      firstName: s.firstName || "",
+      lastName: s.lastName || "",
+      name: s.fullName || (s.firstName ? `${s.firstName} ${s.lastName || ""}`.trim() : s.email),
+      storeName: s.storeName || s.brandName || s.store_name || s.name,
+      storePhone: s.storePhone || "",
+      email: s.email,
+      isActive: s.active !== false,
+      city: s.city || "",
+      state: s.state || "",
+      country: s.country || "",
+      zipCode: s.zipCode || "",
+      address: s.address || "",
+      profileImage: s.profileImage || s.image || s.avatar || "",
+      storeLogo: s.storeLogo || s.brandLogo || "",
+      dateOfBirth: s.dateOfBirth || "",
+      phone: s.phone || s.phoneNumber || s.mobile,
+      sales: s.sales || s.totalSales || 0,
+      productsCount: s.productsCount || s.products?.length || 0,
+      category: s.category || s.brandName || "",
+      status: s.status || (s.active === false ? "suspended" : "active"),
+      rating: s.rating || s.rate || 0,
+      sellerCode: s.sellerCode || s.code || `#SEL-${(s._id || s.id || "").slice(-4)}`,
+    }));
+  } catch (error) {
+    console.error("Error fetching admin sellers:", error);
+    return [];
+  }
+}
+
+export async function createSellerByAdmin(data: any, token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: "/users/admin/sellers",
+    method: "POST",
+    body: data,
+    token,
+  });
 }
 
 export async function getSellerById(
@@ -79,11 +149,18 @@ export async function getSellerById(
         (data.firstName
           ? `${data.firstName} ${data.lastName || ""}`.trim()
           : data.email),
-      store_name: data.store_name || data.name,
+      storeName: data.storeName || data.store_name || data.name,
       email: data.email,
     };
   } catch (error) {
     console.error(`Error fetching seller ${id}:`, error);
     return null;
   }
+}
+export async function deleteSeller(id: string, token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/users/${id}`,
+    method: "DELETE",
+    token,
+  });
 }

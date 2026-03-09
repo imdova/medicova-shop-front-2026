@@ -333,7 +333,7 @@ export const Step1CoreInfo = ({
         console.log("DEBUG: fetchedSellers count:", fetchedSellers.length);
         const mapped = fetchedSellers.map((s) => ({
           id: s.id,
-          displayName: s.store_name || s.name || s.email,
+          displayName: s.storeName || s.name || s.email,
         }));
         setSellers(mapped);
 
@@ -349,7 +349,7 @@ export const Step1CoreInfo = ({
               if (s) {
                 setSellers((prev) => [
                   ...prev,
-                  { id: s.id, displayName: s.store_name || s.name || s.email },
+                  { id: s.id, displayName: s.storeName || s.name || s.email },
                 ]);
               }
             })
