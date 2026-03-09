@@ -16,11 +16,16 @@ import {
 
 // Types & Data
 import { Discount } from "@/types/product";
-import { dummyDiscounts } from "@/constants/discounts";
+import { getDiscounts, deleteDiscount } from "@/services/discountService";
+import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
+import Loading from "@/app/[locale]/loading";
+import { useRouter } from "next/navigation";
 
 function hashToNumber(input: string) {
   let hash = 0;
-  for (let i = 0; i < input.length; i++) hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < input.length; i++)
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
   return hash;
 }
 
@@ -65,33 +70,86 @@ export default function DiscountsPage() {
   const isArabic = locale === "ar";
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | Discount["status"]>("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | Discount["discountType"]>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | Discount["status"]>(
+    "all",
+  );
+  const [typeFilter, setTypeFilter] = useState<
+    "all" | Discount["discountType"]
+  >("all");
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
 
-  const rows = useMemo(() => {
-    return dummyDiscounts.map((d) => {
-      const h = hashToNumber(`discount:${d.id}:${d.couponCode}`);
-      const usageLimit = d.isUnlimited
-        ? undefined
-        : d.usageLimit ?? (150 + (h % 850));
-      const usedCount = d.usedCount ?? (usageLimit ? Math.min(usageLimit, h % (usageLimit + 1)) : 12 + (h % 260));
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const router = useRouter();
 
-      const name =
-        d.description?.split(".")[0]?.trim() ||
-        titleFromCode(d.couponCode);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchDiscounts = React.useCallback(async () => {
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      const data = await getDiscounts(token);
+      setDiscounts(data);
+    } catch (error) {
+      console.error("Failed to fetch discounts:", error);
+      toast.error(isArabic ? "فشل تحميل الخصومات" : "Failed to load discounts");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token, isArabic]);
+
+  React.useEffect(() => {
+    fetchDiscounts();
+  }, [fetchDiscounts]);
+
+  const handleDelete = async (id: string) => {
+    if (!token) return;
+    if (
+      !confirm(
+        isArabic
+          ? "هل أنت متأكد من حذف هذا الخصم؟"
+          : "Are you sure you want to delete this discount?",
+      )
+    )
+      return;
+
+    try {
+      await deleteDiscount(id, token);
+      toast.success(
+        isArabic ? "تم حذف الخصم بنجاح" : "Discount deleted successfully",
+      );
+      fetchDiscounts();
+    } catch (error) {
+      console.error("Delete failed:", error);
+      toast.error(isArabic ? "فشل حذف الخصم" : "Failed to delete discount");
+    }
+  };
+
+  const rows = useMemo(() => {
+    return discounts.map((d) => {
+      const h = hashToNumber(`discount:${d.id}:${d.discountCode}`);
+      // Usage info might not be in API yet, use placeholders or derive if possible
+      const usageLimit = (d as any).isUnlimited ? undefined : 1000;
+      const usedCount = (d as any).usedCount || 0;
+
+      const name = d.discountName;
 
       const typeLabel =
         d.discountType === "percentage"
-          ? `${d.value}% Off`
+          ? `${d.discountValue}% Off`
           : d.discountType === "fixed"
-            ? `$${d.value} Fixed`
+            ? `$${d.discountValue} Fixed`
             : isArabic
               ? "شحن مجاني"
               : "Free Shipping";
 
-      const expiryLabel = d.neverExpired ? (isArabic ? "بدون انتهاء" : "No Expiry") : formatDate(d.endDate, locale);
+      const expiryLabel = d.active
+        ? formatDate(d.endDate, locale)
+        : isArabic
+          ? "غير نشط"
+          : "Inactive";
 
       const usageLabel =
         usageLimit == null
@@ -106,9 +164,10 @@ export default function DiscountsPage() {
         usageLimit,
         usageLabel,
         expiryLabel,
+        couponCode: d.discountCode, // sync for UI
       };
     });
-  }, [isArabic, locale]);
+  }, [discounts, isArabic, locale]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -117,23 +176,29 @@ export default function DiscountsPage() {
         !q ||
         d.couponCode.toLowerCase().includes(q) ||
         d.name.toLowerCase().includes(q) ||
-        d.store.toLowerCase().includes(q);
-      const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
-      const matchesType = typeFilter === "all" ? true : d.discountType === typeFilter;
+        (d.store || "").toLowerCase().includes(q);
+      const matchesStatus =
+        statusFilter === "all" ? true : d.status === statusFilter;
+      const matchesType =
+        typeFilter === "all" ? true : d.discountType === typeFilter;
       return matchesSearch && matchesStatus && matchesType;
     });
   }, [rows, searchQuery, statusFilter, typeFilter]);
 
   const totals = useMemo(() => {
     const activeCount = rows.filter((d) => d.status === "active").length;
-    const totalRedemptions = rows.reduce((acc, d) => acc + (d.usedCount ?? 0), 0);
+    const totalRedemptions = rows.reduce(
+      (acc, d) => acc + (d.usedCount ?? 0),
+      0,
+    );
     const revenueSaved = rows.reduce((acc, d) => {
+      const val = d.value ?? d.discountValue ?? 0;
       const unit =
         d.discountType === "percentage"
-          ? Math.max(1, d.value) * 2.3
+          ? Math.max(1, val) * 2.3
           : d.discountType === "shipping"
-            ? Math.max(1, d.value)
-            : Math.max(1, d.value);
+            ? Math.max(1, val)
+            : Math.max(1, val);
       return acc + (d.usedCount ?? 0) * unit;
     }, 0);
     return { activeCount, totalRedemptions, revenueSaved };
@@ -152,6 +217,7 @@ export default function DiscountsPage() {
     setTypeFilter("all");
     setPage(1);
   };
+  if (isLoading) return <Loading />;
 
   return (
     <div className="animate-in fade-in space-y-8 duration-700">
@@ -214,9 +280,13 @@ export default function DiscountsPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
                 <Tag className="h-5 w-5" />
               </div>
-              <div className="text-xs font-extrabold text-emerald-700">{k.delta}</div>
+              <div className="text-xs font-extrabold text-emerald-700">
+                {k.delta}
+              </div>
             </div>
-            <div className="mt-4 text-sm font-semibold text-slate-500">{k.label}</div>
+            <div className="mt-4 text-sm font-semibold text-slate-500">
+              {k.label}
+            </div>
             <div className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">
               {k.value}
             </div>
@@ -237,10 +307,16 @@ export default function DiscountsPage() {
                 }}
                 className="h-10 appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
-                <option value="all">{isArabic ? "كل الحالات" : "All Statuses"}</option>
+                <option value="all">
+                  {isArabic ? "كل الحالات" : "All Statuses"}
+                </option>
                 <option value="active">{isArabic ? "نشط" : "Active"}</option>
-                <option value="scheduled">{isArabic ? "مجدول" : "Scheduled"}</option>
-                <option value="expired">{isArabic ? "منتهي" : "Expired"}</option>
+                <option value="scheduled">
+                  {isArabic ? "مجدول" : "Scheduled"}
+                </option>
+                <option value="expired">
+                  {isArabic ? "منتهي" : "Expired"}
+                </option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             </div>
@@ -254,10 +330,16 @@ export default function DiscountsPage() {
                 }}
                 className="h-10 appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
-                <option value="all">{isArabic ? "كل الأنواع" : "All Types"}</option>
-                <option value="percentage">{isArabic ? "نسبة" : "Percentage"}</option>
+                <option value="all">
+                  {isArabic ? "كل الأنواع" : "All Types"}
+                </option>
+                <option value="percentage">
+                  {isArabic ? "نسبة" : "Percentage"}
+                </option>
                 <option value="fixed">{isArabic ? "ثابت" : "Fixed"}</option>
-                <option value="shipping">{isArabic ? "شحن" : "Shipping"}</option>
+                <option value="shipping">
+                  {isArabic ? "شحن" : "Shipping"}
+                </option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             </div>
@@ -279,7 +361,11 @@ export default function DiscountsPage() {
                 setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              placeholder={isArabic ? "ابحث باسم الخصم أو الكود..." : "Search discount name or code..."}
+              placeholder={
+                isArabic
+                  ? "ابحث باسم الخصم أو الكود..."
+                  : "Search discount name or code..."
+              }
               className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
@@ -292,13 +378,21 @@ export default function DiscountsPage() {
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                <th className="px-5 py-3">{isArabic ? "اسم الخصم" : "Discount Name"}</th>
+                <th className="px-5 py-3">
+                  {isArabic ? "اسم الخصم" : "Discount Name"}
+                </th>
                 <th className="px-5 py-3">{isArabic ? "النوع" : "Type"}</th>
                 <th className="px-5 py-3">{isArabic ? "الكود" : "Code"}</th>
-                <th className="px-5 py-3">{isArabic ? "الاستخدام" : "Usage"}</th>
+                <th className="px-5 py-3">
+                  {isArabic ? "الاستخدام" : "Usage"}
+                </th>
                 <th className="px-5 py-3">{isArabic ? "الحالة" : "Status"}</th>
-                <th className="px-5 py-3">{isArabic ? "تاريخ الانتهاء" : "Expiry Date"}</th>
-                <th className="px-5 py-3 text-right">{isArabic ? "الإجراءات" : "Actions"}</th>
+                <th className="px-5 py-3">
+                  {isArabic ? "تاريخ الانتهاء" : "Expiry Date"}
+                </th>
+                <th className="px-5 py-3 text-right">
+                  {isArabic ? "الإجراءات" : "Actions"}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -315,9 +409,14 @@ export default function DiscountsPage() {
                     : "bg-emerald-50 text-emerald-700";
 
                 return (
-                  <tr key={d.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40">
+                  <tr
+                    key={d.id}
+                    className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40"
+                  >
                     <td className="px-5 py-4">
-                      <div className="font-extrabold text-slate-900">{(d as any).name}</div>
+                      <div className="font-extrabold text-slate-900">
+                        {(d as any).name}
+                      </div>
                       <div className="mt-1 text-xs font-medium text-slate-500">
                         {d.description || d.store}
                       </div>
@@ -327,12 +426,16 @@ export default function DiscountsPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <span className={`rounded-lg px-2 py-1 text-xs font-extrabold ${codeTone}`}>
+                        <span
+                          className={`rounded-lg px-2 py-1 text-xs font-extrabold ${codeTone}`}
+                        >
                           {d.couponCode}
                         </span>
                         <button
                           type="button"
-                          onClick={() => navigator.clipboard.writeText(d.couponCode)}
+                          onClick={() =>
+                            navigator.clipboard.writeText(d.couponCode)
+                          }
                           className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                           aria-label="Copy code"
                         >
@@ -344,7 +447,9 @@ export default function DiscountsPage() {
                       {(d as any).usageLabel}
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${statusTone}`}>
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${statusTone}`}
+                      >
                         {d.status === "active"
                           ? isArabic
                             ? "نشط"
@@ -372,7 +477,9 @@ export default function DiscountsPage() {
                         </Link>
                         <button
                           type="button"
-                          onClick={() => navigator.clipboard.writeText(d.couponCode)}
+                          onClick={() =>
+                            navigator.clipboard.writeText(d.couponCode)
+                          }
                           className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
                           aria-label="Copy discount"
                         >
@@ -380,7 +487,7 @@ export default function DiscountsPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => console.log("delete", d.id)}
+                          onClick={() => handleDelete(d.id)}
                           className="rounded-xl p-2 text-slate-500 transition hover:bg-rose-50 hover:text-rose-600"
                           aria-label="Delete discount"
                         >
@@ -399,7 +506,9 @@ export default function DiscountsPage() {
                       {isArabic ? "لا توجد خصومات" : "No discounts found"}
                     </div>
                     <div className="mt-1 text-sm font-medium text-slate-500">
-                      {isArabic ? "جرّب تغيير الفلاتر أو البحث." : "Try changing filters or search."}
+                      {isArabic
+                        ? "جرّب تغيير الفلاتر أو البحث."
+                        : "Try changing filters or search."}
                     </div>
                   </td>
                 </tr>

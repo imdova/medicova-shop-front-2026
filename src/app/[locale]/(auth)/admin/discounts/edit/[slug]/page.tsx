@@ -162,32 +162,37 @@ export default function EditDiscountPage() {
 
       // Map the discount data to form values
       const formData = {
-        type: found.type,
-        coupon_code: found.couponCode,
+        type:
+          found.type ||
+          (found.method === "automatic_discount" ? "promotion" : "coupon"),
+        coupon_code: found.couponCode || found.discountCode,
         discount_type: found.discountType,
-        value: found.value,
-        apply_for: found.applyFor,
+        value: found.value ?? found.discountValue ?? 0,
+        apply_for: (found.applyFor ?? found.appliesTo ?? "all_orders") as any,
         start_date: found.startDate,
         end_date: found.endDate,
-        can_use_with_promotion: found.canUseWithPromotion,
-        can_use_with_flash_sale: found.canUseWithFlashSale,
-        is_unlimited: found.isUnlimited,
-        apply_via_url: found.applyViaUrl,
-        display_at_checkout: found.displayAtCheckout,
-        never_expired: found.neverExpired,
-        minimum_amount: found.minimumAmount || 0,
-        selected_products: found.selectedProducts || [],
-        selected_categories: found.selectedCategories || [],
+        can_use_with_promotion: found.canUseWithPromotion ?? false,
+        can_use_with_flash_sale: found.canUseWithFlashSale ?? false,
+        is_unlimited: found.isUnlimited ?? true,
+        apply_via_url: found.applyViaUrl ?? false,
+        display_at_checkout: found.displayAtCheckout ?? false,
+        never_expired: found.neverExpired ?? false,
+        minimum_amount: found.minimumAmount ?? 0,
+        selected_products: found.selectedProducts || found.productIds || [],
+        selected_categories:
+          found.selectedCategories || found.categoryIds || [],
       };
 
       form.reset(formData);
 
       // Set selected products and categories for UI
-      if (found.selectedProducts) {
-        setSelectedProducts(found.selectedProducts);
+      if (found.selectedProducts || found.productIds) {
+        setSelectedProducts(found.selectedProducts || found.productIds || []);
       }
-      if (found.selectedCategories) {
-        setSelectedCategories(found.selectedCategories);
+      if (found.selectedCategories || found.categoryIds) {
+        setSelectedCategories(
+          found.selectedCategories || found.categoryIds || [],
+        );
       }
     }
     setIsLoading(false);
@@ -204,10 +209,15 @@ export default function EditDiscountPage() {
     const updated: Discount = {
       ...(discount as Discount),
       type: data.type,
+      method:
+        data.type === "promotion" ? "automatic_discount" : "discount_code",
       couponCode: data.coupon_code,
+      discountCode: data.coupon_code,
       discountType: data.discount_type,
       value: data.value,
+      discountValue: data.value,
       applyFor: data.apply_for,
+      appliesTo: data.apply_for,
       startDate: data.start_date,
       endDate: data.end_date,
       canUseWithPromotion: data.can_use_with_promotion,
@@ -218,7 +228,9 @@ export default function EditDiscountPage() {
       neverExpired: data.never_expired,
       minimumAmount: data.minimum_amount,
       selectedProducts: data.selected_products,
+      productIds: data.selected_products || [],
       selectedCategories: data.selected_categories,
+      categoryIds: data.selected_categories || [],
     };
 
     console.log("Updated Discount:", updated);

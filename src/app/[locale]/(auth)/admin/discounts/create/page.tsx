@@ -23,9 +23,18 @@ import {
 } from "@/components/shared/select";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { Switch } from "@/components/shared/switch";
-import { getProductsData, getCategoriesData } from "@/data";
-const products = getProductsData();
-const { medicalCategories } = getCategoriesData();
+import { getProducts, ApiProduct } from "@/services/productService";
+import { getCategories } from "@/services/categoryService";
+import {
+  createDiscount,
+  CreateDiscountPayload,
+} from "@/services/discountService";
+import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import Loading from "@/app/[locale]/loading";
+import { Product } from "@/types/product";
+import { CategoryType } from "@/types";
 import { Checkbox } from "@/components/shared/Check-Box";
 import { Link } from "@/i18n/navigation";
 import { CalendarDays, ChevronDown, Plus, Search, Tag } from "lucide-react";
@@ -178,13 +187,82 @@ export default function CreateDiscountPage() {
     form.setValue("selected_categories", selectedCategories);
   }, [selectedProducts, selectedCategories, form]);
 
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const user = (session as any)?.user;
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch products and categories
+  useEffect(() => {
+    if (!token) return;
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [prodData, catData] = await Promise.all([
+          getProducts(token),
+          getCategories(token),
+        ]);
+        setProducts(prodData as any);
+        setCategories(catData as any);
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+        toast.error(
+          isRTL ? "فشل تحميل البيانات" : "Failed to load products/categories",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [token, isRTL]);
+
   const onSubmit = async (data: DiscountFormData) => {
+    if (!token) return;
+    setIsSubmitting(true);
     try {
-      console.log("Discount Data:", data);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      // Handle successful submission
-    } catch (error) {
+      const payload: CreateDiscountPayload = {
+        sellerId:
+          user?.role === "admin"
+            ? (user as any)?.id || "507f1f77bcf86cd799439011"
+            : (user as any)?.storeId || (user as any)?.id,
+        discountName: data.coupon_code, // Or add a field for name
+        method:
+          data.type === "promotion" ? "automatic_discount" : "discount_code",
+        discountCode: data.coupon_code,
+        discountType: data.discount_type,
+        discountValue: data.value,
+        appliesTo: data.apply_for,
+        productIds: data.selected_products || [],
+        categoryIds: data.selected_categories || [],
+        subcategoryIds: [], // Add if UI supports it
+        availableOnAllSalesChannels: true,
+        eligibility: "all_customers", // Add if UI supports it
+        customerSegmentIds: [],
+        customerIds: [],
+        startDate: data.start_date,
+        startTime: "00:00", // Add if UI supports it
+        endDate: data.end_date,
+        endTime: "23:59", // Add if UI supports it
+        active: true,
+      };
+
+      await createDiscount(payload, token);
+      toast.success(
+        isRTL ? "تم إنشاء الخصم بنجاح" : "Discount created successfully",
+      );
+      router.push("/admin/discounts");
+    } catch (error: any) {
       console.error("Submission failed", error);
+      toast.error(
+        error.message ||
+          (isRTL ? "فشل إنشاء الخصم" : "Failed to create discount"),
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -300,22 +378,20 @@ export default function CreateDiscountPage() {
   const filteredProducts = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
     if (!q) return products;
-    return products.filter((p) =>
-      (p.title?.[locale] || p.title?.en || "")
-        .toLowerCase()
-        .includes(q),
+    return products.filter((p: any) =>
+      ((p.nameAr || "") + (p.nameEn || "")).toLowerCase().includes(q),
     );
-  }, [productQuery, locale]);
+  }, [productQuery, products]);
 
   const filteredCategories = useMemo(() => {
     const q = categoryQuery.trim().toLowerCase();
-    if (!q) return medicalCategories;
-    return medicalCategories.filter((c) =>
-      (c.title?.[locale] || c.title?.en || "")
+    if (!q) return categories;
+    return categories.filter((c: any) =>
+      ((c.title?.[locale] || c.title?.en || "") as string)
         .toLowerCase()
         .includes(q),
     );
-  }, [categoryQuery, locale]);
+  }, [categoryQuery, categories, locale]);
 
   const computedStatus = useMemo(() => {
     const now = Date.now();
@@ -334,8 +410,13 @@ export default function CreateDiscountPage() {
         ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100"
         : "bg-slate-100 text-slate-600 ring-1 ring-slate-200";
 
+  if (isLoading || isSubmitting) return <Loading />;
+
   return (
-    <div className="animate-in fade-in space-y-8 duration-700" dir={isRTL ? "rtl" : "ltr"}>
+    <div
+      className="animate-in fade-in space-y-8 duration-700"
+      dir={isRTL ? "rtl" : "ltr"}
+    >
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
@@ -378,7 +459,11 @@ export default function CreateDiscountPage() {
       </div>
 
       <Form {...form}>
-        <form id={formId} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          id={formId}
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* Left column */}
             <div className="space-y-6 lg:col-span-8">
@@ -390,7 +475,9 @@ export default function CreateDiscountPage() {
                       {isRTL ? "تفاصيل الخصم" : "Discount Details"}
                     </div>
                     <div className="mt-1 text-xs font-semibold text-slate-500">
-                      {isRTL ? "الكود، النوع، والقيمة" : "Code, type, and value"}
+                      {isRTL
+                        ? "الكود، النوع، والقيمة"
+                        : "Code, type, and value"}
                     </div>
                   </div>
                 </div>
@@ -403,15 +490,24 @@ export default function CreateDiscountPage() {
                         <FormLabel className="text-xs font-semibold text-slate-600">
                           {isRTL ? "نوع الخصم" : "Discount Kind"}
                         </FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500/20">
-                              <SelectValue placeholder={isRTL ? "اختر" : "Select"} />
+                              <SelectValue
+                                placeholder={isRTL ? "اختر" : "Select"}
+                              />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="coupon">{isRTL ? "كوبون" : "Coupon"}</SelectItem>
-                            <SelectItem value="promotion">{isRTL ? "حملة" : "Promotion"}</SelectItem>
+                            <SelectItem value="coupon">
+                              {isRTL ? "كوبون" : "Coupon"}
+                            </SelectItem>
+                            <SelectItem value="promotion">
+                              {isRTL ? "حملة" : "Promotion"}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -451,7 +547,9 @@ export default function CreateDiscountPage() {
                           {t.discount}
                         </FormLabel>
                         <Select
-                          onValueChange={(value: "fixed" | "percentage" | "shipping") => {
+                          onValueChange={(
+                            value: "fixed" | "percentage" | "shipping",
+                          ) => {
                             field.onChange(value);
                             setDiscountType(value);
                           }}
@@ -463,9 +561,15 @@ export default function CreateDiscountPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="fixed">{t.fixed_amount}</SelectItem>
-                            <SelectItem value="percentage">{t.percentage}</SelectItem>
-                            <SelectItem value="shipping">{t.free_shipping}</SelectItem>
+                            <SelectItem value="fixed">
+                              {t.fixed_amount}
+                            </SelectItem>
+                            <SelectItem value="percentage">
+                              {t.percentage}
+                            </SelectItem>
+                            <SelectItem value="shipping">
+                              {t.free_shipping}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -489,9 +593,15 @@ export default function CreateDiscountPage() {
                               type="number"
                               placeholder="0"
                               value={field.value as any}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value || "0"))}
+                              onChange={(e) =>
+                                field.onChange(
+                                  parseFloat(e.target.value || "0"),
+                                )
+                              }
                               min="0"
-                              step={discountType === "percentage" ? "1" : "0.01"}
+                              step={
+                                discountType === "percentage" ? "1" : "0.01"
+                              }
                               className="h-11 rounded-xl border-slate-200 bg-white pl-8 text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                             />
                           </div>
@@ -521,10 +631,18 @@ export default function CreateDiscountPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="all_orders">{t.all_orders}</SelectItem>
-                            <SelectItem value="specific_products">{t.specific_products}</SelectItem>
-                            <SelectItem value="specific_categories">{t.specific_categories}</SelectItem>
-                            <SelectItem value="minimum_amount">{t.minimum_amount}</SelectItem>
+                            <SelectItem value="all_orders">
+                              {t.all_orders}
+                            </SelectItem>
+                            <SelectItem value="specific_products">
+                              {t.specific_products}
+                            </SelectItem>
+                            <SelectItem value="specific_categories">
+                              {t.specific_categories}
+                            </SelectItem>
+                            <SelectItem value="minimum_amount">
+                              {t.minimum_amount}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -541,7 +659,9 @@ export default function CreateDiscountPage() {
                     {isRTL ? "الأهلية" : "Eligibility"}
                   </div>
                   <div className="mt-1 text-xs font-semibold text-slate-500">
-                    {isRTL ? "حدد أين وكيف يمكن تطبيق الخصم." : "Define where and how this discount can be applied."}
+                    {isRTL
+                      ? "حدد أين وكيف يمكن تطبيق الخصم."
+                      : "Define where and how this discount can be applied."}
                   </div>
                 </div>
 
@@ -568,21 +688,25 @@ export default function CreateDiscountPage() {
                     </div>
 
                     <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
-                      {filteredProducts.map((product) => (
+                      {filteredProducts.map((product: any) => (
                         <div
-                          key={product.id}
+                          key={product._id}
                           className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-slate-50"
                         >
                           <Checkbox
-                            id={`product-${product.id}`}
-                            checked={selectedProducts.includes(product.id)}
-                            onCheckedChange={() => handleProductSelect(product.id)}
+                            id={`product-${product._id}`}
+                            checked={selectedProducts.includes(product._id)}
+                            onCheckedChange={() =>
+                              handleProductSelect(product._id)
+                            }
                           />
                           <label
-                            htmlFor={`product-${product.id}`}
+                            htmlFor={`product-${product._id}`}
                             className="flex-1 cursor-pointer text-sm font-medium text-slate-700"
                           >
-                            {product.title[locale]}
+                            {product.nameAr && locale === "ar"
+                              ? product.nameAr
+                              : product.nameEn || product.nameAr}
                           </label>
                         </div>
                       ))}
@@ -627,13 +751,16 @@ export default function CreateDiscountPage() {
                           <Checkbox
                             id={`category-${category.id}`}
                             checked={selectedCategories.includes(category.id)}
-                            onCheckedChange={() => handleCategorySelect(category.id)}
+                            onCheckedChange={() =>
+                              handleCategorySelect(category.id)
+                            }
                           />
                           <label
                             htmlFor={`category-${category.id}`}
                             className="flex-1 cursor-pointer text-sm font-medium text-slate-700"
                           >
-                            {category.title[locale]}
+                            {(category as any).title?.[locale] ||
+                              (category as any).title?.en}
                           </label>
                         </div>
                       ))}
@@ -650,7 +777,8 @@ export default function CreateDiscountPage() {
                 {applyFor === "minimum_amount" ? (
                   <div className="space-y-3">
                     <div className="text-sm font-semibold text-slate-700">
-                      {t.minimum_amount_label} <span className="text-rose-600">*</span>
+                      {t.minimum_amount_label}{" "}
+                      <span className="text-rose-600">*</span>
                     </div>
                     <div className="text-sm font-medium text-slate-500">
                       {t.minimum_amount_description}
@@ -664,7 +792,11 @@ export default function CreateDiscountPage() {
                               type="number"
                               placeholder={t.enter_minimum_amount}
                               value={field.value as any}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value || "0"))}
+                              onChange={(e) =>
+                                field.onChange(
+                                  parseFloat(e.target.value || "0"),
+                                )
+                              }
                               min="0"
                               step="0.01"
                               className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
@@ -679,7 +811,9 @@ export default function CreateDiscountPage() {
 
                 {applyFor === "all_orders" ? (
                   <div className="rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-700">
-                    {isRTL ? "سيتم تطبيق الخصم على جميع الطلبات." : "This discount will apply to all orders."}
+                    {isRTL
+                      ? "سيتم تطبيق الخصم على جميع الطلبات."
+                      : "This discount will apply to all orders."}
                   </div>
                 ) : null}
               </div>
@@ -691,7 +825,9 @@ export default function CreateDiscountPage() {
                     {isRTL ? "قواعد الاستخدام" : "Usage Rules"}
                   </div>
                   <div className="mt-1 text-xs font-semibold text-slate-500">
-                    {isRTL ? "إعدادات توافق العروض وطريقة التطبيق." : "Promotion compatibility and application settings."}
+                    {isRTL
+                      ? "إعدادات توافق العروض وطريقة التطبيق."
+                      : "Promotion compatibility and application settings."}
                   </div>
                 </div>
 
@@ -707,9 +843,21 @@ export default function CreateDiscountPage() {
                       label: t.can_use_with_flash_sale,
                       desc: t.flash_sale_description,
                     },
-                    { name: "is_unlimited" as const, label: t.unlimited_coupon, desc: "" },
-                    { name: "apply_via_url" as const, label: t.apply_via_url, desc: t.url_description },
-                    { name: "display_at_checkout" as const, label: t.display_at_checkout, desc: t.checkout_description },
+                    {
+                      name: "is_unlimited" as const,
+                      label: t.unlimited_coupon,
+                      desc: "",
+                    },
+                    {
+                      name: "apply_via_url" as const,
+                      label: t.apply_via_url,
+                      desc: t.url_description,
+                    },
+                    {
+                      name: "display_at_checkout" as const,
+                      label: t.display_at_checkout,
+                      desc: t.checkout_description,
+                    },
                   ].map((row) => (
                     <FormField
                       key={row.name}
@@ -749,7 +897,9 @@ export default function CreateDiscountPage() {
                   <div className="text-xs font-extrabold uppercase tracking-widest text-white/90">
                     {isRTL ? "معاينة" : "LIVE PREVIEW"}
                   </div>
-                  <div className={`rounded-full px-3 py-1 text-xs font-extrabold ${statusChip}`}>
+                  <div
+                    className={`rounded-full px-3 py-1 text-xs font-extrabold ${statusChip}`}
+                  >
                     {computedStatus === "active"
                       ? isRTL
                         ? "نشط"
@@ -797,17 +947,23 @@ export default function CreateDiscountPage() {
                   <div className="mt-5 space-y-2">
                     {applyFor === "all_orders" ? (
                       <div className="text-sm font-semibold text-slate-700">
-                        {isRTL ? "ينطبق على جميع الطلبات" : "Applies to all orders"}
+                        {isRTL
+                          ? "ينطبق على جميع الطلبات"
+                          : "Applies to all orders"}
                       </div>
                     ) : applyFor === "specific_products" ? (
                       <div className="text-sm font-semibold text-slate-700">
                         {isRTL ? "منتجات محددة" : "Specific products"}{" "}
-                        <span className="text-slate-400">({selectedProducts.length})</span>
+                        <span className="text-slate-400">
+                          ({selectedProducts.length})
+                        </span>
                       </div>
                     ) : applyFor === "specific_categories" ? (
                       <div className="text-sm font-semibold text-slate-700">
                         {isRTL ? "فئات محددة" : "Specific categories"}{" "}
-                        <span className="text-slate-400">({selectedCategories.length})</span>
+                        <span className="text-slate-400">
+                          ({selectedCategories.length})
+                        </span>
                       </div>
                     ) : (
                       <div className="text-sm font-semibold text-slate-700">
@@ -847,7 +1003,9 @@ export default function CreateDiscountPage() {
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
                     <CalendarDays className="h-4 w-4" />
                   </div>
-                  <div className="text-sm font-extrabold text-slate-900">{t.time}</div>
+                  <div className="text-sm font-extrabold text-slate-900">
+                    {t.time}
+                  </div>
                 </div>
 
                 <div className="space-y-4">
