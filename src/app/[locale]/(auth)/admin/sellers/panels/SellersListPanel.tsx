@@ -10,7 +10,8 @@ import { useMemo, useState } from "react";
 
 function hashToNumber(input: string) {
   let hash = 0;
-  for (let i = 0; i < input.length; i++) hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < input.length; i++)
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
   return hash;
 }
 
@@ -63,7 +64,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
       const totalSales = Math.round((8000 + (seed % 52000)) * 100) / 100;
       const rating = Math.max(
         0,
-        Math.min(5, (s.rating ? 3.6 + s.rating * 0.22 : 0) + ((seed % 7) / 10)),
+        Math.min(5, (s.rating ? 3.6 + s.rating * 0.22 : 0) + (seed % 7) / 10),
       );
 
       return {
@@ -121,21 +122,18 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
           {
             title: isAr ? "إجمالي البائعين" : "Total Sellers",
             value: formatNumber(counts.total, locale),
-            sub: isAr ? "↑ 12% هذا الشهر" : "↑ 12% vs last month",
             iconBg: "bg-emerald-50",
             iconTone: "text-emerald-700",
           },
           {
             title: isAr ? "توثيق قيد الانتظار" : "Pending Verifications",
             value: formatNumber(counts.pending, locale),
-            sub: isAr ? "يتطلب إجراء عاجل" : "Needs action: urgent",
             iconBg: "bg-amber-50",
             iconTone: "text-amber-700",
           },
           {
             title: isAr ? "أفضل المؤدين" : "Top Performers",
             value: formatNumber(Math.max(0, counts.active - 1), locale),
-            sub: isAr ? "↑ 5% معدل النمو" : "↑ 5% growth rate",
             iconBg: "bg-emerald-50",
             iconTone: "text-emerald-700",
           },
@@ -145,7 +143,6 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
               derived.reduce((sum, s) => sum + s.totalSales * 0.06, 0),
               locale,
             ),
-            sub: isAr ? "↑ 18.4% هذا الربع" : "↑ 18.4% this quarter",
             iconBg: "bg-emerald-50",
             iconTone: "text-emerald-700",
           },
@@ -166,9 +163,6 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
             </div>
             <div className="mt-2 text-2xl font-extrabold text-slate-900">
               {c.value}
-            </div>
-            <div className="mt-1 text-[11px] font-semibold text-emerald-600">
-              {c.sub}
             </div>
           </div>
         ))}
@@ -198,9 +192,21 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
 
             <div className="flex items-center rounded-2xl bg-slate-50 p-1 ring-1 ring-slate-200">
               {[
-                { id: "active", label: isAr ? "نشط" : "Active", count: counts.active },
-                { id: "pending", label: isAr ? "قيد الانتظار" : "Pending", count: counts.pending },
-                { id: "suspended", label: isAr ? "موقوف" : "Suspended", count: counts.suspended },
+                {
+                  id: "active",
+                  label: isAr ? "نشط" : "Active",
+                  count: counts.active,
+                },
+                {
+                  id: "pending",
+                  label: isAr ? "قيد الانتظار" : "Pending",
+                  count: counts.pending,
+                },
+                {
+                  id: "suspended",
+                  label: isAr ? "موقوف" : "Suspended",
+                  count: counts.suspended,
+                },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -217,7 +223,9 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                   <span
                     className={[
                       "rounded-full px-2 py-0.5 text-[10px] font-black",
-                      status === t.id ? "bg-white/20 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200",
+                      status === t.id
+                        ? "bg-white/20 text-white"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200",
                     ].join(" ")}
                   >
                     {t.count}
@@ -235,8 +243,12 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead>
               <tr className="bg-slate-50/60 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                <th className="px-5 py-3">{isAr ? "اسم البائع" : "Seller Name"}</th>
-                <th className="px-5 py-3">{isAr ? "بيانات التواصل" : "Contact Info"}</th>
+                <th className="px-5 py-3">
+                  {isAr ? "اسم البائع" : "Seller Name"}
+                </th>
+                <th className="px-5 py-3">
+                  {isAr ? "بيانات التواصل" : "Contact Info"}
+                </th>
                 <th className="px-5 py-3">{isAr ? "الموقع" : "Location"}</th>
                 <th className="px-5 py-3">{isAr ? "الأداء" : "Performance"}</th>
                 <th className="px-5 py-3">{isAr ? "الفئة" : "Category"}</th>
@@ -270,12 +282,17 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                         };
 
                 return (
-                  <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/40">
+                  <tr
+                    key={s.id}
+                    className="border-t border-slate-100 hover:bg-slate-50/40"
+                  >
                     <td className="px-5 py-4">
                       <Link
                         href={`/admin/sellers/${encodeURIComponent(s.id)}`}
                         className="group flex items-center gap-3"
-                        title={isAr ? "فتح تفاصيل البائع" : "Open seller details"}
+                        title={
+                          isAr ? "فتح تفاصيل البائع" : "Open seller details"
+                        }
                       >
                         <Avatar
                           className="h-11 w-11 rounded-2xl border border-white shadow-sm ring-1 ring-slate-100"
@@ -330,8 +347,12 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold ${statusBadge.bg} ${statusBadge.text} ring-1 ${statusBadge.ring}`}>
-                        <span className={`h-2 w-2 rounded-full ${statusBadge.text.replace("text", "bg")}`} />
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold ${statusBadge.bg} ${statusBadge.text} ring-1 ${statusBadge.ring}`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${statusBadge.text.replace("text", "bg")}`}
+                        />
                         {statusBadge.label}
                       </span>
                     </td>
@@ -370,7 +391,10 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
               })}
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">
+                  <td
+                    colSpan={8}
+                    className="px-5 py-10 text-center text-sm font-semibold text-slate-500"
+                  >
                     {isAr ? "لا توجد نتائج" : "No results"}
                   </td>
                 </tr>
@@ -396,14 +420,19 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setParam("page", String(Math.max(1, safePage - 1)))}
+              onClick={() =>
+                setParam("page", String(Math.max(1, safePage - 1)))
+              }
               disabled={safePage === 1}
               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               aria-label={isAr ? "السابق" : "Previous"}
             >
               ‹
             </button>
-            {Array.from({ length: Math.min(3, totalPages) }, (_, i) => i + 1).map((n) => (
+            {Array.from(
+              { length: Math.min(3, totalPages) },
+              (_, i) => i + 1,
+            ).map((n) => (
               <button
                 key={n}
                 type="button"

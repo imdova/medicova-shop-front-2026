@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useMemo, useState, useEffect } from "react";
 import { Link } from "@/i18n/navigation";
 import Image from "next/image";
 import {
@@ -16,8 +16,15 @@ import {
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { LanguageType } from "@/util/translations";
 import { Product, ProductCollection } from "@/types/product";
-import { ProductCollections } from "@/constants/productCollection";
+import {
+  getProductCollectionById,
+  deleteProductCollection,
+} from "@/services/productCollectionService";
 import { products as allProducts } from "@/data";
+import Loading from "@/app/[locale]/loading";
+import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 function formatNumber(value: number, locale: LanguageType) {
   return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US").format(
@@ -54,9 +61,69 @@ export default function CollectionOverviewPage({
 }) {
   const { slug } = use(params);
   const locale = useAppLocale();
+  const router = useRouter();
   const isAr = locale === "ar";
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
 
-  const collection = ProductCollections.find((c) => c.id === slug) ?? null;
+  const [collection, setCollection] = useState<ProductCollection | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) return;
+    const fetchCollection = async () => {
+      setIsLoading(true);
+      try {
+        const data = await getProductCollectionById(slug, token);
+        if (data) {
+          setCollection(data);
+        } else {
+          toast.error(
+            isAr ? "لم يتم العثور على المجموعة" : "Collection not found",
+          );
+          router.push("/admin/product-collections");
+        }
+      } catch (error) {
+        console.error("Failed to fetch collection:", error);
+        toast.error(
+          isAr
+            ? "فشل في تحميل بيانات المجموعة"
+            : "Failed to load collection data",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCollection();
+  }, [slug, isAr, router, token]);
+
+  const handleDelete = async () => {
+    if (!collection) return;
+    if (
+      !window.confirm(
+        isAr
+          ? "هل أنت متأكد من حذف هذه المجموعة؟"
+          : "Are you sure you want to delete this collection?",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteProductCollection(collection.id, token);
+      toast.success(
+        isAr ? "تم حذف المجموعة بنجاح" : "Collection deleted successfully",
+      );
+      router.push("/admin/product-collections");
+    } catch (error) {
+      console.error("Failed to delete collection:", error);
+      toast.error(isAr ? "فشل في حذف المجموعة" : "Failed to delete collection");
+    }
+  };
+
+  if (isLoading) {
+    return <Loading />;
+  }
 
   if (!collection) {
     return (
@@ -91,10 +158,6 @@ export default function CollectionOverviewPage({
   const [productSearch, setProductSearch] = useState("");
   const visibleProducts = useMemo(() => {
     const pool: Product[] = [...(collection.products ?? [])];
-    for (const p of allProducts) {
-      if (pool.length >= 8) break;
-      if (!pool.some((x) => x.id === p.id)) pool.push(p);
-    }
     const q = productSearch.trim().toLowerCase();
     const filtered = !q
       ? pool
@@ -105,7 +168,7 @@ export default function CollectionOverviewPage({
             title.toLowerCase().includes(q) || sku.toLowerCase().includes(q)
           );
         });
-    return filtered.slice(0, 3);
+    return filtered;
   }, [collection.products, locale, productSearch]);
 
   const t = {
@@ -116,7 +179,9 @@ export default function CollectionOverviewPage({
     totalProducts: isAr ? "إجمالي المنتجات" : "Total Products",
     totalViews: isAr ? "إجمالي المشاهدات" : "Total Views",
     addToCarts: isAr ? "إضافة إلى السلة" : "Add-to-Carts",
-    addProducts: isAr ? "إضافة منتجات إلى المجموعة" : "Add Products to Collection",
+    addProducts: isAr
+      ? "إضافة منتجات إلى المجموعة"
+      : "Add Products to Collection",
     quickAdd: isAr ? "إضافة سريعة" : "Quick Add",
     currentProducts: isAr ? "المنتجات الحالية" : "Current Products",
     recentlyAdded: isAr ? "أضيف مؤخراً" : "Recently Added",
@@ -186,6 +251,7 @@ export default function CollectionOverviewPage({
             </Link>
             <button
               type="button"
+              onClick={handleDelete}
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-rose-600 shadow-sm transition hover:bg-rose-50"
               aria-label={isAr ? "حذف" : "Delete"}
             >
@@ -444,8 +510,8 @@ export default function CollectionOverviewPage({
                 </div>
                 <div className="flex flex-col gap-3 border-t border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-xs font-medium text-slate-500">
-                    {t.showing} {visibleProducts.length} {t.of} {totalProducts}{" "}
-                    {t.productsWord}
+                    {t.showing} {visibleProducts.length} {t.of}{" "}
+                    {collection.products?.length || 0} {t.productsWord}
                   </p>
                   <div className="flex items-center gap-2">
                     <button

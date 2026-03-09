@@ -2,6 +2,7 @@
 
 import { Package, Plus, RefreshCw, Trash2, Truck, X } from "lucide-react";
 import { Input } from "@/components/shared/input";
+import toast from "react-hot-toast";
 import { Label } from "@/components/shared/label";
 import { ProductFormData } from "@/lib/validations/product-schema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -180,62 +181,27 @@ export const Step2PricingInventory = ({
     [onUpdate, specs],
   );
 
-  const hasShippingRequiredSpec = useMemo(
-    () => !!getSpecByKey("Shipping Required"),
-    [getSpecByKey],
+  const shippingRequired = product.shipping?.isPhysicalProduct ?? true;
+
+  const shippingFees = useMemo<ShippingFees>(
+    () => ({
+      insideCairo: product.shipping?.shippingCostInsideCairo ?? 0,
+      region1: product.shipping?.shippingCostRegion1 ?? 0,
+      region2: product.shipping?.shippingCostRegion2 ?? 0,
+    }),
+    [product.shipping],
   );
-  const shippingRequired = useMemo(() => {
-    const spec = getSpecByKey("Shipping Required");
-    if (!spec) return true; // default ON
-    const v = String(spec?.valueEn || "").toLowerCase();
-    return v === "true" || v === "1" || v === "yes";
-  }, [getSpecByKey]);
-
-  useEffect(() => {
-    if (hasShippingRequiredSpec) return;
-    upsertSpec({
-      keyEn: "Shipping Required",
-      keyAr: "يتطلب الشحن",
-      valueEn: "true",
-      valueAr: "true",
-    });
-  }, [hasShippingRequiredSpec, upsertSpec]);
-
-  const shippingFees = useMemo<ShippingFees>(() => {
-    const spec = getSpecByKey("Shipping Fees");
-    const raw = String(spec?.valueEn || "").trim();
-    if (!raw) return { insideCairo: 0, region1: 0, region2: 0 };
-    try {
-      const parsed = JSON.parse(raw);
-      return {
-        insideCairo: Number(parsed?.insideCairo) || 0,
-        region1: Number(parsed?.region1) || 0,
-        region2: Number(parsed?.region2) || 0,
-      };
-    } catch {
-      return { insideCairo: 0, region1: 0, region2: 0 };
-    }
-  }, [getSpecByKey]);
 
   const shippingPackages = useMemo<ShippingPackage[]>(() => {
-    const spec = getSpecByKey("Shipping Packages");
-    const raw = String(spec?.valueEn || "").trim();
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.map((p: any) => ({
-        id: String(p?.id || makeId()),
-        name: String(p?.name || ""),
-        weightKg: p?.weightKg !== undefined ? Number(p.weightKg) : undefined,
-        lengthCm: p?.lengthCm !== undefined ? Number(p.lengthCm) : undefined,
-        widthCm: p?.widthCm !== undefined ? Number(p.widthCm) : undefined,
-        heightCm: p?.heightCm !== undefined ? Number(p.heightCm) : undefined,
-      }));
-    } catch {
-      return [];
-    }
-  }, [getSpecByKey]);
+    return (product.packages || []).map((p: any) => ({
+      id: String(p?.id || makeId()),
+      name: String(p?.name || ""),
+      weightKg: p?.weightKg !== undefined ? Number(p.weightKg) : undefined,
+      lengthCm: p?.lengthCm !== undefined ? Number(p.lengthCm) : undefined,
+      widthCm: p?.widthCm !== undefined ? Number(p.widthCm) : undefined,
+      heightCm: p?.heightCm !== undefined ? Number(p.heightCm) : undefined,
+    }));
+  }, [product.packages]);
 
   const colorImagesSpec = useMemo(() => {
     return (product.specifications || []).find(
@@ -968,11 +934,11 @@ export const Step2PricingInventory = ({
                 <button
                   type="button"
                   onClick={() =>
-                    upsertSpec({
-                      keyEn: "Shipping Required",
-                      keyAr: "يتطلب الشحن",
-                      valueEn: String(!shippingRequired),
-                      valueAr: String(!shippingRequired),
+                    onUpdate({
+                      shipping: {
+                        ...product.shipping,
+                        isPhysicalProduct: !shippingRequired,
+                      },
                     })
                   }
                   className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
@@ -1001,15 +967,11 @@ export const Step2PricingInventory = ({
                   disabled={!shippingRequired}
                   value={shippingFees.insideCairo}
                   onChange={(e) => {
-                    const next: ShippingFees = {
-                      ...shippingFees,
-                      insideCairo: Number(e.target.value || 0),
-                    };
-                    upsertSpec({
-                      keyEn: "Shipping Fees",
-                      keyAr: "رسوم الشحن",
-                      valueEn: JSON.stringify(next),
-                      valueAr: JSON.stringify(next),
+                    onUpdate({
+                      shipping: {
+                        ...product.shipping,
+                        shippingCostInsideCairo: Number(e.target.value || 0),
+                      },
                     });
                   }}
                   className={`h-10 rounded-xl border-gray-200 px-3 text-sm ${COLORS.focus}`}
@@ -1025,15 +987,11 @@ export const Step2PricingInventory = ({
                   disabled={!shippingRequired}
                   value={shippingFees.region1}
                   onChange={(e) => {
-                    const next: ShippingFees = {
-                      ...shippingFees,
-                      region1: Number(e.target.value || 0),
-                    };
-                    upsertSpec({
-                      keyEn: "Shipping Fees",
-                      keyAr: "رسوم الشحن",
-                      valueEn: JSON.stringify(next),
-                      valueAr: JSON.stringify(next),
+                    onUpdate({
+                      shipping: {
+                        ...product.shipping,
+                        shippingCostRegion1: Number(e.target.value || 0),
+                      },
                     });
                   }}
                   className={`h-10 rounded-xl border-gray-200 px-3 text-sm ${COLORS.focus}`}
@@ -1049,15 +1007,11 @@ export const Step2PricingInventory = ({
                   disabled={!shippingRequired}
                   value={shippingFees.region2}
                   onChange={(e) => {
-                    const next: ShippingFees = {
-                      ...shippingFees,
-                      region2: Number(e.target.value || 0),
-                    };
-                    upsertSpec({
-                      keyEn: "Shipping Fees",
-                      keyAr: "رسوم الشحن",
-                      valueEn: JSON.stringify(next),
-                      valueAr: JSON.stringify(next),
+                    onUpdate({
+                      shipping: {
+                        ...product.shipping,
+                        shippingCostRegion2: Number(e.target.value || 0),
+                      },
                     });
                   }}
                   className={`h-10 rounded-xl border-gray-200 px-3 text-sm ${COLORS.focus}`}
@@ -1086,12 +1040,7 @@ export const Step2PricingInventory = ({
                         name: draftPackage.name.trim(),
                       },
                     ];
-                    upsertSpec({
-                      keyEn: "Shipping Packages",
-                      keyAr: "حزم الشحن",
-                      valueEn: JSON.stringify(nextList),
-                      valueAr: JSON.stringify(nextList),
-                    });
+                    onUpdate({ packages: nextList });
                     setDraftPackage({
                       id: "",
                       name: "",
@@ -1223,16 +1172,7 @@ export const Step2PricingInventory = ({
                           const nextList = shippingPackages.filter(
                             (x) => x.id !== p.id,
                           );
-                          if (!nextList.length)
-                            removeSpecByKey("Shipping Packages");
-                          else {
-                            upsertSpec({
-                              keyEn: "Shipping Packages",
-                              keyAr: "حزم الشحن",
-                              valueEn: JSON.stringify(nextList),
-                              valueAr: JSON.stringify(nextList),
-                            });
-                          }
+                          onUpdate({ packages: nextList });
                         }}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                         aria-label={isAr ? "حذف" : "Delete"}
@@ -1745,7 +1685,7 @@ export const Step2PricingInventory = ({
 
                   if (filesToAppend.length < tempColorImageFiles.size) {
                     // over limit; keep it simple for now
-                    alert(
+                    toast.error(
                       isAr
                         ? "الحد الأقصى 10 صور. تم تجاهل بعض صور الألوان."
                         : "Max 10 images. Some color images were ignored.",

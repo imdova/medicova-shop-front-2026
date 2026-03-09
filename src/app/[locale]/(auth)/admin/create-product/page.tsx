@@ -1,5 +1,5 @@
-import ProductCreationWizard from "@/components/features/ProductCreationWizard/ProductCreationWizard";
+import CreateProduct2WizardLayout from "./CreateProduct2WizardLayout";
 
-export default function CreateProductPage() {
-  return <ProductCreationWizard />;
+export default function CreateProduct2Page() {
+  return <CreateProduct2WizardLayout />;
 }

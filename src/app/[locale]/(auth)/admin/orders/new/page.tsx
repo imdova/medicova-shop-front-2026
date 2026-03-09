@@ -7,7 +7,16 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
 import { Switch } from "@/components/shared/switch";
-import { Check, ChevronRight, Plus, Search, Store, Truck, User } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  Plus,
+  Search,
+  Store,
+  Truck,
+  User,
+} from "lucide-react";
+import toast from "react-hot-toast";
 
 type Customer = {
   id: string;
@@ -75,7 +84,9 @@ export default function AddNewOrderPage() {
     },
   ]);
 
-  const [draft, setDraft] = useState<Record<string, { color: string; size: string; qty: number }>>({
+  const [draft, setDraft] = useState<
+    Record<string, { color: string; size: string; qty: number }>
+  >({
     scrubs: { color: "Navy Blue", size: "Small", qty: 1 },
     coat: { color: "Unisex", size: "L", qty: 1 },
   });
@@ -115,9 +126,15 @@ export default function AddNewOrderPage() {
     });
   }, [catalog, productQuery]);
 
-  const subtotal = useMemo(() => items.reduce((acc, it) => acc + it.price * it.qty, 0), [items]);
+  const subtotal = useMemo(
+    () => items.reduce((acc, it) => acc + it.price * it.qty, 0),
+    [items],
+  );
   const shipping = useMemo(() => (items.length ? 45 : 0), [items.length]);
-  const tax = useMemo(() => (taxExempt ? 0 : subtotal * 0.08), [subtotal, taxExempt]);
+  const tax = useMemo(
+    () => (taxExempt ? 0 : subtotal * 0.08),
+    [subtotal, taxExempt],
+  );
   const total = subtotal + shipping + tax;
 
   const addToOrder = (id: string) => {
@@ -125,7 +142,9 @@ export default function AddNewOrderPage() {
     if (!p) return;
     const d = draft[id] || { color: p.colors[0]!, size: p.sizes[0]!, qty: 1 };
     setItems((prev) => {
-      const existing = prev.find((x) => x.id === id && x.color === d.color && x.size === d.size);
+      const existing = prev.find(
+        (x) => x.id === id && x.color === d.color && x.size === d.size,
+      );
       if (existing) {
         return prev.map((x) =>
           x === existing ? { ...x, qty: x.qty + Math.max(1, d.qty) } : x,
@@ -150,7 +169,9 @@ export default function AddNewOrderPage() {
   const removeCustomer = () => setSelectedCustomer(null);
 
   const onCreate = () => {
-    alert(isArabic ? "تم إنشاء الطلب (واجهة فقط)" : "Order created (UI only)");
+    toast.success(
+      isArabic ? "تم إنشاء الطلب (واجهة فقط)" : "Order created (UI only)",
+    );
   };
 
   return (
@@ -274,7 +295,9 @@ export default function AddNewOrderPage() {
                   </div>
                 ) : (
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
-                    {isArabic ? "لم يتم اختيار عميل بعد." : "No customer selected yet."}
+                    {isArabic
+                      ? "لم يتم اختيار عميل بعد."
+                      : "No customer selected yet."}
                   </div>
                 )}
               </div>
@@ -291,7 +314,10 @@ export default function AddNewOrderPage() {
                     {isArabic ? "اختيار المنتجات" : "Product Selection"}
                   </div>
                 </div>
-                <button type="button" className="text-sm font-semibold text-emerald-700 hover:underline">
+                <button
+                  type="button"
+                  className="text-sm font-semibold text-emerald-700 hover:underline"
+                >
                   + {isArabic ? "إضافة عناصر متعددة" : "Add Multiple Items"}
                 </button>
               </div>
@@ -313,22 +339,38 @@ export default function AddNewOrderPage() {
 
                 <div className="mt-4 space-y-4">
                   {filteredCatalog.map((p) => {
-                    const d = draft[p.id] || { color: p.colors[0]!, size: p.sizes[0]!, qty: 1 };
+                    const d = draft[p.id] || {
+                      color: p.colors[0]!,
+                      size: p.sizes[0]!,
+                      qty: 1,
+                    };
                     return (
-                      <div key={p.id} className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+                      <div
+                        key={p.id}
+                        className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm"
+                      >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-start gap-4">
                             <div className="relative h-14 w-14 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-                              <Image src={p.image} alt={p.name} fill className="object-cover" />
+                              <Image
+                                src={p.image}
+                                alt={p.name}
+                                fill
+                                className="object-cover"
+                              />
                             </div>
                             <div className="min-w-0">
-                              <div className="text-sm font-extrabold text-slate-900">{p.name}</div>
+                              <div className="text-sm font-extrabold text-slate-900">
+                                {p.name}
+                              </div>
                               <div className="mt-1 text-xs font-semibold text-slate-500">
                                 SKU: {p.sku}
                               </div>
                             </div>
                           </div>
-                          <div className="text-lg font-extrabold text-slate-900">{formatMoney(p.price, locale)}</div>
+                          <div className="text-lg font-extrabold text-slate-900">
+                            {formatMoney(p.price, locale)}
+                          </div>
                         </div>
 
                         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
@@ -386,14 +428,19 @@ export default function AddNewOrderPage() {
                                 onClick={() =>
                                   setDraft((prev) => ({
                                     ...prev,
-                                    [p.id]: { ...d, qty: Math.max(1, d.qty - 1) },
+                                    [p.id]: {
+                                      ...d,
+                                      qty: Math.max(1, d.qty - 1),
+                                    },
                                   }))
                                 }
                                 className="h-8 w-8 rounded-lg text-sm font-extrabold text-slate-600 hover:bg-slate-100"
                               >
                                 -
                               </button>
-                              <div className="text-sm font-extrabold text-slate-900">{d.qty}</div>
+                              <div className="text-sm font-extrabold text-slate-900">
+                                {d.qty}
+                              </div>
                               <button
                                 type="button"
                                 onClick={() =>
@@ -435,20 +482,32 @@ export default function AddNewOrderPage() {
                   {isArabic ? "ملخص الطلب" : "Order Summary"}
                 </div>
                 <div className="mt-1 text-xs font-semibold text-slate-500">
-                  {isArabic ? "المجموع يتم حسابه تلقائياً..." : "Auto-calculating total..."}
+                  {isArabic
+                    ? "المجموع يتم حسابه تلقائياً..."
+                    : "Auto-calculating total..."}
                 </div>
               </div>
 
               <div className="p-5">
                 <div className="space-y-4">
                   {items.map((it) => (
-                    <div key={`${it.id}:${it.color}:${it.size}`} className="flex items-start justify-between gap-3">
+                    <div
+                      key={`${it.id}:${it.color}:${it.size}`}
+                      className="flex items-start justify-between gap-3"
+                    >
                       <div className="flex items-start gap-3">
                         <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-                          <Image src={it.image} alt={it.name} fill className="object-cover" />
+                          <Image
+                            src={it.image}
+                            alt={it.name}
+                            fill
+                            className="object-cover"
+                          />
                         </div>
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-extrabold text-slate-900">{it.name}</div>
+                          <div className="truncate text-sm font-extrabold text-slate-900">
+                            {it.name}
+                          </div>
                           <div className="mt-0.5 text-xs font-semibold text-slate-500">
                             Qty: {it.qty} • {it.color}, {it.size}
                           </div>
@@ -472,13 +531,17 @@ export default function AddNewOrderPage() {
                   </div>
                   <div className="flex items-center justify-between font-semibold text-slate-600">
                     <span>{isArabic ? "الضريبة (معفى)" : "Tax (Exempt)"}</span>
-                    <span className={taxExempt ? "text-emerald-700" : ""}>{formatMoney(tax, locale)}</span>
+                    <span className={taxExempt ? "text-emerald-700" : ""}>
+                      {formatMoney(tax, locale)}
+                    </span>
                   </div>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between text-sm font-extrabold text-slate-900">
                   <span>{isArabic ? "الإجمالي المستحق" : "Total Due"}</span>
-                  <span className="text-lg text-emerald-700">{formatMoney(total, locale)}</span>
+                  <span className="text-lg text-emerald-700">
+                    {formatMoney(total, locale)}
+                  </span>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3">
@@ -521,4 +584,3 @@ export default function AddNewOrderPage() {
     </div>
   );
 }
-

@@ -8,6 +8,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, X, Upload, Undo } from "lucide-react";
 import { useAppLocale } from "@/hooks/useAppLocale";
+import toast from "react-hot-toast";
 import TextEditor from "@/components/forms/CustomTextEditor";
 import Image from "next/image";
 
@@ -40,8 +41,8 @@ type FAQ = { question: string; answer: string };
 // Translations
 const translations = {
   en: {
-    title: "Edit Category",
-    back: "Back to Categories",
+    title: "Edit Category 2",
+    back: "Back to Categories 2",
     categoryName: "Category Name",
     categoryNameAr: "Category Name (Arabic)",
     slugEn: "Slug (English)",
@@ -79,8 +80,8 @@ const translations = {
     loading: "Loading...",
   },
   ar: {
-    title: "تعديل الفئة",
-    back: "العودة إلى الفئات",
+    title: "تعديل الفئة 2",
+    back: "العودة إلى الفئات 2",
     categoryName: "اسم الفئة",
     categoryNameAr: "اسم الفئة (العربية)",
     slugEn: "الرابط (الإنجليزية)",
@@ -135,8 +136,14 @@ const getCategoryData = (slug: string) => {
     imageUrl: "/images/landau.jpg",
     iconUrl: "/images/icon.png",
     faqs: [
-      { question: "What is this category?", answer: "This is a sample category." },
-      { question: "How to use it?", answer: "You can use it for organizing products." },
+      {
+        question: "What is this category?",
+        answer: "This is a sample category.",
+      },
+      {
+        question: "How to use it?",
+        answer: "You can use it for organizing products.",
+      },
     ],
   };
 };
@@ -253,7 +260,11 @@ export default function EditCategoryPage() {
     setFaqs([...faqs, { question: "", answer: "" }]);
   };
 
-  const updateFAQ = (index: number, field: "question" | "answer", value: string) => {
+  const updateFAQ = (
+    index: number,
+    field: "question" | "answer",
+    value: string,
+  ) => {
     const newFaqs = [...faqs];
     newFaqs[index][field] = value;
     setFaqs(newFaqs);
@@ -268,7 +279,7 @@ export default function EditCategoryPage() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image size should be less than 5MB");
+        toast.error("Image size should be less than 5MB");
         return;
       }
       form.setValue("image", e.target.files as FileList);
@@ -295,7 +306,7 @@ export default function EditCategoryPage() {
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) {
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image size should be less than 5MB");
+        toast.error("Image size should be less than 5MB");
         return;
       }
       const dataTransfer = new DataTransfer();
@@ -313,7 +324,10 @@ export default function EditCategoryPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" dir={isRTL ? "rtl" : "ltr"}>
+      <div
+        className="flex min-h-screen items-center justify-center"
+        dir={isRTL ? "rtl" : "ltr"}
+      >
         <p className="text-lg">{t.loading}</p>
       </div>
     );
@@ -345,7 +359,8 @@ export default function EditCategoryPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      {t.categoryName} <span className="text-red-500">{t.required}</span>
+                      {t.categoryName}{" "}
+                      <span className="text-red-500">{t.required}</span>
                     </label>
                     <input
                       type="text"
@@ -363,7 +378,8 @@ export default function EditCategoryPage() {
 
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      {t.categoryNameAr} <span className="text-red-500">{t.required}</span>
+                      {t.categoryNameAr}{" "}
+                      <span className="text-red-500">{t.required}</span>
                     </label>
                     <input
                       type="text"
@@ -381,7 +397,8 @@ export default function EditCategoryPage() {
 
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      {t.slugEn} <span className="text-red-500">{t.required}</span>
+                      {t.slugEn}{" "}
+                      <span className="text-red-500">{t.required}</span>
                     </label>
                     <input
                       type="text"
@@ -399,7 +416,8 @@ export default function EditCategoryPage() {
 
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      {t.slugAr} <span className="text-red-500">{t.required}</span>
+                      {t.slugAr}{" "}
+                      <span className="text-red-500">{t.required}</span>
                     </label>
                     <input
                       type="text"
@@ -416,7 +434,9 @@ export default function EditCategoryPage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium">{t.icon}</label>
+                    <label className="mb-2 block text-sm font-medium">
+                      {t.icon}
+                    </label>
                     <div className="space-y-2">
                       <button
                         type="button"
@@ -467,14 +487,18 @@ export default function EditCategoryPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-2 block text-sm font-medium">{t.metaTitle}</label>
+                    <label className="mb-2 block text-sm font-medium">
+                      {t.metaTitle}
+                    </label>
                     <input
                       type="text"
                       {...form.register("metaTitle")}
                       placeholder={t.metaTitlePlaceholder}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
-                    <p className="mt-1 text-xs text-gray-500">{t.metaTitleNote}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t.metaTitleNote}
+                    </p>
                   </div>
 
                   <div>
@@ -487,11 +511,15 @@ export default function EditCategoryPage() {
                       rows={3}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
-                    <p className="mt-1 text-xs text-gray-500">{t.metaDescriptionNote}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t.metaDescriptionNote}
+                    </p>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium">{t.metaKeywords}</label>
+                    <label className="mb-2 block text-sm font-medium">
+                      {t.metaKeywords}
+                    </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -509,7 +537,9 @@ export default function EditCategoryPage() {
                         <Plus size={16} />
                       </button>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">{t.metaKeywordsNote}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t.metaKeywordsNote}
+                    </p>
                     {keywords.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {keywords.map((keyword, index) => (
@@ -554,7 +584,9 @@ export default function EditCategoryPage() {
                       className="rounded-md border border-gray-200 bg-gray-50 p-4"
                     >
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm font-medium">FAQ {index + 1}</span>
+                        <span className="text-sm font-medium">
+                          FAQ {index + 1}
+                        </span>
                         <button
                           type="button"
                           onClick={() => removeFAQ(index)}
@@ -567,13 +599,17 @@ export default function EditCategoryPage() {
                         <input
                           type="text"
                           value={faq.question}
-                          onChange={(e) => updateFAQ(index, "question", e.target.value)}
+                          onChange={(e) =>
+                            updateFAQ(index, "question", e.target.value)
+                          }
                           placeholder="Question"
                           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                         />
                         <textarea
                           value={faq.answer}
-                          onChange={(e) => updateFAQ(index, "answer", e.target.value)}
+                          onChange={(e) =>
+                            updateFAQ(index, "answer", e.target.value)
+                          }
                           placeholder="Answer"
                           rows={2}
                           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -589,7 +625,9 @@ export default function EditCategoryPage() {
             <div className="space-y-6">
               {/* Category Image */}
               <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <h2 className="mb-4 text-lg font-semibold">{t.categoryImage}</h2>
+                <h2 className="mb-4 text-lg font-semibold">
+                  {t.categoryImage}
+                </h2>
                 <div
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
@@ -624,7 +662,9 @@ export default function EditCategoryPage() {
                         {t.dragDrop}
                       </p>
                       <p className="text-sm text-gray-500">{t.orClick}</p>
-                      <p className="mt-2 text-xs text-gray-400">{t.fileTypes}</p>
+                      <p className="mt-2 text-xs text-gray-400">
+                        {t.fileTypes}
+                      </p>
                     </>
                   )}
                   <input
@@ -639,7 +679,9 @@ export default function EditCategoryPage() {
 
               {/* Category Headline */}
               <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <label className="mb-2 block text-sm font-medium">{t.headline}</label>
+                <label className="mb-2 block text-sm font-medium">
+                  {t.headline}
+                </label>
                 <input
                   type="text"
                   {...form.register("headline")}
@@ -652,13 +694,13 @@ export default function EditCategoryPage() {
               {/* Description */}
               <div className="rounded-lg border border-gray-200 bg-white p-6">
                 <label className="mb-2 block text-sm font-medium">
-                  {t.description} <span className="text-red-500">{t.required}</span>
+                  {t.description}{" "}
+                  <span className="text-red-500">{t.required}</span>
                 </label>
                 <div className="relative">
                   <TextEditor
                     value={form.watch("description") || ""}
                     onChange={(value) => form.setValue("description", value)}
-
                     showEditor={true}
                   />
                   <button
@@ -669,7 +711,9 @@ export default function EditCategoryPage() {
                     <Undo size={14} />
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">{t.descriptionNote}</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {t.descriptionNote}
+                </p>
                 {form.formState.errors.description && (
                   <p className="mt-1 text-xs text-red-600">
                     {form.formState.errors.description.message}
@@ -690,7 +734,7 @@ export default function EditCategoryPage() {
             </button>
             <button
               type="submit"
-              className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90"
+              className="hover:bg-primary/90 rounded-md bg-primary px-6 py-2 text-sm font-medium text-white"
             >
               {t.submit}
             </button>
@@ -700,4 +744,3 @@ export default function EditCategoryPage() {
     </div>
   );
 }
-

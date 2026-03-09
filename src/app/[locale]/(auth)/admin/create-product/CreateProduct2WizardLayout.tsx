@@ -13,6 +13,7 @@ import { Step3Settings } from "@/components/features/ProductCreationWizard/steps
 import { WizardHeader } from "@/components/features/ProductCreationWizard/WizardHeader";
 import DynamicButton from "@/components/shared/Buttons/DynamicButton";
 import { ChevronLeft, ChevronRight, Check, Save } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function CreateProduct2WizardLayout() {
   const locale = useAppLocale();
@@ -114,7 +115,9 @@ export default function CreateProduct2WizardLayout() {
               variant="outline"
               onClick={() => {
                 // UI-only draft action for now (keeps original info untouched)
-                alert(isAr ? "تم حفظ المسودة محلياً." : "Draft saved locally.");
+                toast.success(
+                  isAr ? "تم حفظ المسودة محلياً." : "Draft saved locally.",
+                );
               }}
               className="h-10 rounded-xl px-4 text-xs font-bold"
               label={isAr ? "حفظ كمسودة" : "Save Draft"}

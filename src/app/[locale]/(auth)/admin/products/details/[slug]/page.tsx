@@ -216,7 +216,7 @@ export default function ProductDetails2Page({
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Link
-              href={`/${locale}/admin/products-2`}
+              href={`/${locale}/admin/products`}
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"
               aria-label={isAr ? "رجوع" : "Back"}
             >
@@ -234,14 +234,14 @@ export default function ProductDetails2Page({
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/${locale}/admin/products-2/${slug}`}
+              href={`/${locale}/admin/products/${slug}`}
               className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               <Pencil className="h-4 w-4" />
               {isAr ? "تعديل" : "Edit"}
             </Link>
             <Link
-              href={product?.slugEn ? `/${locale}/product-details/${product.slugEn}` : `/${locale}/admin/products-2/details/${slug}`}
+              href={product?.slugEn ? `/${locale}/product-details/${product.slugEn}` : `/${locale}/admin/products/details/${slug}`}
               className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               <PlayCircle className="h-4 w-4" />

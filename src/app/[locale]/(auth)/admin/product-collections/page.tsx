@@ -18,7 +18,13 @@ import {
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { LanguageType } from "@/util/translations";
 import { ProductCollection } from "@/types/product";
-import { ProductCollections } from "@/constants/productCollection";
+import {
+  getProductCollections,
+  deleteProductCollection,
+} from "@/services/productCollectionService";
+import { useEffect } from "react";
+import { toast } from "react-hot-toast";
+import { useSession } from "next-auth/react";
 
 function formatDate(dateStr: string, locale: LanguageType) {
   const date = new Date(dateStr);
@@ -30,7 +36,9 @@ function formatDate(dateStr: string, locale: LanguageType) {
 }
 
 function formatNumber(value: number, locale: LanguageType) {
-  return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US").format(value);
+  return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US").format(
+    value,
+  );
 }
 
 function formatCurrency(value: number, locale: LanguageType) {
@@ -48,28 +56,72 @@ function hashToNumber(str: string) {
   return h;
 }
 
-const MOCK_SELLERS = ["WMA Tex", "Alaalmia", "MediSupply", "HealthPro", "Global Med"];
+// ---------------- Helper Functions ----------------
 
 // Derive seller from first product in collection, or mock from id for display/filter
 function getCollectionSellerName(col: ProductCollection): string {
-  const first = col.products?.[0] as { sellers?: { name?: string }; seller?: { name?: string }; createdBy?: string } | undefined;
-  if (first) {
-    const s = first.sellers ?? first.seller;
-    if (s) return typeof s === "string" ? s : s.name || "";
-    if (first.createdBy) return first.createdBy;
+  // 1. Check if collection has a populated sellerId object
+  const anyCol = col as any;
+  const sellerObj = anyCol.sellerId || anyCol.seller;
+
+  if (sellerObj && typeof sellerObj === "object") {
+    // If it's the admin store, return "Admin"
+    if (
+      sellerObj.brandName?.toLowerCase() === "admin" ||
+      sellerObj.name?.toLowerCase() === "admin"
+    ) {
+      return "Admin";
+    }
+    return (
+      sellerObj.brandName ||
+      sellerObj.name ||
+      (sellerObj.firstName
+        ? `${sellerObj.firstName} ${sellerObj.lastName || ""}`.trim()
+        : "") ||
+      sellerObj._id ||
+      "—"
+    );
   }
-  return MOCK_SELLERS[hashToNumber(col.id) % MOCK_SELLERS.length];
+
+  // 2. Check first product
+  const first = col.products?.[0] as any;
+  if (first) {
+    // Check if created by admin
+    if (first.createdBy === "admin") return "Admin";
+
+    const s = first.sellers ?? first.seller;
+    if (s) {
+      if (typeof s === "string")
+        return s.toLowerCase() === "admin" ? "Admin" : s;
+
+      if (
+        s.brandName?.toLowerCase() === "admin" ||
+        s.name?.toLowerCase() === "admin"
+      ) {
+        return "Admin";
+      }
+
+      return (
+        s.brandName ||
+        s.name ||
+        (s.firstName ? `${s.firstName} ${s.lastName || ""}`.trim() : "") ||
+        ""
+      );
+    }
+    if (first.createdBy)
+      return first.createdBy === "admin" ? "Admin" : first.createdBy;
+  }
+
+  return "—";
 }
 
-// Stable mock orders/revenue from collection id
+// Stats from collection object
 function getCollectionOrders(col: ProductCollection): number {
-  const h = hashToNumber(col.id + "orders");
-  return 12 + (h % 240);
+  return col.orders || 0;
 }
 
 function getCollectionRevenue(col: ProductCollection): number {
-  const h = hashToNumber(col.id + "revenue");
-  return 800 + (h % 4200);
+  return col.revenue || 0;
 }
 
 // Derive display status: some as "scheduled" for design variety (optional)
@@ -86,33 +138,93 @@ function getDisplayStatus(
 export default function ProductCollectionsListPanel() {
   const locale = useAppLocale();
   const isAr = locale === "ar";
+  const [collections, setCollections] = useState<ProductCollection[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sellerFilter, setSellerFilter] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 4;
 
-  const totalCollections = ProductCollections.length;
-  const activeCount = ProductCollections.filter((c) => c.status === "published").length;
+  const { data: session, status } = useSession();
+  const token = (session as any)?.accessToken;
+
+  useEffect(() => {
+    console.log(
+      `DEBUG [CollectionsPage]: Session status: ${status} | Token: ${token ? `${token.substring(0, 10)}...` : "MISSING"}`,
+      session,
+    );
+    if (token) {
+      fetchCollections();
+    }
+  }, [token, session, status]);
+
+  const fetchCollections = async () => {
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      const data = await getProductCollections(token);
+      setCollections(data);
+    } catch (error) {
+      console.error("Failed to fetch collections:", error);
+      toast.error(
+        isAr ? "فشل في تحميل المجموعات" : "Failed to load collections",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (
+      !window.confirm(
+        isAr
+          ? "هل أنت متأكد من حذف هذه المجموعة؟"
+          : "Are you sure you want to delete this collection?",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteProductCollection(id, token);
+      toast.success(
+        isAr ? "تم حذف المجموعة بنجاح" : "Collection deleted successfully",
+      );
+      fetchCollections();
+    } catch (error) {
+      console.error("Failed to delete collection:", error);
+      toast.error(isAr ? "فشل في حذف المجموعة" : "Failed to delete collection");
+    }
+  };
+
+  const totalCollections = collections.length;
+  const activeCount = collections.filter(
+    (c) => c.status === "published",
+  ).length;
   const totalProductReach = useMemo(
-    () => ProductCollections.reduce((sum, c) => sum + (c.products?.length ?? 0), 0),
-    [],
+    () => collections.reduce((sum, c) => sum + (c.products?.length ?? 0), 0),
+    [collections],
   );
 
   const uniqueSellers = useMemo(() => {
     const set = new Set<string>();
-    ProductCollections.forEach((col) => {
+    collections.forEach((col) => {
       const name = getCollectionSellerName(col);
       if (name && name !== "—") set.add(name);
     });
     return Array.from(set).sort();
-  }, []);
+  }, [collections]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return ProductCollections.filter((col) => {
+    return collections.filter((col) => {
       const name = (col.name[locale] || col.name.en).toLowerCase();
-      const desc = (col.short_description?.[locale] || col.short_description?.en || "").toLowerCase();
+      const desc = (
+        col.description?.[locale] ||
+        col.description?.en ||
+        ""
+      ).toLowerCase();
       const matchSearch = !q || name.includes(q) || desc.includes(q);
       const displayStatus = getDisplayStatus(col, locale);
       const matchStatus =
@@ -124,7 +236,7 @@ export default function ProductCollectionsListPanel() {
       const matchSeller = !sellerFilter || sellerName === sellerFilter;
       return matchSearch && matchStatus && matchSeller;
     });
-  }, [locale, searchQuery, statusFilter, sellerFilter]);
+  }, [locale, searchQuery, statusFilter, sellerFilter, collections]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   const safePage = Math.min(Math.max(1, currentPage), totalPages);
@@ -157,14 +269,12 @@ export default function ProductCollectionsListPanel() {
           </div>
         </div>
 
-        {/* Stats cards: smart, consistent with products-2 */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {[
             {
               icon: Layers,
               label: isAr ? "إجمالي المجموعات" : "Total Collections",
               value: String(totalCollections),
-              sub: isAr ? "+3 من الشهر الماضي" : "+3 from last month",
               accent: "emerald",
               gradient: "from-emerald-500/8 to-emerald-600/4",
               iconBg: "bg-emerald-500/15",
@@ -176,7 +286,6 @@ export default function ProductCollectionsListPanel() {
               icon: CheckCircle,
               label: isAr ? "المجموعات النشطة" : "Active Collections",
               value: String(activeCount),
-              sub: isAr ? "مباشر على متجرك" : "Live on your storefront",
               accent: "emerald",
               gradient: "from-emerald-500/8 to-emerald-600/4",
               iconBg: "bg-emerald-500/15",
@@ -188,7 +297,6 @@ export default function ProductCollectionsListPanel() {
               icon: FileStack,
               label: isAr ? "إجمالي وصول المنتجات" : "Total Product Reach",
               value: String(totalProductReach),
-              sub: isAr ? "موزعة على المجموعات" : "Distributed across collections",
               accent: "violet",
               gradient: "from-violet-500/8 to-violet-600/4",
               iconBg: "bg-violet-500/15",
@@ -201,25 +309,29 @@ export default function ProductCollectionsListPanel() {
               key={card.label}
               className={`group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm ring-1 ring-slate-900/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${card.shadow} hover:ring-2 ${card.ring}`}
             >
-              <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-100`} aria-hidden />
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-100`}
+                aria-hidden
+              />
               <div className="relative flex items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${card.iconBg} ${card.iconColor} transition-transform duration-300 group-hover:scale-105`}>
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${card.iconBg} ${card.iconColor} transition-transform duration-300 group-hover:scale-105`}
+                  >
                     <card.icon className="h-5 w-5" strokeWidth={2.25} />
                   </div>
                   <p className="text-2xl font-extrabold tabular-nums tracking-tight text-slate-900">
                     {card.value}
                   </p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${card.iconBg} ${card.iconColor}`}>
-                  {card.sub}
-                </span>
               </div>
               <div className="relative mt-3">
-                <p className="text-xs font-medium text-slate-500">{card.label}</p>
+                <p className="text-xs font-medium text-slate-500">
+                  {card.label}
+                </p>
               </div>
               <div
-                className={`absolute top-0 left-0 h-0.5 w-14 rounded-r-full ${
+                className={`absolute left-0 top-0 h-0.5 w-14 rounded-r-full ${
                   card.accent === "emerald" ? "bg-emerald-500" : "bg-violet-500"
                 }`}
                 aria-hidden
@@ -232,7 +344,9 @@ export default function ProductCollectionsListPanel() {
         <div className="rounded-2xl border border-slate-200/60 bg-white/90 p-4 shadow-sm backdrop-blur-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-md">
-              <Search className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isAr ? "right-3" : "left-3"}`} />
+              <Search
+                className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isAr ? "right-3" : "left-3"}`}
+              />
               <input
                 type="text"
                 value={searchQuery}
@@ -240,7 +354,9 @@ export default function ProductCollectionsListPanel() {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder={isAr ? "بحث في المجموعات..." : "Search collections..."}
+                placeholder={
+                  isAr ? "بحث في المجموعات..." : "Search collections..."
+                }
                 className={`h-11 w-full rounded-xl border border-slate-200/80 bg-slate-50/50 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${isAr ? "pl-4 pr-10" : "pl-10 pr-4"}`}
               />
             </div>
@@ -255,7 +371,9 @@ export default function ProductCollectionsListPanel() {
                   }}
                   className="h-11 appearance-none rounded-xl border border-slate-200/80 bg-white pl-4 pr-10 text-[13px] font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
-                  <option value="">{isAr ? "كل البائعين" : "All Sellers"}</option>
+                  <option value="">
+                    {isAr ? "كل البائعين" : "All Sellers"}
+                  </option>
                   {uniqueSellers.map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -273,9 +391,13 @@ export default function ProductCollectionsListPanel() {
                   }}
                   className="h-11 appearance-none rounded-xl border border-slate-200/80 bg-white pl-4 pr-10 text-[13px] font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
-                  <option value="all">{isAr ? "كل الحالة" : "All Status"}</option>
+                  <option value="all">
+                    {isAr ? "كل الحالة" : "All Status"}
+                  </option>
                   <option value="active">{isAr ? "نشط" : "Active"}</option>
-                  <option value="scheduled">{isAr ? "مجدول" : "Scheduled"}</option>
+                  <option value="scheduled">
+                    {isAr ? "مجدول" : "Scheduled"}
+                  </option>
                   <option value="draft">{isAr ? "مسودة" : "Draft"}</option>
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -297,14 +419,24 @@ export default function ProductCollectionsListPanel() {
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-bold uppercase tracking-wider text-slate-800">
-                  <th className="px-5 py-3.5">{isAr ? "المجموعة" : "COLLECTION"}</th>
+                  <th className="px-5 py-3.5">
+                    {isAr ? "المجموعة" : "COLLECTION"}
+                  </th>
                   <th className="px-5 py-3.5">{isAr ? "البائع" : "SELLER"}</th>
-                  <th className="px-5 py-3.5">{isAr ? "المنتجات" : "PRODUCTS"}</th>
+                  <th className="px-5 py-3.5">
+                    {isAr ? "المنتجات" : "PRODUCTS"}
+                  </th>
                   <th className="px-5 py-3.5">{isAr ? "الطلبات" : "ORDERS"}</th>
-                  <th className="px-5 py-3.5">{isAr ? "الإيراد" : "REVENUE"}</th>
+                  <th className="px-5 py-3.5">
+                    {isAr ? "الإيراد" : "REVENUE"}
+                  </th>
                   <th className="px-5 py-3.5">{isAr ? "الحالة" : "STATUS"}</th>
-                  <th className="px-5 py-3.5">{isAr ? "آخر تحديث" : "LAST UPDATED"}</th>
-                  <th className="px-5 py-3.5">{isAr ? "إجراءات" : "ACTIONS"}</th>
+                  <th className="px-5 py-3.5">
+                    {isAr ? "آخر تحديث" : "LAST UPDATED"}
+                  </th>
+                  <th className="px-5 py-3.5">
+                    {isAr ? "إجراءات" : "ACTIONS"}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -312,21 +444,25 @@ export default function ProductCollectionsListPanel() {
                   const displayStatus = getDisplayStatus(item, locale);
                   const statusConfig =
                     displayStatus === "active"
-                      ? { bg: "bg-emerald-50", text: "text-emerald-700", label: isAr ? "نشط" : "Active" }
+                      ? {
+                          bg: "bg-emerald-50",
+                          text: "text-emerald-700",
+                          label: isAr ? "نشط" : "Active",
+                        }
                       : displayStatus === "scheduled"
                         ? {
                             bg: "bg-indigo-50",
                             text: "text-indigo-700",
                             label: isAr ? "مجدول" : "Scheduled",
                           }
-                        : { bg: "bg-slate-100", text: "text-slate-700", label: isAr ? "مسودة" : "Draft" };
+                        : {
+                            bg: "bg-slate-100",
+                            text: "text-slate-700",
+                            label: isAr ? "مسودة" : "Draft",
+                          };
                   const name = item.name[locale] || item.name.en;
                   const desc =
-                    item.short_description?.[locale] ||
-                    item.short_description?.en ||
-                    item.description?.[locale] ||
-                    item.description?.en ||
-                    "";
+                    item.description?.[locale] || item.description?.en || "";
                   const productCount = item.products?.length ?? 0;
                   const sellerName = getCollectionSellerName(item);
                   const orders = getCollectionOrders(item);
@@ -353,17 +489,21 @@ export default function ProductCollectionsListPanel() {
                           </div>
                           <div className="min-w-0">
                             <Link
-                              href={`/admin/product-collections/${item.id}/overview`}
+                              href={`/admin/product-collections/edit/${item.id}`}
                               className="font-semibold text-slate-900 underline-offset-4 hover:text-emerald-700 hover:underline"
                             >
                               {name}
                             </Link>
-                            <p className="mt-0.5 truncate text-xs text-slate-500">{desc}</p>
+                            <p className="mt-0.5 truncate text-xs text-slate-500">
+                              {item.slug || item.link || item.id}
+                            </p>
                           </div>
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <span className="text-sm font-medium text-slate-700">{sellerName}</span>
+                        <span className="text-sm font-medium text-slate-700">
+                          {sellerName}
+                        </span>
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2 text-slate-700">
@@ -407,12 +547,15 @@ export default function ProductCollectionsListPanel() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700"
-                            aria-label={isAr ? "فتح في نافذة جديدة" : "Open in new tab"}
+                            aria-label={
+                              isAr ? "فتح في نافذة جديدة" : "Open in new tab"
+                            }
                           >
                             <ExternalLink className="h-4 w-4" />
                           </a>
                           <button
                             type="button"
+                            onClick={() => handleDelete(item.id)}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-rose-50 hover:text-rose-700"
                             aria-label={isAr ? "حذف" : "Delete"}
                           >
@@ -423,13 +566,28 @@ export default function ProductCollectionsListPanel() {
                     </tr>
                   );
                 })}
-                {pageItems.length === 0 && (
+                {isLoading ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-500">
+                    <td
+                      colSpan={8}
+                      className="px-5 py-12 text-center text-sm text-slate-500"
+                    >
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
+                        <span>{isAr ? "جاري التحميل..." : "Loading..."}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : pageItems.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="px-5 py-12 text-center text-sm text-slate-500"
+                    >
                       {isAr ? "لا توجد مجموعات" : "No collections found"}
                     </td>
                   </tr>
-                )}
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -451,7 +609,10 @@ export default function ProductCollectionsListPanel() {
               >
                 ‹
               </button>
-              {Array.from({ length: Math.min(3, totalPages) }, (_, i) => i + 1).map((n) => (
+              {Array.from(
+                { length: Math.min(3, totalPages) },
+                (_, i) => i + 1,
+              ).map((n) => (
                 <button
                   key={n}
                   type="button"
@@ -467,7 +628,9 @@ export default function ProductCollectionsListPanel() {
               ))}
               <button
                 type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
                 disabled={safePage === totalPages}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white"
                 aria-label={isAr ? "التالي" : "Next"}
@@ -480,7 +643,10 @@ export default function ProductCollectionsListPanel() {
 
         {/* Promotional banner */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-700 px-6 py-8 text-white shadow-xl md:px-8">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 to-transparent" aria-hidden />
+          <div
+            className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 to-transparent"
+            aria-hidden
+          />
           <h2 className="relative text-xl font-bold md:text-2xl">
             {isAr ? "زد ظهورك" : "Grow your visibility"}
           </h2>
@@ -493,7 +659,9 @@ export default function ProductCollectionsListPanel() {
             href="#"
             className="relative mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:scale-[1.02] hover:bg-emerald-50 active:scale-[0.98]"
           >
-            {isAr ? "اعرف المزيد عن المجموعات المروجة" : "Learn About Promoted Collections"}
+            {isAr
+              ? "اعرف المزيد عن المجموعات المروجة"
+              : "Learn About Promoted Collections"}
             <span className="text-emerald-600">→</span>
           </Link>
         </div>

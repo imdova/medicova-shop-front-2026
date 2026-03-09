@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, X, Upload, Undo } from "lucide-react";
 import { useAppLocale } from "@/hooks/useAppLocale";
+import toast from "react-hot-toast";
 import TextEditor from "@/components/forms/CustomTextEditor";
 import Image from "next/image";
 
@@ -42,15 +43,16 @@ type FAQ = { question: string; answer: string };
 // Translations
 const translations = {
   en: {
-    title: "Add New Sub Category",
-    back: "Back to Sub Categories",
+    title: "Add New Sub Category 2",
+    back: "Back to Sub Categories 2",
     subCategoryName: "Sub Category Name",
     subCategoryNameAr: "Sub Category Name (Arabic)",
     slugEn: "Slug (English)",
     slugAr: "Slug (Arabic)",
     slugNote: "Auto-generated from name (editable).",
     priority: "Priority",
-    priorityNote: "Optional: Display order for the subcategory (defaults to 0).",
+    priorityNote:
+      "Optional: Display order for the subcategory (defaults to 0).",
     parentCategory: "Parent Category",
     chooseParent: "Choose Parent Category",
     icon: "Icon",
@@ -84,8 +86,8 @@ const translations = {
     required: "*",
   },
   ar: {
-    title: "إضافة فئة فرعية جديدة",
-    back: "العودة إلى الفئات الفرعية",
+    title: "إضافة فئة فرعية جديدة 2",
+    back: "العودة إلى الفئات الفرعية 2",
     subCategoryName: "اسم الفئة الفرعية",
     subCategoryNameAr: "اسم الفئة الفرعية (العربية)",
     slugEn: "الرابط (الإنجليزية)",
@@ -209,7 +211,11 @@ export default function CreateSubCategoryPage() {
     setFaqs([...faqs, { question: "", answer: "" }]);
   };
 
-  const updateFAQ = (index: number, field: "question" | "answer", value: string) => {
+  const updateFAQ = (
+    index: number,
+    field: "question" | "answer",
+    value: string,
+  ) => {
     const newFaqs = [...faqs];
     newFaqs[index][field] = value;
     setFaqs(newFaqs);
@@ -224,7 +230,7 @@ export default function CreateSubCategoryPage() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image size should be less than 5MB");
+        toast.error("Image size should be less than 5MB");
         return;
       }
       form.setValue("image", e.target.files as FileList);
@@ -251,7 +257,7 @@ export default function CreateSubCategoryPage() {
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) {
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image size should be less than 5MB");
+        toast.error("Image size should be less than 5MB");
         return;
       }
       const dataTransfer = new DataTransfer();
@@ -288,12 +294,15 @@ export default function CreateSubCategoryPage() {
             <div className="space-y-6">
               {/* Sub Category Setup */}
               <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <h2 className="mb-4 text-lg font-semibold">Sub Category Setup</h2>
+                <h2 className="mb-4 text-lg font-semibold">
+                  Sub Category Setup
+                </h2>
 
                 <div className="space-y-4">
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      {t.subCategoryName} <span className="text-red-500">{t.required}</span>
+                      {t.subCategoryName}{" "}
+                      <span className="text-red-500">{t.required}</span>
                     </label>
                     <input
                       type="text"
@@ -311,7 +320,8 @@ export default function CreateSubCategoryPage() {
 
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      {t.subCategoryNameAr} <span className="text-red-500">{t.required}</span>
+                      {t.subCategoryNameAr}{" "}
+                      <span className="text-red-500">{t.required}</span>
                     </label>
                     <input
                       type="text"
@@ -329,7 +339,8 @@ export default function CreateSubCategoryPage() {
 
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      {t.slugEn} <span className="text-red-500">{t.required}</span>
+                      {t.slugEn}{" "}
+                      <span className="text-red-500">{t.required}</span>
                     </label>
                     <input
                       type="text"
@@ -347,7 +358,8 @@ export default function CreateSubCategoryPage() {
 
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      {t.slugAr} <span className="text-red-500">{t.required}</span>
+                      {t.slugAr}{" "}
+                      <span className="text-red-500">{t.required}</span>
                     </label>
                     <input
                       type="text"
@@ -364,19 +376,24 @@ export default function CreateSubCategoryPage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium">{t.priority}</label>
+                    <label className="mb-2 block text-sm font-medium">
+                      {t.priority}
+                    </label>
                     <input
                       type="number"
                       {...form.register("priority", { valueAsNumber: true })}
                       defaultValue={0}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
-                    <p className="mt-1 text-xs text-gray-500">{t.priorityNote}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t.priorityNote}
+                    </p>
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      {t.parentCategory} <span className="text-red-500">{t.required}</span>
+                      {t.parentCategory}{" "}
+                      <span className="text-red-500">{t.required}</span>
                     </label>
                     <select
                       {...form.register("parentCategory")}
@@ -397,7 +414,9 @@ export default function CreateSubCategoryPage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium">{t.icon}</label>
+                    <label className="mb-2 block text-sm font-medium">
+                      {t.icon}
+                    </label>
                     <div className="space-y-2">
                       <button
                         type="button"
@@ -448,14 +467,18 @@ export default function CreateSubCategoryPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-2 block text-sm font-medium">{t.metaTitle}</label>
+                    <label className="mb-2 block text-sm font-medium">
+                      {t.metaTitle}
+                    </label>
                     <input
                       type="text"
                       {...form.register("metaTitle")}
                       placeholder={t.metaTitlePlaceholder}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
-                    <p className="mt-1 text-xs text-gray-500">{t.metaTitleNote}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t.metaTitleNote}
+                    </p>
                   </div>
 
                   <div>
@@ -468,11 +491,15 @@ export default function CreateSubCategoryPage() {
                       rows={3}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
-                    <p className="mt-1 text-xs text-gray-500">{t.metaDescriptionNote}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t.metaDescriptionNote}
+                    </p>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium">{t.metaKeywords}</label>
+                    <label className="mb-2 block text-sm font-medium">
+                      {t.metaKeywords}
+                    </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -490,7 +517,9 @@ export default function CreateSubCategoryPage() {
                         <Plus size={16} />
                       </button>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">{t.metaKeywordsNote}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t.metaKeywordsNote}
+                    </p>
                     {keywords.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {keywords.map((keyword, index) => (
@@ -535,7 +564,9 @@ export default function CreateSubCategoryPage() {
                       className="rounded-md border border-gray-200 bg-gray-50 p-4"
                     >
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm font-medium">FAQ {index + 1}</span>
+                        <span className="text-sm font-medium">
+                          FAQ {index + 1}
+                        </span>
                         <button
                           type="button"
                           onClick={() => removeFAQ(index)}
@@ -548,13 +579,17 @@ export default function CreateSubCategoryPage() {
                         <input
                           type="text"
                           value={faq.question}
-                          onChange={(e) => updateFAQ(index, "question", e.target.value)}
+                          onChange={(e) =>
+                            updateFAQ(index, "question", e.target.value)
+                          }
                           placeholder="Question"
                           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                         />
                         <textarea
                           value={faq.answer}
-                          onChange={(e) => updateFAQ(index, "answer", e.target.value)}
+                          onChange={(e) =>
+                            updateFAQ(index, "answer", e.target.value)
+                          }
                           placeholder="Answer"
                           rows={2}
                           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -570,7 +605,9 @@ export default function CreateSubCategoryPage() {
             <div className="space-y-6">
               {/* Sub Category Image */}
               <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <h2 className="mb-4 text-lg font-semibold">{t.subCategoryImage}</h2>
+                <h2 className="mb-4 text-lg font-semibold">
+                  {t.subCategoryImage}
+                </h2>
                 <div
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
@@ -605,7 +642,9 @@ export default function CreateSubCategoryPage() {
                         {t.dragDrop}
                       </p>
                       <p className="text-sm text-gray-500">{t.orClick}</p>
-                      <p className="mt-2 text-xs text-gray-400">{t.fileTypes}</p>
+                      <p className="mt-2 text-xs text-gray-400">
+                        {t.fileTypes}
+                      </p>
                     </>
                   )}
                   <input
@@ -620,7 +659,9 @@ export default function CreateSubCategoryPage() {
 
               {/* Sub Category Headline */}
               <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <label className="mb-2 block text-sm font-medium">{t.headline}</label>
+                <label className="mb-2 block text-sm font-medium">
+                  {t.headline}
+                </label>
                 <input
                   type="text"
                   {...form.register("headline")}
@@ -633,13 +674,13 @@ export default function CreateSubCategoryPage() {
               {/* Description */}
               <div className="rounded-lg border border-gray-200 bg-white p-6">
                 <label className="mb-2 block text-sm font-medium">
-                  {t.description} <span className="text-red-500">{t.required}</span>
+                  {t.description}{" "}
+                  <span className="text-red-500">{t.required}</span>
                 </label>
                 <div className="relative">
                   <TextEditor
                     value={form.watch("description") || ""}
                     onChange={(value) => form.setValue("description", value)}
-
                     showEditor={true}
                   />
                   <button
@@ -650,7 +691,9 @@ export default function CreateSubCategoryPage() {
                     <Undo size={14} />
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">{t.descriptionNote}</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {t.descriptionNote}
+                </p>
                 {form.formState.errors.description && (
                   <p className="mt-1 text-xs text-red-600">
                     {form.formState.errors.description.message}
@@ -671,7 +714,7 @@ export default function CreateSubCategoryPage() {
             </button>
             <button
               type="submit"
-              className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90"
+              className="hover:bg-primary/90 rounded-md bg-primary px-6 py-2 text-sm font-medium text-white"
             >
               {t.submit}
             </button>
@@ -681,4 +724,3 @@ export default function CreateSubCategoryPage() {
     </div>
   );
 }
-

@@ -4,9 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Plus, SlidersHorizontal, X, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { Input } from "@/components/shared/input";
+import { Button } from "@/components/shared/button";
+import Modal from "@/components/shared/Modals/DynamicModal";
 import type { ProductOption } from "@/types/product";
 import {
   createVariant,
@@ -77,6 +80,8 @@ export default function ProductVariantsPanel() {
   const [saving, setSaving] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<VariantEditorDraft>(makeEmptyDraft);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [idToDelete, setIdToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -122,14 +127,18 @@ export default function ProductVariantsPanel() {
     setDraft(fromVariant(v));
   };
 
-  const removeVariant = async (id: string) => {
-    if (!token) return;
-    if (!confirm(isAr ? "حذف هذا المتغير؟" : "Delete this variable?")) return;
+  const removeVariant = (id: string) => {
+    setIdToDelete(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!token || !idToDelete) return;
     try {
-      await deleteVariant(id, token);
-      setVariants((prev) => prev.filter((v) => v.id !== id));
-      if (selectedId === id) {
-        const next = variants.find((v) => v.id !== id) || null;
+      await deleteVariant(idToDelete, token);
+      setVariants((prev) => prev.filter((v) => v.id !== idToDelete));
+      if (selectedId === idToDelete) {
+        const next = variants.find((v) => v.id !== idToDelete) || null;
         if (next) {
           setSelectedId(next.id);
           setDraft(fromVariant(next));
@@ -137,15 +146,22 @@ export default function ProductVariantsPanel() {
           startCreate();
         }
       }
+      toast.success(isAr ? "تم الحذف بنجاح" : "Deleted successfully");
     } catch {
-      alert(isAr ? "فشل الحذف" : "Delete failed");
+      toast.error(isAr ? "فشل الحذف" : "Delete failed");
+    } finally {
+      setShowDeleteConfirm(false);
+      setIdToDelete(null);
     }
   };
 
   const addOption = () => {
     setDraft((d) => ({
       ...d,
-      options: [...d.options, { id: makeId(), en: "", ar: "", price: 0, stock: 0 }],
+      options: [
+        ...d.options,
+        { id: makeId(), en: "", ar: "", price: 0, stock: 0 },
+      ],
     }));
   };
 
@@ -174,11 +190,13 @@ export default function ProductVariantsPanel() {
       .filter((o) => o.en.length > 0 || o.ar.length > 0);
 
     if (!nameEn) {
-      alert(isAr ? "اكتب اسم المتغير" : "Please enter a variable name");
+      toast.error(isAr ? "اكتب اسم المتغير" : "Please enter a variable name");
       return;
     }
     if (cleanOptions.length === 0) {
-      alert(isAr ? "أضف خيارًا واحدًا على الأقل" : "Please add at least one option");
+      toast.error(
+        isAr ? "أضف خيارًا واحدًا على الأقل" : "Please add at least one option",
+      );
       return;
     }
 
@@ -212,8 +230,9 @@ export default function ProductVariantsPanel() {
       });
       setSelectedId(saved.id);
       setDraft(fromVariant(saved));
+      toast.success(isAr ? "تم الحفظ بنجاح" : "Saved successfully");
     } catch {
-      alert(isAr ? "فشل الحفظ" : "Save failed");
+      toast.error(isAr ? "فشل الحفظ" : "Save failed");
     } finally {
       setSaving(false);
     }
@@ -292,7 +311,10 @@ export default function ProductVariantsPanel() {
                           </span>
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-extrabold text-slate-900">
-                              {v.name?.[locale] || v.name?.en || v.name?.ar || "—"}
+                              {v.name?.[locale] ||
+                                v.name?.en ||
+                                v.name?.ar ||
+                                "—"}
                             </span>
                           </span>
                         </button>
@@ -338,7 +360,9 @@ export default function ProductVariantsPanel() {
                       onChange={(e) =>
                         setDraft((d) => ({ ...d, nameAr: e.target.value }))
                       }
-                      placeholder={isAr ? "مثال: المقاس" : "Arabic name (optional)"}
+                      placeholder={
+                        isAr ? "مثال: المقاس" : "Arabic name (optional)"
+                      }
                       className="h-10 rounded-xl border-slate-200 bg-slate-50/60 text-sm"
                     />
                   </div>
@@ -373,13 +397,17 @@ export default function ProductVariantsPanel() {
                   <div key={opt.id} className="flex items-center gap-2">
                     <Input
                       value={opt.en}
-                      onChange={(e) => updateOption(opt.id, { en: e.target.value })}
+                      onChange={(e) =>
+                        updateOption(opt.id, { en: e.target.value })
+                      }
                       placeholder={isAr ? "الخيار (EN)" : "Option (EN)"}
                       className="h-10 rounded-xl border-slate-200 bg-white text-sm"
                     />
                     <Input
                       value={opt.ar}
-                      onChange={(e) => updateOption(opt.id, { ar: e.target.value })}
+                      onChange={(e) =>
+                        updateOption(opt.id, { ar: e.target.value })
+                      }
                       placeholder={isAr ? "الخيار (AR)" : "Option (AR)"}
                       className="h-10 rounded-xl border-slate-200 bg-slate-50/60 text-sm"
                     />
@@ -417,8 +445,10 @@ export default function ProductVariantsPanel() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {t("saving")}
                   </span>
+                ) : isAr ? (
+                  "حفظ المتغير"
                 ) : (
-                  isAr ? "حفظ المتغير" : "Save Variable"
+                  "Save Variable"
                 )}
               </button>
               {!token ? (
@@ -432,7 +462,44 @@ export default function ProductVariantsPanel() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        size="sm"
+      >
+        <div className="p-1">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+            <X size={24} strokeWidth={2.5} />
+          </div>
+          <div className="mt-4">
+            <h3 className="text-lg font-black text-gray-900">
+              {isAr ? "حذف المتغير؟" : "Delete Variable?"}
+            </h3>
+            <p className="mt-2 text-sm font-medium text-gray-500">
+              {isAr
+                ? "هل أنت متأكد من حذف هذا المتغير؟ لا يمكن التراجع عن هذا الإجراء."
+                : "Are you sure you want to delete this variable? This action cannot be undone."}
+            </p>
+          </div>
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              className="h-10 rounded-xl border-gray-100 text-xs font-black"
+            >
+              {isAr ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              className="h-10 rounded-xl bg-rose-600 text-xs font-black text-white hover:bg-rose-700"
+            >
+              {isAr ? "تأكيد الحذف" : "Confirm Delete"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
-

@@ -31,7 +31,11 @@ import {
   getSubCategoryChildren,
 } from "@/services/categoryService";
 import { getBrands } from "@/services/brandService";
-import { getSellers } from "@/services/sellerService";
+import {
+  getSellers,
+  getSellerById,
+  Seller as SellerServiceType,
+} from "@/services/sellerService";
 import { getTags } from "@/services/tagService";
 import { MultiCategory, Brand } from "@/types";
 import { apiClient } from "@/lib/apiClient";
@@ -43,6 +47,8 @@ interface Step1CoreInfoProps {
   onUpdate: (updates: Partial<ProductFormData>) => void;
   errors: Record<string, string>;
   locale: string;
+  token?: string;
+  userRole?: string;
 }
 
 // Standardized Design Tokens
@@ -198,10 +204,12 @@ export const Step1CoreInfo = ({
   onUpdate,
   errors,
   locale,
+  token: propToken,
+  userRole: propUserRole,
 }: Step1CoreInfoProps) => {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
-  const userRole = (session as any)?.user?.role;
+  const token = propToken || (session as any)?.accessToken;
+  const userRole = propUserRole || (session as any)?.user?.role;
   const [categories, setCategories] = useState<MultiCategory[]>([]);
   const [subCategories, setSubCategories] = useState<MultiCategory[]>([]);
   const [subCategoryChildren, setSubCategoryChildren] = useState<
@@ -297,40 +305,75 @@ export const Step1CoreInfo = ({
 
   useEffect(() => {
     const init = async () => {
+      console.log(
+        "DEBUG: Step1CoreInfo init called | token:",
+        !!token,
+        "| userRole:",
+        userRole,
+      );
       const [cats, brs] = await Promise.all([
-        getCategories(token).catch(() => []),
-        getBrands(token).catch(() => []),
+        getCategories(token).catch((err) => {
+          console.error("getCategories fail:", err);
+          return [];
+        }),
+        getBrands(token).catch((err) => {
+          console.error("getBrands fail:", err);
+          return [];
+        }),
       ]);
       setCategories(cats);
       setBrands(brs);
 
       if (userRole === "admin") {
-        const fetchedSellers = await getSellers(token).catch(() => []);
-        setSellers(
-          fetchedSellers.map((s) => ({
-            id: s.id,
-            displayName: s.store_name || s.name || s.email,
-          })),
-        );
+        console.log("DEBUG: Admin detected, fetching sellers...");
+        const fetchedSellers = await getSellers(token).catch((err) => {
+          console.error("DEBUG: getSellers explicitly failed:", err);
+          return [];
+        });
+        console.log("DEBUG: fetchedSellers count:", fetchedSellers.length);
+        const mapped = fetchedSellers.map((s) => ({
+          id: s.id,
+          displayName: s.store_name || s.name || s.email,
+        }));
+        setSellers(mapped);
+
+        // EXTRA: If the product has a store ID that isn't in the first page of sellers,
+        // we might need to fetch that specific seller to show their name
+        if (product.store && !mapped.some((m) => m.id === product.store)) {
+          console.log(
+            "DEBUG: Product store not in initial list, fetching specific seller:",
+            product.store,
+          );
+          getSellerById(product.store, token)
+            .then((s: SellerServiceType | null) => {
+              if (s) {
+                setSellers((prev) => [
+                  ...prev,
+                  { id: s.id, displayName: s.store_name || s.name || s.email },
+                ]);
+              }
+            })
+            .catch(() => {});
+        }
       }
     };
     init();
-  }, [token, userRole]);
+  }, [token, userRole, product.store]); // added product.store to re-check if it exists in list
 
   // Hydrate subcategories and children when edit mode pre-fills classification IDs
   useEffect(() => {
     const hydrate = async () => {
+      // If we have a category ID but no subcategories, or the category just loaded
       if (product.classification.category && categories.length > 0) {
-        const subs = await getSubCategories(
-          product.classification.category,
-          token,
-        );
+        // Only fetch if subcategories are empty or belong to a different category
+        const subId = product.classification.subcategory;
+        const catId = product.classification.category;
+
+        const subs = await getSubCategories(catId, token);
         setSubCategories(subs);
-        if (product.classification.subcategory) {
-          const children = await getSubCategoryChildren(
-            product.classification.subcategory,
-            token,
-          );
+
+        if (subId) {
+          const children = await getSubCategoryChildren(subId, token);
           setSubCategoryChildren(children);
         }
       }
@@ -403,17 +446,29 @@ export const Step1CoreInfo = ({
   const userSpecifications = useMemo(() => {
     const specs = (product.specifications || []) as any[];
     return specs.filter((s) => {
-      const key = String(s?.keyEn || "").trim().toLowerCase();
+      const key = String(s?.keyEn || "")
+        .trim()
+        .toLowerCase();
       if (!key) return false;
       return !RESERVED_SPEC_KEYS.has(key);
     });
   }, [product.specifications]);
 
   const upsertSpecification = useCallback(
-    (spec: { keyEn: string; keyAr: string; valueEn: string; valueAr: string }) => {
+    (spec: {
+      keyEn: string;
+      keyAr: string;
+      valueEn: string;
+      valueAr: string;
+    }) => {
       const key = spec.keyEn.trim().toLowerCase();
       const current = (product.specifications || []) as any[];
-      const next = current.filter((s) => String(s?.keyEn || "").trim().toLowerCase() !== key);
+      const next = current.filter(
+        (s) =>
+          String(s?.keyEn || "")
+            .trim()
+            .toLowerCase() !== key,
+      );
       next.push(spec as any);
       onUpdate({ specifications: next as any });
     },
@@ -425,7 +480,12 @@ export const Step1CoreInfo = ({
       const key = keyEn.trim().toLowerCase();
       const current = (product.specifications || []) as any[];
       onUpdate({
-        specifications: current.filter((s) => String(s?.keyEn || "").trim().toLowerCase() !== key) as any,
+        specifications: current.filter(
+          (s) =>
+            String(s?.keyEn || "")
+              .trim()
+              .toLowerCase() !== key,
+        ) as any,
       });
     },
     [onUpdate, product.specifications],
@@ -824,7 +884,9 @@ export const Step1CoreInfo = ({
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
               <div className="mb-4">
                 <h3 className="text-sm font-bold text-gray-900">
-                  {locale === "ar" ? "مواصفات المنتج" : "Product Specifications"}
+                  {locale === "ar"
+                    ? "مواصفات المنتج"
+                    : "Product Specifications"}
                 </h3>
                 <p className="mt-1 text-xs text-gray-500">
                   {locale === "ar"
@@ -840,7 +902,9 @@ export const Step1CoreInfo = ({
                   </Label>
                   <Input
                     value={draftSpec.keyEn}
-                    onChange={(e) => setDraftSpec((p) => ({ ...p, keyEn: e.target.value }))}
+                    onChange={(e) =>
+                      setDraftSpec((p) => ({ ...p, keyEn: e.target.value }))
+                    }
                     className={`h-10 rounded-xl border-gray-200 px-3 text-sm ${COLORS.focus}`}
                     placeholder={locale === "ar" ? "Material" : "Material"}
                   />
@@ -851,26 +915,38 @@ export const Step1CoreInfo = ({
                   </Label>
                   <Input
                     value={draftSpec.valueEn}
-                    onChange={(e) => setDraftSpec((p) => ({ ...p, valueEn: e.target.value }))}
+                    onChange={(e) =>
+                      setDraftSpec((p) => ({ ...p, valueEn: e.target.value }))
+                    }
                     className={`h-10 rounded-xl border-gray-200 px-3 text-sm ${COLORS.focus}`}
                     placeholder={locale === "ar" ? "Cotton" : "Cotton"}
                   />
                 </div>
                 <div className="space-y-2" dir="rtl">
-                  <Label className={COLORS.label}>{locale === "ar" ? "المفتاح (AR)" : "Key (AR)"}</Label>
+                  <Label className={COLORS.label}>
+                    {locale === "ar" ? "المفتاح (AR)" : "Key (AR)"}
+                  </Label>
                   <Input
                     value={draftSpec.keyAr}
-                    onChange={(e) => setDraftSpec((p) => ({ ...p, keyAr: e.target.value }))}
-                    className={`h-10 rounded-xl border-gray-200 px-3 text-sm text-right ${COLORS.focus}`}
-                    placeholder={locale === "ar" ? "مثال: الخامة" : "مثال: الخامة"}
+                    onChange={(e) =>
+                      setDraftSpec((p) => ({ ...p, keyAr: e.target.value }))
+                    }
+                    className={`h-10 rounded-xl border-gray-200 px-3 text-right text-sm ${COLORS.focus}`}
+                    placeholder={
+                      locale === "ar" ? "مثال: الخامة" : "مثال: الخامة"
+                    }
                   />
                 </div>
                 <div className="space-y-2" dir="rtl">
-                  <Label className={COLORS.label}>{locale === "ar" ? "القيمة (AR)" : "Value (AR)"}</Label>
+                  <Label className={COLORS.label}>
+                    {locale === "ar" ? "القيمة (AR)" : "Value (AR)"}
+                  </Label>
                   <Input
                     value={draftSpec.valueAr}
-                    onChange={(e) => setDraftSpec((p) => ({ ...p, valueAr: e.target.value }))}
-                    className={`h-10 rounded-xl border-gray-200 px-3 text-sm text-right ${COLORS.focus}`}
+                    onChange={(e) =>
+                      setDraftSpec((p) => ({ ...p, valueAr: e.target.value }))
+                    }
+                    className={`h-10 rounded-xl border-gray-200 px-3 text-right text-sm ${COLORS.focus}`}
                     placeholder={locale === "ar" ? "مثال: قطن" : "مثال: قطن"}
                   />
                 </div>
@@ -888,7 +964,12 @@ export const Step1CoreInfo = ({
                     valueEn,
                     valueAr: draftSpec.valueAr.trim() || valueEn,
                   });
-                  setDraftSpec({ keyEn: "", valueEn: "", keyAr: "", valueAr: "" });
+                  setDraftSpec({
+                    keyEn: "",
+                    valueEn: "",
+                    keyAr: "",
+                    valueAr: "",
+                  });
                 }}
                 className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700"
               >
@@ -903,12 +984,18 @@ export const Step1CoreInfo = ({
                       className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-gray-900">{s.keyEn}</p>
-                        <p className="truncate text-xs text-gray-500">{s.valueEn}</p>
+                        <p className="truncate text-sm font-bold text-gray-900">
+                          {s.keyEn}
+                        </p>
+                        <p className="truncate text-xs text-gray-500">
+                          {s.valueEn}
+                        </p>
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeSpecificationByKey(String(s.keyEn || ""))}
+                        onClick={() =>
+                          removeSpecificationByKey(String(s.keyEn || ""))
+                        }
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                         aria-label={locale === "ar" ? "حذف" : "Delete"}
                       >
@@ -919,7 +1006,9 @@ export const Step1CoreInfo = ({
                 </div>
               ) : (
                 <p className="mt-4 text-xs text-gray-400">
-                  {locale === "ar" ? "لا توجد مواصفات بعد." : "No specifications yet."}
+                  {locale === "ar"
+                    ? "لا توجد مواصفات بعد."
+                    : "No specifications yet."}
                 </p>
               )}
             </div>
@@ -1017,7 +1106,7 @@ export const Step1CoreInfo = ({
                   {locale === "ar" ? "معرض الصور" : "Gallery"}
                 </p>
                 <span className="text-[11px] font-semibold text-gray-400">
-                  {(imageUrls.length > 0 ? imageUrls.length - 1 : 0)}/9
+                  {imageUrls.length > 0 ? imageUrls.length - 1 : 0}/9
                 </span>
               </div>
 
@@ -1115,9 +1204,7 @@ export const Step1CoreInfo = ({
                   {selectedTagIds.map((id) => {
                     const tag = availableTags.find((t) => t.id === id);
                     const label =
-                      tag?.name?.[locale as "en" | "ar"] ||
-                      tag?.name?.en ||
-                      id;
+                      tag?.name?.[locale as "en" | "ar"] || tag?.name?.en || id;
                     return (
                       <span
                         key={id}
@@ -1251,3 +1338,4 @@ export const Step1CoreInfo = ({
     </motion.div>
   );
 };
+export default Step1CoreInfo;

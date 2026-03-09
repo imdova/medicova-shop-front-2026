@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 type ReturnItem = {
   id: string;
@@ -30,9 +31,11 @@ type ResolutionType = "refund" | "exchange" | "store_credit";
 
 function formatDateLabel(locale: string) {
   const loc = locale === "ar" ? "ar-EG" : "en-US";
-  return new Intl.DateTimeFormat(loc, { month: "short", day: "2-digit", year: "numeric" }).format(
-    new Date(),
-  );
+  return new Intl.DateTimeFormat(loc, {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(new Date());
 }
 
 export default function CreateReturnRequestPage() {
@@ -68,7 +71,10 @@ export default function CreateReturnRequestPage() {
       maxReturnQty: 100,
     },
   ]);
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(["gloves", "masks"]);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([
+    "gloves",
+    "masks",
+  ]);
   const [returnQty, setReturnQty] = useState<Record<string, number>>({
     gloves: 2,
     monitor: 0,
@@ -113,19 +119,28 @@ export default function CreateReturnRequestPage() {
   };
 
   const onCancel = () => {
-    alert(isArabic ? "تم الإلغاء (واجهة فقط)" : "Cancelled (UI only)");
+    toast.error(isArabic ? "تم الإلغاء (واجهة فقط)" : "Cancelled (UI only)");
   };
 
   const onSaveDraft = () => {
-    alert(isArabic ? "تم حفظ المسودة (واجهة فقط)" : "Saved as draft (UI only)");
+    toast.success(
+      isArabic ? "تم حفظ المسودة (واجهة فقط)" : "Saved as draft (UI only)",
+    );
   };
 
   const onSubmit = () => {
-    alert(isArabic ? "تم إرسال الطلب (واجهة فقط)" : "Return request submitted (UI only)");
+    toast.success(
+      isArabic
+        ? "تم إرسال الطلب (واجهة فقط)"
+        : "Return request submitted (UI only)",
+    );
   };
 
   return (
-    <div className="animate-in fade-in min-h-screen bg-[#F8FAFC] p-4 duration-700 md:p-8" dir={isArabic ? "rtl" : "ltr"}>
+    <div
+      className="animate-in fade-in min-h-screen bg-[#F8FAFC] p-4 duration-700 md:p-8"
+      dir={isArabic ? "rtl" : "ltr"}
+    >
       <div className="mx-auto max-w-[1200px]">
         {/* Breadcrumbs */}
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
@@ -216,7 +231,8 @@ export default function CreateReturnRequestPage() {
                         {isArabic ? "تم التحقق من الطلب" : "Order Verified"}
                       </div>
                       <div className="mt-1 text-xs font-semibold text-slate-500">
-                        {isArabic ? "التاريخ" : "Date"}: {formatDateLabel(locale)} •{" "}
+                        {isArabic ? "التاريخ" : "Date"}:{" "}
+                        {formatDateLabel(locale)} •{" "}
                         {isArabic ? "المرجع" : "Ref"}: {orderRef}
                       </div>
                     </div>
@@ -242,11 +258,19 @@ export default function CreateReturnRequestPage() {
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                      <th className="px-3 py-3">{isArabic ? "اختر" : "Select"}</th>
-                      <th className="px-3 py-3">{isArabic ? "العنصر الطبي" : "Medical Item"}</th>
+                      <th className="px-3 py-3">
+                        {isArabic ? "اختر" : "Select"}
+                      </th>
+                      <th className="px-3 py-3">
+                        {isArabic ? "العنصر الطبي" : "Medical Item"}
+                      </th>
                       <th className="px-3 py-3">SKU</th>
-                      <th className="px-3 py-3">{isArabic ? "كمية الطلب" : "Order Qty"}</th>
-                      <th className="px-3 py-3">{isArabic ? "كمية المرتجع" : "Return Qty"}</th>
+                      <th className="px-3 py-3">
+                        {isArabic ? "كمية الطلب" : "Order Qty"}
+                      </th>
+                      <th className="px-3 py-3">
+                        {isArabic ? "كمية المرتجع" : "Return Qty"}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -254,7 +278,10 @@ export default function CreateReturnRequestPage() {
                       const checked = selectedItemIds.includes(it.id);
                       const qty = returnQty[it.id] ?? 0;
                       return (
-                        <tr key={it.id} className="border-b border-slate-100 last:border-b-0">
+                        <tr
+                          key={it.id}
+                          className="border-b border-slate-100 last:border-b-0"
+                        >
                           <td className="px-3 py-3">
                             <Checkbox
                               id={`sel-${it.id}`}
@@ -269,19 +296,30 @@ export default function CreateReturnRequestPage() {
                             />
                           </td>
                           <td className="px-3 py-3">
-                            <div className="font-semibold text-slate-900">{it.name}</div>
+                            <div className="font-semibold text-slate-900">
+                              {it.name}
+                            </div>
                           </td>
-                          <td className="px-3 py-3 text-xs font-semibold text-slate-500">{it.sku}</td>
-                          <td className="px-3 py-3 text-sm font-semibold text-slate-700">{it.orderQty}</td>
+                          <td className="px-3 py-3 text-xs font-semibold text-slate-500">
+                            {it.sku}
+                          </td>
+                          <td className="px-3 py-3 text-sm font-semibold text-slate-700">
+                            {it.orderQty}
+                          </td>
                           <td className="px-3 py-3">
                             <Input
                               type="number"
                               value={qty}
                               onChange={(e) => {
-                                const v = Number.parseInt(e.target.value || "0", 10) || 0;
+                                const v =
+                                  Number.parseInt(e.target.value || "0", 10) ||
+                                  0;
                                 setReturnQty((prev) => ({
                                   ...prev,
-                                  [it.id]: Math.max(0, Math.min(it.maxReturnQty, v)),
+                                  [it.id]: Math.max(
+                                    0,
+                                    Math.min(it.maxReturnQty, v),
+                                  ),
                                 }));
                               }}
                               disabled={!checked}
@@ -297,7 +335,9 @@ export default function CreateReturnRequestPage() {
 
               <div className="mt-3 text-xs font-semibold text-slate-500">
                 {isArabic ? "العناصر المحددة" : "Selected items"}:{" "}
-                <span className="font-extrabold text-slate-900">{selectedItems.length}</span>
+                <span className="font-extrabold text-slate-900">
+                  {selectedItems.length}
+                </span>
               </div>
             </div>
           </section>
@@ -324,9 +364,15 @@ export default function CreateReturnRequestPage() {
                     onChange={(e) => setPrimaryReason(e.target.value)}
                     className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   >
-                    <option value="damaged_packaging">{isArabic ? "تلف التغليف" : "Damaged Packaging"}</option>
-                    <option value="wrong_item">{isArabic ? "عنصر غير صحيح" : "Wrong Item"}</option>
-                    <option value="defective">{isArabic ? "منتج معيب" : "Defective"}</option>
+                    <option value="damaged_packaging">
+                      {isArabic ? "تلف التغليف" : "Damaged Packaging"}
+                    </option>
+                    <option value="wrong_item">
+                      {isArabic ? "عنصر غير صحيح" : "Wrong Item"}
+                    </option>
+                    <option value="defective">
+                      {isArabic ? "منتج معيب" : "Defective"}
+                    </option>
                     <option value="other">{isArabic ? "أخرى" : "Other"}</option>
                   </select>
 
@@ -379,11 +425,19 @@ export default function CreateReturnRequestPage() {
                                   : "bg-white text-slate-300 ring-slate-200",
                               ].join(" ")}
                             >
-                              {active ? <CheckCircle2 className="h-4 w-4" /> : <span className="h-2 w-2 rounded-full bg-current" />}
+                              {active ? (
+                                <CheckCircle2 className="h-4 w-4" />
+                              ) : (
+                                <span className="h-2 w-2 rounded-full bg-current" />
+                              )}
                             </span>
                             <div>
-                              <div className="text-sm font-extrabold text-slate-900">{opt.title}</div>
-                              <div className="mt-0.5 text-xs font-semibold text-slate-500">{opt.desc}</div>
+                              <div className="text-sm font-extrabold text-slate-900">
+                                {opt.title}
+                              </div>
+                              <div className="mt-0.5 text-xs font-semibold text-slate-500">
+                                {opt.desc}
+                              </div>
                             </div>
                           </div>
                         </button>
@@ -394,12 +448,18 @@ export default function CreateReturnRequestPage() {
 
                 <div className="lg:col-span-6">
                   <div className="mb-1 text-[12px] font-semibold text-slate-600">
-                    {isArabic ? "ملاحظات وتفاصيل الفحص" : "Inspection Notes & Details"}
+                    {isArabic
+                      ? "ملاحظات وتفاصيل الفحص"
+                      : "Inspection Notes & Details"}
                   </div>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder={isArabic ? "أضف ملاحظات الفحص هنا..." : "Add detailed inspection notes here..."}
+                    placeholder={
+                      isArabic
+                        ? "أضف ملاحظات الفحص هنا..."
+                        : "Add detailed inspection notes here..."
+                    }
                     className="min-h-[210px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
@@ -442,11 +502,21 @@ export default function CreateReturnRequestPage() {
                 </label>
 
                 {previews.map((p) => (
-                  <div key={p.url} className="relative h-28 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                    <Image src={p.url} alt={p.file.name} fill className="object-cover" />
+                  <div
+                    key={p.url}
+                    className="relative h-28 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                  >
+                    <Image
+                      src={p.url}
+                      alt={p.file.name}
+                      fill
+                      className="object-cover"
+                    />
                     <button
                       type="button"
-                      onClick={() => setFiles((prev) => prev.filter((f) => f !== p.file))}
+                      onClick={() =>
+                        setFiles((prev) => prev.filter((f) => f !== p.file))
+                      }
                       className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/90 text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-white"
                       aria-label="Remove"
                     >
@@ -500,4 +570,3 @@ export default function CreateReturnRequestPage() {
     </div>
   );
 }
-

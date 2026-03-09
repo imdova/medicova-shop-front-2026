@@ -32,6 +32,7 @@ import { FlashSalesData } from "@/constants/flashSales";
 import { LocalizedTitle } from "@/types/language";
 import NotFound from "@/app/[locale]/not-found";
 import Loading from "@/app/[locale]/loading";
+import toast from "react-hot-toast";
 
 export interface FlashSaleProduct {
   id: string;
@@ -185,14 +186,14 @@ export default function EditFlashSalePage() {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Show success message
-      alert(
+      toast.success(
         locale === "en"
           ? "Flash sale updated successfully!"
           : "تم تحديث العرض الترويجي بنجاح!",
       );
     } catch (error) {
       console.error("Update failed", error);
-      alert(
+      toast.error(
         locale === "en"
           ? "Failed to update flash sale!"
           : "فشل تحديث العرض الترويجي!",

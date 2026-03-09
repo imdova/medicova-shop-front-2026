@@ -195,9 +195,18 @@ export interface Product {
     label: LocalizedTitle;
     content: LocalizedTitle;
   }[];
+  weightKg: number;
   shipping_fee: number;
   shippingMethod: shippingMethod;
-  weightKg: number;
+  createdBy?: "admin" | "seller" | string;
+  sellerId?: string | null;
+  seller?: {
+    _id?: string;
+    brandName?: string;
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+  } | string;
 }
 
 export type ProductTag = {
@@ -414,16 +423,26 @@ export interface ProductCollection {
   slug: string;
   createdAt: string;
   status: "published" | "draft";
+  sellerId?: string | null;
+  descriptiveData?: string | null;
   description: {
     en: string;
     ar: string;
   };
+  nameAr?: string;
+  nameEn?: string;
+  descriptionAr?: string;
+  descriptionEn?: string;
+  isFeatures?: boolean;
+  is_featured: boolean;
   short_description: {
     en: string;
     ar: string;
   };
-  is_featured: boolean;
   products: Product[];
+  link?: string;
+  orders?: number;
+  revenue?: number;
 }
 
 export type DiscountType = "fixed" | "percentage" | "shipping";

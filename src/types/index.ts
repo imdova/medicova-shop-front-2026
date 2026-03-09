@@ -151,7 +151,7 @@ export interface CategoryType {
 export interface Brand {
   id: string;
   name: LocalizedTitle;
-  slug: string;
+  slug?: string;
   slugAr?: string;
   url?: string;
   image: string;

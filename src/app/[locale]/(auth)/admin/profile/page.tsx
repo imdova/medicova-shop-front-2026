@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { useAppLocale } from "@/hooks/useAppLocale";
+import toast from "react-hot-toast";
 
 interface ProfileFormData {
   firstName: string;
@@ -47,7 +48,7 @@ const ProfilePage: React.FC = () => {
 
   const onSubmit = (data: ProfileFormData) => {
     console.log("Form Data:", data);
-    alert(
+    toast.success(
       locale === "ar"
         ? "تم تحديث الملف الشخصي بنجاح!"
         : "Profile updated successfully!",

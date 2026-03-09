@@ -39,13 +39,15 @@ export async function apiClient<T = unknown>({
 
   const isFormData = body instanceof FormData;
 
-  console.log(`DEBUG: Making ${method} request to ${url} | Token present: ${!!token}`);
+  console.log(`DEBUG [apiClient]: ${method} ${url} | Token: ${token ? `${token.substring(0, 10)}...` : "MISSING"}`);
 
   const fetchOptions: RequestInit = {
     method,
     headers: {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(!isFormData && method !== "GET" && method !== "DELETE"
+        ? { "Content-Type": "application/json" }
+        : {}),
+      ...(token ? { Authorization: `Bearer ${token.trim()}` } : {}),
       ...headers,
     },
   };
@@ -75,10 +77,9 @@ export async function apiClient<T = unknown>({
   }
 
   if (!response.ok) {
-    // Avoid noisy logs for common auth-expiry cases (handled upstream).
-    if (response.status !== 401) {
-      console.error("API Error Details:", JSON.stringify(data, null, 2));
-    }
+    // Log API error details to help debugging
+    console.error(`API Error (${response.status} ${url}):`, JSON.stringify(data, null, 2));
+
     const errorMsg =
       data.errors?.message?.[0] ||
       data.message ||

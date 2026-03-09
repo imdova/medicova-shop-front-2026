@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { LanguageType } from "@/util/translations";
 import { useSession } from "next-auth/react";
 import { Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
 import {
   getProducts,
   deleteProduct,
@@ -56,9 +57,10 @@ export default function ProductListPanel({
       await deleteProduct(product._id, token);
       console.log("DEBUG: Delete successful for", product._id);
       setProducts((prev) => prev.filter((p) => p._id !== product._id));
+      toast.success(isAr ? "تم الحذف بنجاح" : "Deleted successfully");
     } catch (err: any) {
       console.error("Delete failed:", err);
-      alert(
+      toast.error(
         isAr
           ? `فشل الحذف: ${err?.message || ""}`
           : `Delete failed: ${err?.message || ""}`,
@@ -75,9 +77,10 @@ export default function ProductListPanel({
           p._id === product._id ? { ...p, approved: !p.approved } : p,
         ),
       );
+      toast.success(isAr ? "تم تحديث الحالة" : "Status updated successfully");
     } catch (err) {
       console.error("Approve toggle failed:", err);
-      alert(isAr ? "فشل تغيير الحالة" : "Status update failed");
+      toast.error(isAr ? "فشل تغيير الحالة" : "Status update failed");
     } finally {
       setApprovingId(null);
     }

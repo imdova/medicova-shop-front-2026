@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
 import { Switch } from "@/components/shared/switch";
+import toast from "react-hot-toast";
 
 type SettingsNavKey =
   | "general"
@@ -38,7 +39,9 @@ export default function SiteSettingsPage() {
   const [timezone, setTimezone] = useState("GMT (Europe/London)");
   const [language, setLanguage] = useState("English");
   const [currency, setCurrency] = useState("GBP (£)");
-  const [seoTitle, setSeoTitle] = useState("Medicova | Medical Education & Resources");
+  const [seoTitle, setSeoTitle] = useState(
+    "Medicova | Medical Education & Resources",
+  );
   const [metaDescription, setMetaDescription] = useState("");
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [studentRegistration, setStudentRegistration] = useState(true);
@@ -58,19 +61,51 @@ export default function SiteSettingsPage() {
       {
         label: isArabic ? "إدارة الموقع" : "SITE MANAGEMENT",
         items: [
-          { key: "general" as const, label: isArabic ? "عام" : "General", icon: Settings2 },
-          { key: "branding" as const, label: isArabic ? "الهوية" : "Branding", icon: BadgeCheck },
-          { key: "integrations" as const, label: isArabic ? "التكاملات" : "Integrations", icon: Link2 },
-          { key: "marketing" as const, label: isArabic ? "التسويق والتحليلات" : "Marketing & Analytics", icon: Megaphone },
-          { key: "security" as const, label: isArabic ? "الأمان" : "Security", icon: Lock },
-          { key: "maintenance" as const, label: isArabic ? "الصيانة" : "Maintenance", icon: Wrench },
+          {
+            key: "general" as const,
+            label: isArabic ? "عام" : "General",
+            icon: Settings2,
+          },
+          {
+            key: "branding" as const,
+            label: isArabic ? "الهوية" : "Branding",
+            icon: BadgeCheck,
+          },
+          {
+            key: "integrations" as const,
+            label: isArabic ? "التكاملات" : "Integrations",
+            icon: Link2,
+          },
+          {
+            key: "marketing" as const,
+            label: isArabic ? "التسويق والتحليلات" : "Marketing & Analytics",
+            icon: Megaphone,
+          },
+          {
+            key: "security" as const,
+            label: isArabic ? "الأمان" : "Security",
+            icon: Lock,
+          },
+          {
+            key: "maintenance" as const,
+            label: isArabic ? "الصيانة" : "Maintenance",
+            icon: Wrench,
+          },
         ],
       },
       {
         label: isArabic ? "متقدم" : "ADVANCED",
         items: [
-          { key: "api" as const, label: isArabic ? "وصول API" : "API Access", icon: Globe },
-          { key: "webhooks" as const, label: isArabic ? "Webhooks" : "Webhooks", icon: LayoutGrid },
+          {
+            key: "api" as const,
+            label: isArabic ? "وصول API" : "API Access",
+            icon: Globe,
+          },
+          {
+            key: "webhooks" as const,
+            label: isArabic ? "Webhooks" : "Webhooks",
+            icon: LayoutGrid,
+          },
         ],
       },
     ],
@@ -92,14 +127,19 @@ export default function SiteSettingsPage() {
   };
 
   const onSave = () => {
-    alert(isArabic ? "تم حفظ التغييرات" : "Changes saved");
+    toast.success(isArabic ? "تم حفظ التغييرات" : "Changes saved");
   };
 
   return (
-    <div dir={isArabic ? "rtl" : "ltr"} className="animate-in fade-in space-y-6 duration-700">
+    <div
+      dir={isArabic ? "rtl" : "ltr"}
+      className="animate-in fade-in space-y-6 duration-700"
+    >
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <span className="truncate">{isArabic ? "إعدادات الموقع" : "Site Settings"}</span>
+          <span className="truncate">
+            {isArabic ? "إعدادات الموقع" : "Site Settings"}
+          </span>
           <ChevronRight className="h-4 w-4" />
           <span className="truncate">{isArabic ? "عام" : "General"}</span>
         </div>
@@ -131,14 +171,18 @@ export default function SiteSettingsPage() {
                       onClick={() => setActive(it.key)}
                       className={[
                         "flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition",
-                        isActive ? "bg-emerald-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-50",
+                        isActive
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "text-slate-700 hover:bg-slate-50",
                       ].join(" ")}
                     >
                       <span className="flex items-center gap-2">
                         <span
                           className={[
                             "flex h-8 w-8 items-center justify-center rounded-lg transition",
-                            isActive ? "bg-white/15" : "bg-slate-100 text-slate-600",
+                            isActive
+                              ? "bg-white/15"
+                              : "bg-slate-100 text-slate-600",
                           ].join(" ")}
                         >
                           <Icon className="h-4 w-4" />
@@ -298,7 +342,9 @@ export default function SiteSettingsPage() {
                     type="file"
                     accept="image/png,image/x-icon"
                     className="hidden"
-                    onChange={(e) => setFaviconFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) =>
+                      setFaviconFile(e.target.files?.[0] ?? null)
+                    }
                   />
                   {faviconLabel}
                 </label>
@@ -308,7 +354,8 @@ export default function SiteSettingsPage() {
                 <div className="mb-1 flex items-center justify-between text-[12px] font-semibold text-slate-600">
                   <span>{isArabic ? "عنوان SEO" : "SEO Title"}</span>
                   <span className="text-[11px] font-semibold text-slate-400">
-                    {Math.min(60, seoTitle.length)}/60 {isArabic ? "موصى به" : "recommended"}
+                    {Math.min(60, seoTitle.length)}/60{" "}
+                    {isArabic ? "موصى به" : "recommended"}
                   </span>
                 </div>
                 <Input
@@ -325,7 +372,11 @@ export default function SiteSettingsPage() {
                 <textarea
                   value={metaDescription}
                   onChange={(e) => setMetaDescription(e.target.value)}
-                  placeholder={isArabic ? "وصف مختصر لنتائج البحث" : "Brief description for search results"}
+                  placeholder={
+                    isArabic
+                      ? "وصف مختصر لنتائج البحث"
+                      : "Brief description for search results"
+                  }
                   className="min-h-[110px] w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 />
               </div>
@@ -356,7 +407,9 @@ export default function SiteSettingsPage() {
               </div>
               <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/40 px-4 py-3">
                 <div className="text-sm font-semibold text-slate-800">
-                  {isArabic ? "السماح بتسجيل الطلاب" : "Allow Student Registration"}
+                  {isArabic
+                    ? "السماح بتسجيل الطلاب"
+                    : "Allow Student Registration"}
                 </div>
                 <Switch
                   checked={studentRegistration}

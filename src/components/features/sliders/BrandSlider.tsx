@@ -91,7 +91,7 @@ const BrandSlider = ({ brands, locale = "en" }: BrandSliderProps) => {
         >
           {brands.map((brand, index) => {
             const localizedSlug =
-              isRTL && brand.slugAr ? brand.slugAr : brand.slug;
+              (isRTL && brand.slugAr ? brand.slugAr : brand.slug) || brand.id;
             return (
               <Link
                 key={index}

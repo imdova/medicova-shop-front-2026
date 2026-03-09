@@ -91,7 +91,7 @@ export default function OverviewPanel({ locale }: { locale: LanguageType }) {
         <div className="space-y-8 lg:col-span-8">
           <div className="overflow-hidden rounded-3xl border border-white/60 bg-white/70 p-6 shadow-xl shadow-gray-200/30 backdrop-blur-xl">
             <GenericChart
-              chartTitle={t("salesOverview")}
+              chartTitle={`${t("salesOverview")} 2`}
               data={dummyChartData}
               showCards={true}
               cards={dummyCards}

@@ -40,7 +40,32 @@ export interface CreateProductPayload {
     valueEn?: string;
     valueAr?: string;
   }>;
+  shippingCostInsideCairo?: number;
+  shippingCostRegion1?: number;
+  shippingCostRegion2?: number;
+  isPhysicalProduct?: boolean;
+  packages?: Array<{
+    name: string;
+    weightKg?: number;
+    lengthCm?: number;
+    widthCm?: number;
+    heightCm?: number;
+  }>;
+  shipping?: {
+    isPhysicalProduct: boolean;
+    shippingCostInsideCairo: number;
+    shippingCostRegion1: number;
+    shippingCostRegion2: number;
+    packages: Array<{
+      name: string;
+      weightKg?: number;
+      lengthCm?: number;
+      widthCm?: number;
+      heightCm?: number;
+    }>;
+  };
   store: string;
+  sellerId?: string | null;
   createdBy: "seller" | "admin";
   media: {
     featuredImages?: string;
@@ -54,7 +79,6 @@ export interface CreateProductPayload {
   rate: number;
 }
 
-// Lightweight type for the admin products table
 export interface ApiProduct {
   _id: string;
   nameEn: string;
@@ -64,26 +88,63 @@ export interface ApiProduct {
   approved: boolean;
   createdBy?: string;
   store?: string;
+  sku?: string;
   media?: {
     featuredImages?: string;
     galleryImages?: string[];
   };
+  // root level fields often found in list responses
+  category?: string | any;
+  subcategory?: string | any;
+  childCategory?: string | any;
+  brand?: string | any;
+  price?: number;
+  sale_price?: number;
+  salePrice?: number;
+  original_price?: number;
+  originalPrice?: number;
+  del_price?: number;
+  stock?: number;
+  // nested fields used in creation/details
   pricing?: {
     originalPrice?: number;
     salePrice?: number;
+    sale_price?: number;
+    original_price?: number;
   };
   classification?: {
     category?: string;
     subcategory?: string;
+    childCategory?: string;
     brand?: string;
   };
+  identity?: {
+    sku?: string;
+    skuMode?: string;
+  };
+  inventory?: {
+    trackStock?: boolean;
+    stockQuantity?: number;
+    stockStatus?: string;
+  };
+  stockQuantity?: number;
+  shipping_fee?: number;
+  shippingMethod?: any;
+  orders?: number;
+  totalOrders?: number;
+  total_orders?: number;
+  revenue?: number;
+  total_revenue?: number;
+  totalRevenue?: number;
   createdAt?: string;
+  sellerId?: string | null;
   seller?: {
     _id?: string;
     name?: string;
     firstName?: string;
     lastName?: string;
   } | string;
+  sellers?: any; // sometimes plural in dummy data
 }
 
 export async function createProduct(payload: CreateProductPayload, token?: string) {

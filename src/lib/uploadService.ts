@@ -1,3 +1,5 @@
+import { apiClient } from "./apiClient";
+
 export interface UploadResponse {
   status: string;
   data: {
@@ -8,8 +10,7 @@ export interface UploadResponse {
 }
 
 /**
- * Uploads an image file via the local Next.js API proxy route.
- * This avoids SSL/CORS issues by proxying through the server.
+ * Uploads an image file directly via apiClient.
  * @param file The image file to upload
  * @param category The upload category (e.g. "category", "brand")
  * @param token Optional authorization token
@@ -25,21 +26,14 @@ export async function uploadImage(
   formData.append("category", category);
 
   try {
-    const response = await fetch("/api/upload", {
+    const data = await apiClient<any>({
+      endpoint: "/upload/images",
       method: "POST",
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
       body: formData,
+      token,
     });
 
-    const data: any = await response.json();
-
     console.log("Upload response:", JSON.stringify(data));
-
-    if (!response.ok) {
-      throw new Error(data.message || `Upload failed with status ${response.status}`);
-    }
 
     // Try to extract the image URL from various possible response shapes
     const url =

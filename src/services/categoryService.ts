@@ -93,11 +93,12 @@ export async function getSubCategories(categoryId?: string, token?: string): Pro
   }
 }
 
-export async function getAllSubCategoryChildren(): Promise<MultiCategory[]> {
+export async function getAllSubCategoryChildren(token?: string): Promise<MultiCategory[]> {
   try {
     const res = await apiClient<any>({
       endpoint: "/subcategory-child",
       method: "GET",
+      token,
     });
 
     const items = res.data?.subcategoryChildren || [];
@@ -107,3 +108,4 @@ export async function getAllSubCategoryChildren(): Promise<MultiCategory[]> {
     return [];
   }
 }
+

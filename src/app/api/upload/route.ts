@@ -14,11 +14,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Build the backend URL
-    let baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || "";
-    baseUrl = baseUrl.replace(/\/$/, "");
-    if (!baseUrl.includes("/api/v1")) {
-      baseUrl = `${baseUrl}/api/v1`;
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL;
+    if (baseUrl) {
+      baseUrl = baseUrl.replace(/\/$/, "");
+      if (!baseUrl.includes("/api/v1")) {
+        baseUrl = `${baseUrl}/api/v1`;
+      }
+    } else {
+      baseUrl = "https://shop-api.medicova.net/api/v1";
     }
 
 
@@ -39,9 +42,14 @@ export async function POST(req: NextRequest) {
         ...(authHeader ? { Authorization: authHeader } : {}),
       },
       body: backendFormData,
+    }).catch((err) => {
+      console.error(`DEBUG: Upload Proxy fetch failed for ${baseUrl}/upload/images:`, err);
+      throw err;
     });
 
+    console.log(`DEBUG: Upload Proxy backend status: ${backendResponse.status} for ${baseUrl}/upload/images`);
     const responseText = await backendResponse.text();
+    console.log("DEBUG: Upload Proxy backend response text sample:", responseText.substring(0, 200));
 
     let data: any;
     try {

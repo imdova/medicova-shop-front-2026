@@ -1,12 +1,10 @@
 import { z } from "zod";
 
-// Localized text schema
 export const localizedTextSchema = z.object({
   en: z.string().min(1, "English text is required"),
   ar: z.string().min(1, "Arabic text is required"),
 });
 
-// Bilingual specification schema
 export const bilingualSpecificationSchema = z.object({
   keyEn: z.string().optional(),
   keyAr: z.string().optional(),
@@ -14,18 +12,14 @@ export const bilingualSpecificationSchema = z.object({
   valueAr: z.string().optional(),
 });
 
-// Base product schema with all optional fields for form state
 export const productSchema = z.object({
-  // Highlights (Array of strings now)
   highlightsEn: z.array(z.string()).default([]),
   highlightsAr: z.array(z.string()).default([]),
 
-  // Titles & Slugs
   title: localizedTextSchema,
   slugEn: z.string().optional(),
   slugAr: z.string().optional(),
 
-  // Identity
   identity: z
     .object({
       sku: z.string().optional(),
@@ -33,7 +27,6 @@ export const productSchema = z.object({
     })
     .default({ sku: "", skuMode: "manual" }),
 
-  // Classification
   classification: z
     .object({
       category: z.string().optional(),
@@ -46,7 +39,6 @@ export const productSchema = z.object({
     })
     .default({ productType: "Physical Product" }),
 
-  // Descriptions
   descriptions: z
     .object({
       descriptionEn: z.string().min(1, "Description is required"),
@@ -54,7 +46,6 @@ export const productSchema = z.object({
     })
     .default({ descriptionEn: "", descriptionAr: "" }),
 
-  // Pricing
   pricing: z
     .object({
       originalPrice: z.number().min(0).default(0),
@@ -64,7 +55,6 @@ export const productSchema = z.object({
     })
     .default({ originalPrice: 0, salePrice: 0 }),
 
-  // Inventory
   inventory: z
     .object({
       trackStock: z.boolean().default(true),
@@ -75,16 +65,15 @@ export const productSchema = z.object({
     })
     .default({ trackStock: true, stockQuantity: 0, stockStatus: "in_stock" }),
 
-  // Meta info
   createdBy: z.enum(["admin", "seller"]).default("seller"),
   store: z.string().optional(),
+  sellerId: z.string().optional(),
   approved: z.boolean().default(true),
-  rate: z.number().min(0).max(5).default(0),
+  rate: z.number().min(0).max(5).default(4),
 
-  // Media
   media: z
     .object({
-      featuredImages: z.string().optional(), // Main image URL
+      featuredImages: z.string().optional(),
       galleryImages: z.array(z.string()).default([]),
       productVideo: z
         .object({
@@ -95,10 +84,8 @@ export const productSchema = z.object({
     })
     .default({ galleryImages: [] }),
 
-  // Tags
   tags: z.array(z.string()).default([]),
 
-  // Variants (Complex)
   productVariants: z
     .array(
       z.object({
@@ -128,17 +115,41 @@ export const productSchema = z.object({
     )
     .default([]),
 
-  // Bilingual specifications
+  shipping: z
+    .object({
+      shippingCostInsideCairo: z.number().min(0).default(0),
+      shippingCostRegion1: z.number().min(0).default(0),
+      shippingCostRegion2: z.number().min(0).default(0),
+      isPhysicalProduct: z.boolean().default(true),
+    })
+    .default({
+      shippingCostInsideCairo: 0,
+      shippingCostRegion1: 0,
+      shippingCostRegion2: 0,
+      isPhysicalProduct: true,
+    }),
+
+  packages: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        name: z.string(),
+        weightKg: z.number().optional(),
+        lengthCm: z.number().optional(),
+        widthCm: z.number().optional(),
+        heightCm: z.number().optional(),
+      }),
+    )
+    .default([]),
+
   specifications: z.array(bilingualSpecificationSchema).default([]),
 
-  // Actual Files for upload (Step 2)
   images: z
     .array(z.union([z.string(), z.instanceof(File)]))
     .max(10, "Maximum 10 images allowed")
     .default([]),
 });
 
-// Step-specific validation schemas
 export const step1CoreSchema = z.object({
   classification: z.object({
     category: z.string().min(1, "Category is required"),
@@ -171,12 +182,9 @@ export const step3MediaSchema = z.object({
 });
 
 export const step4SettingsSchema = z.object({
-  // Optional step: variants/tags
   productVariants: z.array(z.any()).optional(),
   tags: z.array(z.string()).optional(),
 });
-
-// Back-compat alias (existing imports)
 export const step3SettingsSchema = step3MediaSchema;
 
 export type ProductFormData = z.infer<typeof productSchema>;

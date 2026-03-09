@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/shared/select";
 import { exportConfigs } from "@/constants/configs";
+import toast from "react-hot-toast";
 
 /* -------------------------------------------------------------------------- */
 /*                              Translation Texts                             */
@@ -204,7 +205,7 @@ export default function ExportDetailPage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    alert(t.exportSuccess);
+    toast.success(t.exportSuccess);
   };
 
   const getTranslatedColumnName = (columnKey: string) =>

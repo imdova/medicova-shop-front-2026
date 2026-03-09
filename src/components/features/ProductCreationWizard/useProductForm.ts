@@ -14,6 +14,8 @@ import {
   CreateProductPayload,
 } from "@/services/productService";
 import { uploadImage } from "@/lib/uploadService";
+import { createVariant } from "@/services/variantService";
+import toast from "react-hot-toast";
 
 export type Step =
   | "step1_core"
@@ -61,6 +63,13 @@ export const useProductForm = (productId?: string) => {
     productVariants: [],
     tags: [],
     specifications: [],
+    shipping: {
+      shippingCostInsideCairo: 0,
+      shippingCostRegion1: 0,
+      shippingCostRegion2: 0,
+      isPhysicalProduct: true,
+    },
+    packages: [],
     images: [],
     createdBy: "seller",
     approved: false,
@@ -92,121 +101,125 @@ export const useProductForm = (productId?: string) => {
     }
   }, []);
 
-  // Load existing product data when in edit mode
   useEffect(() => {
     if (!productId || !token) return;
     setIsLoading(true);
     getProductById(productId, token)
       .then((data: any) => {
         if (data) {
-          // Log full response so we can see every field the API returns
-          console.log(
-            "DEBUG: Full product data for edit:",
-            JSON.stringify(data, null, 2),
-          );
+          console.log("DEBUG: Full product data for edit:", JSON.stringify(data, null, 2));
+          const d = data;
 
-          const d = data; // shorthand
+          // 1. Synthesize Specifications from Variants if they are missing
+          const existingSpecs = d.specifications || [];
+          const hasSizes = existingSpecs.some((s: any) => (s?.keyEn || "").toLowerCase() === "sizes");
+          const hasColors = existingSpecs.some((s: any) => (s?.keyEn || "").toLowerCase() === "colors");
+          const productVariants = d.variants || [];
+
+          let synthesizedSpecs = [...existingSpecs];
+          
+          if (productVariants.length > 0 && (!hasSizes || !hasColors)) {
+            console.log("DEBUG: Synthesizing specifications from variants...");
+            const allSizes = new Set<string>();
+            const allColors = new Map<string, string>(); // Name -> Hex
+            const stockEntries: any[] = [];
+
+            productVariants.forEach((v: any) => {
+              if (typeof v === "string") return;
+              
+              const options = v.optionsEn || v.option_values || [];
+              const type = (v.type || v.option_type || "").toLowerCase();
+
+              options.forEach((opt: any) => {
+                const name = opt.optionName || opt.label?.en || opt.color || opt.hex || "";
+                const stock = opt.stock || 0;
+                
+                if (type === "dropdown" || v.nameEn === "Size") {
+                  allSizes.add(name);
+                  stockEntries.push({ size: name, stock });
+                } else if (type === "color" || v.nameEn === "Color") {
+                  const hex = opt.color || opt.hex || "";
+                  allColors.set(name, hex);
+                  stockEntries.push({ color: name, colorHex: hex, stock });
+                }
+              });
+            });
+
+            if (allSizes.size > 0 && !hasSizes) {
+              const val = Array.from(allSizes).join(", ");
+              synthesizedSpecs.push({ keyEn: "Sizes", keyAr: "المقاسات", valueEn: val, valueAr: val });
+            }
+            if (allColors.size > 0 && !hasColors) {
+              const val = Array.from(allColors.entries()).map(([n, h]) => `${n}|${h}`).join("; ");
+              synthesizedSpecs.push({ keyEn: "Colors", keyAr: "الألوان", valueEn: val, valueAr: val });
+            }
+            if (stockEntries.length > 0 && !existingSpecs.some((s: any) => (s?.keyEn || "").toLowerCase() === "variant stock")) {
+              const val = JSON.stringify(stockEntries);
+              synthesizedSpecs.push({ keyEn: "Variant Stock", keyAr: "مخزون المتغيرات", valueEn: val, valueAr: val });
+            }
+          }
 
           setProduct((prev) => ({
             ...prev,
             title: { en: d.nameEn || "", ar: d.nameAr || "" },
             slugEn: d.slugEn || "",
             slugAr: d.slugAr || "",
-
-            // Descriptions — handle nested or flat
             descriptions: {
-              descriptionEn:
-                d.descriptions?.descriptionEn || d.descriptionEn || "",
-              descriptionAr:
-                d.descriptions?.descriptionAr || d.descriptionAr || "",
+              descriptionEn: d.descriptions?.descriptionEn || d.descriptionEn || "",
+              descriptionAr: d.descriptions?.descriptionAr || d.descriptionAr || "",
             },
-
-            // Identity — handle nested or flat
             identity: {
               sku: d.identity?.sku || d.sku || "",
               skuMode: d.identity?.skuMode || d.skuMode || "manual",
             },
-
-            // Classification — handle nested object or direct IDs
             classification: {
-              category:
-                d.classification?.category?._id ||
-                d.classification?.category ||
-                d.categoryId ||
-                d.category ||
-                "",
-              subcategory:
-                d.classification?.subcategory?._id ||
-                d.classification?.subcategory ||
-                d.subcategoryId ||
-                d.subcategory ||
-                "",
-              childCategory:
-                d.classification?.childCategory?._id ||
-                d.classification?.childCategory ||
-                d.childCategoryId ||
-                d.childCategory ||
-                "",
-              brand:
-                d.classification?.brand?._id ||
-                d.classification?.brand ||
-                d.brandId ||
-                d.brand ||
-                "",
-              productType:
-                d.classification?.productType ||
-                d.productType ||
-                "Physical Product",
+              category: d.classification?.category?._id || d.classification?.category || d.category?._id || d.category || "",
+              subcategory: d.classification?.subcategory?._id || d.classification?.subcategory || d.subcategory?._id || d.subcategory || "",
+              childCategory: d.classification?.childCategory?._id || d.classification?.childCategory || d.childCategory?._id || d.childCategory || "",
+              brand: d.classification?.brand?._id || d.classification?.brand || d.brand?._id || d.brand || "",
+              productType: d.classification?.productType || d.productType || "Physical Product",
             },
-
-            // Pricing — handle nested or flat
             pricing: {
-              originalPrice:
-                d.pricing?.originalPrice ?? d.originalPrice ?? d.price ?? 0,
-              salePrice:
-                d.pricing?.salePrice ?? d.salePrice ?? d.sale_price ?? 0,
+              originalPrice: d.pricing?.originalPrice ?? d.originalPrice ?? d.price ?? 0,
+              salePrice: d.pricing?.salePrice ?? d.salePrice ?? d.sale_price ?? 0,
               startDate: d.pricing?.startDate || d.startDate || null,
               endDate: d.pricing?.endDate || d.endDate || null,
             },
-
-            // Inventory — handle nested or flat
             inventory: d.inventory || {
               trackStock: d.trackStock ?? true,
               stockQuantity: d.stockQuantity ?? d.stock ?? 0,
               stockStatus: d.stockStatus || "in_stock",
             },
-
             highlightsEn: d.highlightsEn || [],
             highlightsAr: d.highlightsAr || [],
-            specifications: d.specifications || [],
-
-            // Images — handle both media-wrapped and flat
-            images:
-              d.media?.galleryImages ||
-              d.galleryImages ||
-              (d.media?.featuredImages
-                ? [d.media.featuredImages]
-                : d.featuredImages
-                  ? [d.featuredImages]
-                  : []),
+            specifications: synthesizedSpecs,
+            shipping: {
+              shippingCostInsideCairo: d.shipping?.shippingCostInsideCairo ?? d.shippingCostInsideCairo ?? 0,
+              shippingCostRegion1: d.shipping?.shippingCostRegion1 ?? d.shippingCostRegion1 ?? 0,
+              shippingCostRegion2: d.shipping?.shippingCostRegion2 ?? d.shippingCostRegion2 ?? 0,
+              isPhysicalProduct: d.shipping?.isPhysicalProduct ?? d.isPhysicalProduct ?? true,
+            },
+            packages: (d.shipping?.packages || d.packages || []).map((p: any) => ({
+              id: p?.id || p?._id || "",
+              name: p?.name || "",
+              weightKg: p?.weightKg,
+              lengthCm: p?.lengthCm,
+              widthCm: p?.widthCm,
+              heightCm: p?.heightCm,
+            })),
+            images: d.media?.galleryImages || d.galleryImages || (d.media?.featuredImages ? [d.media.featuredImages] : d.featuredImages ? [d.featuredImages] : []),
             media: {
               galleryImages: d.media?.galleryImages || d.galleryImages || [],
               productVideo: d.media?.productVideo || d.productVideo,
             },
-
             approved: d.approved ?? false,
-            store:
-              d.store?._id ||
-              d.store ||
-              (typeof d.seller === "string" ? d.seller : d.seller?._id || ""),
+            store: d.store?._id || d.store || (typeof d.seller === "string" ? d.seller : d.seller?._id || ""),
             createdBy: d.createdBy || "seller",
             rate: d.rate || 0,
-
-            // Variants — pre-fill productVariants if they exist
-            productVariants: (d.variants || []).map((v: any) =>
-              typeof v === "string" ? { id: v } : { id: v._id || v.id, ...v },
+            productVariants: productVariants.map((v: any) =>
+              typeof v === "string" ? { id: v } : { id: v._id || v.id, ...v }
             ),
-            tags: d.tags || [],
+            tags: (d.tags || []).map((t: any) => (typeof t === "string" ? t : t._id || t.id)),
           }));
         }
       })
@@ -261,107 +274,233 @@ export const useProductForm = (productId?: string) => {
         }
 
         // 2. Map form state to API payload
-        const mappedSpecifications = (product.specifications || []).map(
-          ({ _id, ...rest }: any) => {
-            const key = String(rest?.keyEn || "").toLowerCase();
-            if (key === "color images") {
-              try {
-                const raw = String(rest?.valueEn || "").trim();
-                if (!raw) return rest;
-                const parsed = JSON.parse(raw);
-                if (!Array.isArray(parsed)) return rest;
-                const next = parsed.map((e: any) => {
-                  const color = typeof e?.color === "string" ? e.color : "";
-                  const colorHex =
-                    typeof e?.colorHex === "string" ? e.colorHex : undefined;
-                  const idx = Number.isFinite(Number(e?.imageIdx))
-                    ? Number(e.imageIdx)
-                    : undefined;
-                  const imageUrl =
-                    typeof e?.imageUrl === "string" ? e.imageUrl : undefined;
-                  const urlFromIdx =
-                    idx !== undefined && imageUrls[idx]
-                      ? imageUrls[idx]
-                      : undefined;
-                  return {
-                    color,
-                    colorHex,
-                    imageUrl: urlFromIdx || imageUrl,
-                  };
-                });
-                return {
-                  ...rest,
-                  valueEn: JSON.stringify(next),
-                  valueAr: JSON.stringify(next),
-                };
-              } catch {
-                return rest;
-              }
-            }
-            return rest;
-          },
+        const cleanedSpecifications: any[] = [];
+        const apiVariants: any[] = [];
+
+        // Extract Sizes and Colors to variants if they exist
+        const sizesSpec = (product.specifications || []).find(
+          (s: any) => (s?.keyEn || "").toLowerCase() === "sizes",
+        );
+        const colorsSpec = (product.specifications || []).find(
+          (s: any) => (s?.keyEn || "").toLowerCase() === "colors",
+        );
+        const variantStockSpec = (product.specifications || []).find(
+          (s: any) => (s?.keyEn || "").toLowerCase() === "variant stock",
         );
 
-        const payload: CreateProductPayload = {
-          nameEn: product.title.en,
-          nameAr: product.title.ar,
-          slugEn:
-            product.slugEn || product.title.en.toLowerCase().replace(/ /g, "-"),
-          slugAr: product.slugAr || product.title.ar.replace(/ /g, "-"),
-          highlightsEn: product.highlightsEn,
-          highlightsAr: product.highlightsAr,
-          identity: {
-            sku: product.identity.sku || "",
-            skuMode: product.identity.skuMode,
-          },
-          classification: {
-            category: product.classification.category || "",
-            subcategory: product.classification.subcategory || "",
-            childCategory: product.classification.childCategory || "",
-            brand: product.classification.brand || "",
-            productType: product.classification.productType,
-          },
-          descriptions: product.descriptions,
-          pricing: {
-            originalPrice: product.pricing.originalPrice,
-            salePrice: product.pricing.salePrice,
-            startDate: product.pricing.startDate || null,
-            endDate: product.pricing.endDate || null,
-          },
-          inventory: product.inventory,
-          variants: product.productVariants
-            .map((v) => v.id)
-            .filter(Boolean) as string[],
-          // Strip _id from specifications (MongoDB adds them but API rejects them)
-          // Also resolve any "Color Images" indices to uploaded URLs
-          specifications: mappedSpecifications as any,
-          store: product.store || (user as any)?.storeId || "",
-          createdBy: user?.role === "admin" ? "admin" : "seller",
+        let sizeStockMap: Record<string, number> = {};
+        let colorStockMap: Record<string, number> = {};
+        if (variantStockSpec) {
+          try {
+            const entries = JSON.parse(variantStockSpec.valueEn || "[]");
+            if (Array.isArray(entries)) {
+              entries.forEach((e: any) => {
+                if (e.size) {
+                  sizeStockMap[e.size] =
+                    (sizeStockMap[e.size] || 0) + (e.stock || 0);
+                }
+                if (e.color) {
+                  colorStockMap[e.color] =
+                    (colorStockMap[e.color] || 0) + (e.stock || 0);
+                }
+              });
+            }
+          } catch (e) {
+            console.error("Failed to parse variant stock", e);
+          }
+        }
+
+        if (sizesSpec) {
+          const sizes = (sizesSpec.valueEn || "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          if (sizes.length) {
+            apiVariants.push({
+              nameEn: "Size",
+              nameAr: "المقاس",
+              type: "dropdown",
+              optionsEn: sizes.map((s) => ({
+                optionName: s,
+                price: 0,
+                stock: sizeStockMap[s] || 0,
+              })),
+              optionsAr: sizes.map((s) => ({
+                optionName: s,
+                price: 0,
+                stock: sizeStockMap[s] || 0,
+              })),
+            });
+          }
+        }
+
+        if (colorsSpec) {
+          const colors = (colorsSpec.valueEn || "")
+            .split(";")
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .map((token) => {
+              const [name, hex] = token.split("|").map((x) => x.trim());
+              return { name, hex };
+            });
+          if (colors.length) {
+            apiVariants.push({
+              nameEn: "Color",
+              nameAr: "اللون",
+              type: "color",
+              optionsEn: colors.map((c) => ({
+                optionName: c.name,
+                price: 0,
+                stock: colorStockMap[c.name] || 0,
+              })),
+              optionsAr: colors.map((c) => ({
+                optionName: c.name,
+                price: 0,
+                stock: colorStockMap[c.name] || 0,
+              })),
+            });
+          }
+        }
+
+        // Add Variant Stock as a spec or transform if needed? 
+        // User said "Sizes Colors الخ" (and others) should be in variants. 
+        // For now, I'll keep Variant Stock in specs if it's JSON, 
+        // but Sizes and Colors are now in variants.
+
+        (product.specifications || []).forEach((s: any) => {
+          const key = (s?.keyEn || "").toLowerCase();
+          if (key !== "sizes" && key !== "colors" && key !== "shipping required" && key !== "shipping fees" && key !== "shipping packages") {
+            // Resolve "Color Images" index to URL
+            if (key === "color images") {
+              try {
+                const raw = (s.valueEn || "").trim();
+                if (raw) {
+                  const parsed = JSON.parse(raw);
+                  if (Array.isArray(parsed)) {
+                    const resolved = parsed.map((e: any) => {
+                      const idx = Number(e?.imageIdx);
+                      const urlFromIdx = Number.isFinite(idx) ? imageUrls[idx] : undefined;
+                      return { ...e, imageUrl: urlFromIdx || e.imageUrl };
+                    });
+                    cleanedSpecifications.push({
+                      ...s,
+                      valueEn: JSON.stringify(resolved),
+                      valueAr: JSON.stringify(resolved),
+                    });
+                    return;
+                  }
+                }
+              } catch (err) { /* ignore */ }
+            }
+            // Strip _id
+            const { _id, ...rest } = s;
+            cleanedSpecifications.push(rest);
+          }
+        });
+
+        // Create variants on the fly if needed
+        const finalVariantIds: string[] = [];
+
+        if (apiVariants.length) {
+          console.log("DEBUG: Automating variant creation...");
+          const targetIsAdmin = user?.role === "admin";
+          const targetStoreId = product.store || (user as any)?.storeId || "";
+          const targetCreatedBy = targetIsAdmin ? "admin" : "seller";
+
+          for (const vData of apiVariants) {
+            try {
+              const v = await createVariant({
+                ...vData,
+                createdBy: targetCreatedBy,
+                storeId: targetStoreId,
+              }, token);
+              if (v.id) finalVariantIds.push(v.id);
+            } catch (vErr) {
+              console.error("Variant creation failed:", vErr);
+            }
+          }
+        }
+
+        const randomSuffix = Math.random().toString(36).substring(2, 7);
+        const nameEn = product.title.en || "product";
+        const nameAr = product.title.ar || "منتج";
+
+        const slugEnBase = product.slugEn || nameEn.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        const slugArBase = product.slugAr || nameAr.trim().replace(/\s+/g, "-");
+
+        const finalSlugEn = isEditMode ? slugEnBase : `${slugEnBase}-${randomSuffix}`;
+        const finalSlugAr = isEditMode ? slugArBase : `${slugArBase}-${randomSuffix}`;
+
+          const finalStoreId = product.store || (user as any)?.storeId || "";
+          const finalCreatedBy = (user?.role === "admin") ? "admin" : "seller";
+
+          const payload: CreateProductPayload = {
+            nameEn: product.title.en,
+            nameAr: product.title.ar,
+            slugEn: finalSlugEn,
+            slugAr: finalSlugAr,
+            highlightsEn: product.highlightsEn,
+            highlightsAr: product.highlightsAr,
+            identity: {
+              sku: product.identity.sku || "",
+              skuMode: product.identity.skuMode,
+            },
+            classification: {
+              category: product.classification.category || "",
+              subcategory: product.classification.subcategory || "",
+              childCategory: product.classification.childCategory || "",
+              brand: product.classification.brand || "",
+              productType: product.classification.productType,
+            },
+            descriptions: product.descriptions,
+            pricing: {
+              originalPrice: product.pricing.originalPrice,
+              salePrice: product.pricing.salePrice,
+              startDate: product.pricing.startDate || null,
+              endDate: product.pricing.endDate || null,
+            },
+            inventory: product.inventory,
+            variants: finalVariantIds.length
+              ? finalVariantIds
+              : (product.productVariants
+                  .map((v) => v.id)
+                  .filter(Boolean) as string[]),
+            specifications: cleanedSpecifications,
+            store: finalStoreId,
+            sellerId: product.store || null,
+            createdBy: finalCreatedBy as "admin" | "seller",
           media: {
             featuredImages: imageUrls[0] || "",
             galleryImages: imageUrls,
-            // Strip _id from productVideo (MongoDB adds it but API rejects it)
             productVideo: product.media?.productVideo
               ? (({ _id, ...rest }: any) => rest)(product.media.productVideo)
               : undefined,
           },
-          approved: false,
-          rate: product.rate || 0,
-        } as any;
+          approved: product.approved ?? true,
+          rate: product.rate || 4,
+          shipping: {
+            isPhysicalProduct: product.shipping?.isPhysicalProduct ?? true,
+            shippingCostInsideCairo: product.shipping?.shippingCostInsideCairo ?? 0,
+            shippingCostRegion1: product.shipping?.shippingCostRegion1 ?? 0,
+            shippingCostRegion2: product.shipping?.shippingCostRegion2 ?? 0,
+            packages: (product.packages || []).map((p) => {
+              const { id, ...rest } = p as any;
+              return rest;
+            }),
+          },
+        };
+
+        console.log("DEBUG: Final Product Payload:", JSON.stringify(payload, null, 2));
 
         let response;
         if (isEditMode && productId) {
           response = await updateProductApi(productId, payload, token);
           console.log("Product Updated Successfully:", response);
-          alert(
-            isEditMode
-              ? "Product Updated Successfully!"
-              : "Product Created Successfully!",
-          );
+          toast.success("Product Updated Successfully!");
         } else {
           response = await createProduct(payload, token);
           console.log("Product Created Successfully:", response);
-          alert("Product Created Successfully!");
+          toast.success("Product Created Successfully!");
         }
         setIsSubmitting(false);
         return true;
@@ -398,5 +537,7 @@ export const useProductForm = (productId?: string) => {
     updateProduct,
     validateStep,
     goToStep,
+    token,
+    userRole: user?.role,
   };
 };

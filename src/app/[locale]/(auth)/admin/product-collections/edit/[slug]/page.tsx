@@ -3,7 +3,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { uploadImage } from "@/lib/uploadService";
 import { LogOutIcon, X, Upload, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
@@ -30,10 +31,16 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { Product } from "@/types/product";
-import { ProductCollections } from "@/constants/productCollection";
-import NotFound from "@/app/[locale]/not-found";
-import { products } from "@/data";
 import Loading from "@/app/[locale]/loading";
+import toast from "react-hot-toast";
+import {
+  getProductCollectionById,
+  updateProductCollection,
+  CreateProductCollectionPayload,
+} from "@/services/productCollectionService";
+import { getProducts, ApiProduct } from "@/services/productService";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 // ---------------- Schema & Types ----------------
 const messages = {
@@ -45,35 +52,27 @@ const messages = {
     en: "Name in Arabic is required",
     ar: "الاسم بالعربية مطلوب",
   },
-  slug_required: {
-    en: "Slug is required",
+  link_required: {
+    en: "Link is required",
     ar: "الرابط مطلوب",
   },
-  slug_invalid: {
-    en: "Slug must contain only lowercase letters, numbers, and hyphens",
+  link_invalid: {
+    en: "Link must contain only lowercase letters, numbers, and hyphens",
     ar: "يجب أن يحتوي الرابط على أحرف صغيرة وأرقام وشرطات فقط",
   },
 };
 
 const collectionSchema = z.object({
-  name: z.object({
-    en: z.string().min(1, messages.name_en_required.en),
-    ar: z.string().min(1, messages.name_ar_required.ar),
-  }),
-  slug: z
+  nameEn: z.string().min(1, messages.name_en_required.en),
+  nameAr: z.string().min(1, messages.name_ar_required.ar),
+  link: z
     .string()
-    .min(1, messages.slug_required.en)
-    .regex(/^[a-z0-9-]+$/, messages.slug_invalid.en),
-  description: z.object({
-    en: z.string().optional(),
-    ar: z.string().optional(),
-  }),
-  short_description: z.object({
-    en: z.string().optional(),
-    ar: z.string().optional(),
-  }),
-  status: z.enum(["published", "draft", "pending"]),
-  is_featured: z.boolean(),
+    .min(1, messages.link_required.en)
+    .regex(/^[a-z0-9-]+$/, messages.link_invalid.en),
+  descriptionEn: z.string().optional(),
+  descriptionAr: z.string().optional(),
+  status: z.enum(["published", "draft"]),
+  isFeatures: z.boolean(),
   image: z.string().optional(),
 });
 
@@ -83,66 +82,151 @@ type CollectionFormData = z.infer<typeof collectionSchema>;
 export default function EditCollectionPage() {
   const locale = useAppLocale();
   const params = useParams();
-  const collectionSlug = params.slug as string;
+  const router = useRouter();
+  const isAr = locale === "ar";
+  const collectionId = params.slug as string;
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const user = (session as any)?.user;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isFetchingProducts, setIsFetchingProducts] = useState(false);
 
-  // Find collection by slug
-  const collection = ProductCollections.find((c) => c.id === collectionSlug);
+  // Fetch live products
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchProducts = async () => {
+      setIsFetchingProducts(true);
+      try {
+        const apiProducts = await getProducts(token);
+        // Map ApiProduct to frontend Product type
+        const mapped: Product[] = apiProducts.map((p) => ({
+          id: p._id,
+          sku: p.sku || "",
+          brand: { id: "", name: { en: "", ar: "" }, image: "", slug: "" }, // Placeholder
+          model: { en: "", ar: "" },
+          category: { id: "", title: { en: "", ar: "" }, image: "", slug: "" }, // Placeholder
+          title: { en: p.nameEn, ar: p.nameAr },
+          price: p.price || p.pricing?.originalPrice || 0,
+          images:
+            p.media?.galleryImages ||
+            (p.media?.featuredImages ? [p.media.featuredImages] : []),
+          rating: 0,
+          isBestSaller: false,
+          reviewCount: 0,
+          description: { en: "", ar: "" },
+          features: { en: [], ar: [] },
+          overview_desc: { en: "", ar: "" },
+          highlights: { en: [], ar: [] },
+          specifications: [],
+          shipping_fee: 0,
+          shippingMethod: { en: "standard", ar: "قياسي" },
+          weightKg: 0,
+          sellers: {
+            id: "",
+            name: "",
+            rating: 0,
+            isActive: true,
+            returnPolicy: { en: "", ar: "" },
+            itemShown: 0,
+            status: { en: "", ar: "" },
+          },
+        }));
+        setAllProducts(mapped);
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+      } finally {
+        setIsFetchingProducts(false);
+      }
+    };
+
+    fetchProducts();
+  }, [token]);
 
   // Initialize form with collection data
   const form = useForm<CollectionFormData>({
     resolver: zodResolver(collectionSchema),
     defaultValues: {
-      name: { en: "", ar: "" },
-      slug: "",
-      description: { en: "", ar: "" },
-      short_description: { en: "", ar: "" },
+      nameEn: "",
+      nameAr: "",
+      link: "",
+      descriptionEn: "",
+      descriptionAr: "",
       status: "published",
-      is_featured: false,
+      isFeatures: false,
       image: "",
     },
   });
-
-  // Load collection data based on slug
+  // Load collection data based on ID
   useEffect(() => {
-    if (collection) {
-      // Set form values
-      form.reset({
-        name: collection.name,
-        slug: collection.slug,
-        description: collection.description,
-        short_description: collection.short_description,
-        status: collection.status,
-        is_featured: collection.is_featured,
-        image: collection.image,
-      });
+    if (!token) return;
+    const fetchCollection = async () => {
+      setIsFetching(true);
+      try {
+        const data = await getProductCollectionById(collectionId, token);
+        if (data) {
+          form.reset({
+            nameEn: data.nameEn || data.name.en || "",
+            nameAr: data.nameAr || data.name.ar || "",
+            link: data.link || data.slug || "",
+            descriptionEn: data.descriptionEn || data.description.en || "",
+            descriptionAr: data.descriptionAr || data.description.ar || "",
+            status: data.status === "published" ? "published" : "draft",
+            isFeatures: data.isFeatures || data.is_featured || false,
+            image: data.image || "",
+          });
+          setSelectedImage(data.image || "");
+          setSelectedProducts(data.products || []);
+          console.log("DEBUG: Collection products loaded:", data.products);
+        } else {
+          toast.error(
+            isAr ? "لم يتم العثور على المجموعة" : "Collection not found",
+          );
+          router.push("/admin/product-collections");
+        }
+      } catch (error) {
+        console.error("Failed to fetch collection:", error);
+        toast.error(
+          isAr
+            ? "فشل في تحميل بيانات المجموعة"
+            : "Failed to load collection data",
+        );
+      } finally {
+        setIsFetching(false);
+      }
+    };
 
-      setSelectedImage(collection.image);
-      setSelectedProducts(collection.products || []);
-    }
-  }, [collection, form]);
+    fetchCollection();
+  }, [collectionId, form, router, isAr, token]);
 
   // Filter products based on search
-  const filteredProducts = products
-    .filter(
-      (product) =>
-        product.title[locale]
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        product.title.en.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
-    .filter(
-      (product) =>
-        !selectedProducts.some((selected) => selected.id === product.id),
-    );
+  const filteredProducts = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const selectedIds = new Set(selectedProducts.map((p) => p.id));
+
+    if (!q) {
+      return allProducts.filter((p) => !selectedIds.has(p.id)).slice(0, 8);
+    }
+
+    return allProducts
+      .filter((p) => !selectedIds.has(p.id))
+      .filter((p) => {
+        const title = (p.title?.[locale] || p.title?.en || "").toLowerCase();
+        const sku = (p.sku || "").toLowerCase();
+        return title.includes(q) || sku.includes(q);
+      })
+      .slice(0, 8);
+  }, [locale, searchTerm, selectedProducts, allProducts]);
 
   // Add product to collection
   const addProduct = (product: Product) => {
@@ -184,7 +268,7 @@ export default function EditCollectionPage() {
   // Simulate image upload
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      alert(
+      toast.error(
         locale === "en"
           ? "Please select an image file"
           : "يرجى اختيار ملف صورة",
@@ -195,13 +279,13 @@ export default function EditCollectionPage() {
     setIsUploading(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const imageUrl = URL.createObjectURL(file);
+      const imageUrl = await uploadImage(file, "product-collections", token);
       setSelectedImage(imageUrl);
       form.setValue("image", imageUrl);
+      toast.success(locale === "en" ? "Image uploaded" : "تم رفع الصورة");
     } catch (error) {
       console.error("Upload failed:", error);
-      alert(locale === "en" ? "Upload failed" : "فشل التحميل");
+      toast.error(locale === "en" ? "Upload failed" : "فشل التحميل");
     } finally {
       setIsUploading(false);
     }
@@ -239,33 +323,51 @@ export default function EditCollectionPage() {
   };
 
   const handleNameChange = (lang: "en" | "ar", value: string) => {
-    form.setValue(`name.${lang}`, value);
-
-    if (lang === "en" && value.trim()) {
-      const generatedSlug = generateSlug(value);
-      form.setValue("slug", generatedSlug);
-    }
+    // form.setValue(`name.${lang}`, value); // This line is no longer needed due to schema change
+    // Removed slug generation logic as per instruction
+    // if (lang === "en" && value.trim()) {
+    //   const generatedSlug = generateSlug(value);
+    //   form.setValue("slug", generatedSlug);
+    // }
   };
 
   const onSubmit = async (data: CollectionFormData) => {
+    setIsUploading(true);
     try {
-      const collectionData = {
-        ...data,
-        products: selectedProducts,
-        id: collection?.id,
+      const payload: Partial<CreateProductCollectionPayload> = {
+        sellerId:
+          user?.role === "admin"
+            ? (user as any)?.id || "507f1f77bcf86cd799439011"
+            : (user as any)?.storeId || (user as any)?.id || null,
+        nameAr: data.nameAr,
+        nameEn: data.nameEn,
+        link: data.link.startsWith("http")
+          ? data.link
+          : `https://medicova.net/collections/${data.link}`,
+        descriptionAr: data.descriptionAr || "",
+        descriptionEn: data.descriptionEn || "",
+        products: selectedProducts.map((p) => p.id),
+        descriptiveData: selectedProducts[0]?.id || "",
+        status: data.status === "published",
+        images: data.image ? [data.image] : [],
+        isFeatures: data.isFeatures,
       };
 
-      console.log("Updated Collection Data:", collectionData);
-      // Add your API update call here
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await updateProductCollection(collectionId, payload, token);
 
-      alert(
-        locale === "en"
-          ? "Collection updated successfully!"
-          : "تم تحديث المجموعة بنجاح!",
+      toast.success(
+        isAr ? "تم تحديث المجموعة بنجاح" : "Collection updated successfully",
       );
-    } catch (error) {
+
+      router.push("/admin/product-collections");
+    } catch (error: any) {
       console.error("Update failed", error);
+      toast.error(
+        error.message ||
+          (isAr ? "فشل تحديث المجموعة" : "Failed to update collection"),
+      );
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -273,7 +375,7 @@ export default function EditCollectionPage() {
     en: {
       title: "Edit Product Collection",
       name: "Name",
-      slug: "Slug",
+      link: "Link", // Changed from slug
       description: "Description",
       short_description: "Short description",
       publish: "Publish",
@@ -310,7 +412,7 @@ export default function EditCollectionPage() {
     ar: {
       title: "تحرير مجموعة المنتجات",
       name: "الاسم",
-      slug: "الرابط",
+      link: "الرابط", // Changed from slug
       description: "الوصف",
       short_description: "وصف مختصر",
       publish: "نشر",
@@ -346,12 +448,8 @@ export default function EditCollectionPage() {
     },
   }[locale];
 
-  if (isUploading) {
+  if (isUploading || isFetching) {
     return <Loading />;
-  }
-
-  if (!collection) {
-    return <NotFound />;
   }
 
   return (
@@ -362,10 +460,10 @@ export default function EditCollectionPage() {
           {t.title}
         </p>
         <Link
-          href={`/admin/product-collections/${collection.id}/overview`}
+          href={`/admin/product-collections/${collectionId}/overview`}
           className="mt-1 block text-2xl font-bold text-gray-900 underline-offset-4 hover:text-primary hover:underline"
         >
-          {collection.name[locale]}
+          {form.watch("nameEn") || form.watch("nameAr") || "..."}
         </Link>
         <p className="mt-1 text-sm text-gray-600">
           {locale === "en" ? "Editing collection" : "جاري تحرير المجموعة"}
@@ -384,19 +482,16 @@ export default function EditCollectionPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <FormField
-                    name="name.en"
+                    name="nameEn"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          {t.name} ({t.english})
-                        </FormLabel>
+                        <FormLabel>Name (En)</FormLabel>
                         <FormControl>
                           <Input
                             placeholder={`${t.name} (${t.english})`}
                             {...field}
                             onChange={(e) => {
                               field.onChange(e);
-                              handleNameChange("en", e.target.value);
                             }}
                           />
                         </FormControl>
@@ -405,19 +500,16 @@ export default function EditCollectionPage() {
                     )}
                   />
                   <FormField
-                    name="name.ar"
+                    name="nameAr"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          {t.name} ({t.arabic})
-                        </FormLabel>
+                        <FormLabel>Name (Ar)</FormLabel>
                         <FormControl>
                           <Input
                             placeholder={`${t.name} (${t.arabic})`}
                             {...field}
                             onChange={(e) => {
                               field.onChange(e);
-                              handleNameChange("ar", e.target.value);
                             }}
                           />
                         </FormControl>
@@ -428,20 +520,22 @@ export default function EditCollectionPage() {
                 </div>
               </Card>
 
-              {/* Slug Section */}
+              {/* Slug & Link Section */}
               <Card className="p-6">
-                <FormField
-                  name="slug"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base">{t.slug} *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="collection-slug" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField
+                    name="link"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base">link *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="collection-link" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </Card>
 
               {/* Products Section */}
@@ -467,27 +561,52 @@ export default function EditCollectionPage() {
                   {isSearchOpen && (
                     <div className="scroll-bar-minimal absolute z-10 mt-1 max-h-[400px] w-full overflow-y-auto rounded-md border bg-white shadow-lg">
                       {filteredProducts.length > 0 ? (
-                        filteredProducts.map((product) => (
+                        filteredProducts.map((product, idx) => (
                           <div
-                            key={product.id}
+                            key={product.id || `prod-${idx}`}
                             className="flex cursor-pointer items-center gap-2 px-4 py-2 hover:bg-gray-100"
                             onClick={() => addProduct(product)}
                           >
                             <Image
                               src={
-                                product.images?.[0] ?? "/images/placeholder.png"
+                                (product as any).media?.featuredImages ||
+                                (product as any).media?.galleryImages?.[0] ||
+                                (product as any).images?.[0] ||
+                                "/images/placeholder.png"
                               }
                               width={100}
                               height={100}
-                              alt={product.title[locale] ?? "Product Desc"}
+                              alt={
+                                isAr
+                                  ? (product as any).nameAr ||
+                                    (product as any).title?.ar ||
+                                    (product as any).name ||
+                                    (product as any).title?.en ||
+                                    "—"
+                                  : (product as any).nameEn ||
+                                    (product as any).title?.en ||
+                                    (product as any).name ||
+                                    (product as any).title?.ar ||
+                                    "—"
+                              }
                               className="h-8 w-8 rounded-md object-cover"
                             />
                             <div>
                               <div className="text-sm font-medium">
-                                {product.title[locale]}
+                                {isAr
+                                  ? (product as any).nameAr ||
+                                    (product as any).title?.ar ||
+                                    (product as any).name ||
+                                    (product as any).title?.en ||
+                                    "—"
+                                  : (product as any).nameEn ||
+                                    (product as any).title?.en ||
+                                    (product as any).name ||
+                                    (product as any).title?.ar ||
+                                    "—"}
                               </div>
                               <div className="text-sm text-gray-600">
-                                ${product.price}
+                                SKU: {product.sku || "—"}
                               </div>
                             </div>
                           </div>
@@ -505,40 +624,63 @@ export default function EditCollectionPage() {
                 <div>
                   <h4 className="mb-3 font-medium">{t.selected_products}</h4>
                   {selectedProducts.length > 0 ? (
-                    <div className="space-y-2">
-                      {selectedProducts.map((product) => (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {selectedProducts.map((product, idx) => (
                         <div
-                          key={product.id}
-                          className="flex justify-between rounded-md border p-3 sm:items-center"
+                          key={product.id || `sel-${idx}`}
+                          className="group relative flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-emerald-200 hover:shadow-md"
                         >
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-gray-50 ring-1 ring-gray-100">
                             <Image
                               src={
-                                product.images?.[0] ?? "/images/placeholder.png"
+                                (product as any).media?.featuredImages ||
+                                (product as any).media?.galleryImages?.[0] ||
+                                (product as any).images?.[0] ||
+                                "/images/placeholder.png"
                               }
-                              width={100}
-                              height={100}
-                              alt={product.title[locale]}
-                              className="h-12 w-12 rounded-md object-cover"
+                              width={64}
+                              height={64}
+                              alt={
+                                isAr
+                                  ? (product as any).nameAr ||
+                                    (product as any).title?.ar ||
+                                    (product as any).name ||
+                                    (product as any).title?.en ||
+                                    "—"
+                                  : (product as any).nameEn ||
+                                    (product as any).title?.en ||
+                                    (product as any).name ||
+                                    (product as any).title?.ar ||
+                                    "—"
+                              }
+                              className="h-full w-full object-cover"
                             />
-                            <div>
-                              <div className="font-medium">
-                                {product.title[locale]}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                ${product.price} • {product.sku}
-                              </div>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-bold text-gray-900">
+                              {isAr
+                                ? (product as any).nameAr ||
+                                  (product as any).title?.ar ||
+                                  (product as any).name ||
+                                  (product as any).title?.en ||
+                                  "—"
+                                : (product as any).nameEn ||
+                                  (product as any).title?.en ||
+                                  (product as any).name ||
+                                  (product as any).title?.ar ||
+                                  "—"}
+                            </div>
+                            <div className="mt-0.5 text-xs font-medium text-gray-500">
+                              SKU: {product.sku || "—"}
                             </div>
                           </div>
-                          <Button
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
                             onClick={() => removeProduct(product.id)}
-                            className="text-red-600 hover:text-red-700"
+                            className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-400 shadow-sm ring-1 ring-gray-200 transition-all hover:bg-red-50 hover:text-red-500 hover:ring-red-200"
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            <Trash2 className="h-3 w-3" />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -556,12 +698,10 @@ export default function EditCollectionPage() {
                   <h3 className="text-lg font-semibold">{t.description}</h3>
                 </div>
                 <FormField
-                  name="description.en"
+                  name="descriptionEn"
                   render={({ field }) => (
                     <FormItem className="mb-4">
-                      <FormLabel>
-                        {t.description} ({t.english})
-                      </FormLabel>
+                      <FormLabel>Description (En)</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder={`${t.description} (${t.english})`}
@@ -574,61 +714,14 @@ export default function EditCollectionPage() {
                   )}
                 />
                 <FormField
-                  name="description.ar"
+                  name="descriptionAr"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>
-                        {t.description} ({t.arabic})
-                      </FormLabel>
+                      <FormLabel>Description (Ar)</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder={`${t.description} (${t.arabic})`}
                           rows={4}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </Card>
-
-              {/* Short Description Section - Bilingual */}
-              <Card className="p-6">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold">
-                    {t.short_description}
-                  </h3>
-                </div>
-                <FormField
-                  name="short_description.en"
-                  render={({ field }) => (
-                    <FormItem className="mb-4">
-                      <FormLabel>
-                        {t.short_description} ({t.english})
-                      </FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder={`${t.short_description} (${t.english})`}
-                          rows={2}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  name="short_description.ar"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {t.short_description} ({t.arabic})
-                      </FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder={`${t.short_description} (${t.arabic})`}
-                          rows={2}
                           {...field}
                         />
                       </FormControl>
@@ -661,42 +754,31 @@ export default function EditCollectionPage() {
                 </CardContent>
               </Card>
 
-              {/* Status */}
-              <Card className="p-4">
-                <FormField
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base">{t.status} *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t.status} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="published">
-                            {t.published}
-                          </SelectItem>
-                          <SelectItem value="draft">{t.draft}</SelectItem>
-                          <SelectItem value="pending">{t.pending}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </Card>
-
               {/* Featured Switch */}
               <Card className="p-4">
-                <div className="flex items-center justify-between">
-                  <FormLabel className="text-base">{t.is_featured}</FormLabel>
+                <div className="mb-4 flex items-center justify-between">
+                  <FormLabel className="text-base">status</FormLabel>
                   <FormField
-                    name="is_featured"
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Switch
+                            checked={field.value === "published"}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked ? "published" : "draft")
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <FormLabel className="text-base">isFeatures</FormLabel>
+                  <FormField
+                    name="isFeatures"
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
@@ -714,7 +796,7 @@ export default function EditCollectionPage() {
               {/* Image Section */}
               <Card className="p-4">
                 <CardHeader className="p-0 pb-4 font-semibold">
-                  {t.image}
+                  images
                 </CardHeader>
                 <CardContent className="space-y-4 p-0">
                   <input

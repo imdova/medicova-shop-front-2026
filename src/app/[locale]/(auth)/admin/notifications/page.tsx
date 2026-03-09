@@ -13,6 +13,7 @@ import {
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import StatusToggle from "@/components/shared/Buttons/StatusToggle";
+import toast from "react-hot-toast";
 
 export default function NotificationsPage() {
   const t = useTranslations("admin");
@@ -212,7 +213,7 @@ export default function NotificationsPage() {
             </div>
 
             <button
-              onClick={() => alert("Preferences saved successfully")}
+              onClick={() => toast.success("Preferences saved successfully")}
               className="shadow-primary/20 group flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary text-sm font-black text-white shadow-xl transition-all duration-300 hover:brightness-110 active:scale-95"
             >
               <Save

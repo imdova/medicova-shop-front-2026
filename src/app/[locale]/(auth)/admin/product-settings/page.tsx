@@ -15,7 +15,7 @@ import {
 
 import CategoryPanelWrapper from "./components/CategoryPanelWrapper";
 import TagsListPanel from "../products-tags/page";
-import ProductOptionsListPanel from "../product-options/page";
+import ProductVariantsPanel from "./components/ProductVariantsPanel";
 
 type TabType =
   | "categories"
@@ -37,7 +37,7 @@ function isCategoryTab(tab: TabType): tab is CategoryTab {
   return (categoryTabs as readonly string[]).includes(tab);
 }
 
-export default function ProductSettingsPage() {
+export default function ProductSettings2Page() {
   const t = useTranslations("admin");
   const [activeTab, setActiveTab] = useState<TabType>("categories");
 
@@ -118,7 +118,7 @@ export default function ProductSettingsPage() {
             <CategoryPanelWrapper activeTab={activeTab} />
           )}
           {activeTab === "tags" && <TagsListPanel />}
-          {activeTab === "variants" && <ProductOptionsListPanel />}
+          {activeTab === "variants" && <ProductVariantsPanel />}
         </div>
       </div>
     </div>

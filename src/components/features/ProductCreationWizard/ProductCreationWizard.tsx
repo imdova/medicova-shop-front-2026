@@ -29,6 +29,8 @@ const ProductCreationWizard = ({
     isSubmitting,
     isLoading,
     isEditMode,
+    token,
+    userRole,
   } = useProductForm(productId);
 
   const steps = [
@@ -40,8 +42,7 @@ const ProductCreationWizard = ({
     {
       key: "step2_pricing" as const,
       number: 2,
-      label:
-        locale === "ar" ? "التسعير والوسائط" : "Pricing & Media",
+      label: locale === "ar" ? "التسعير والوسائط" : "Pricing & Media",
     },
     {
       key: "step3_media" as const,
@@ -64,6 +65,8 @@ const ProductCreationWizard = ({
       errors,
       onUpdate: updateProduct,
       locale,
+      token,
+      userRole,
     };
 
     switch (currentStep) {

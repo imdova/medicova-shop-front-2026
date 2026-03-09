@@ -5,7 +5,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMemo, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
-import { ArrowLeft, CheckCircle2, ImageIcon, Search, Upload, X } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ImageIcon,
+  Search,
+  Upload,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
 import { Textarea } from "@/components/shared/textarea";
@@ -21,7 +28,17 @@ import { useAppLocale } from "@/hooks/useAppLocale";
 import { Switch } from "@/components/shared/switch";
 import Image from "next/image";
 import { Product } from "@/types/product";
-import { products as allProducts } from "@/data";
+import { products as mockProducts } from "@/data";
+import toast from "react-hot-toast";
+import {
+  createProductCollection,
+  CreateProductCollectionPayload,
+} from "@/services/productCollectionService";
+import { getProducts, ApiProduct } from "@/services/productService";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useEffect } from "react";
+import { uploadImage } from "@/lib/uploadService";
 
 function formatCurrency(value: number, locale: string) {
   const loc = locale === "ar" ? "ar-EG" : "en-US";
@@ -43,35 +60,27 @@ const messages = {
     en: "Name in Arabic is required",
     ar: "الاسم بالعربية مطلوب",
   },
-  slug_required: {
-    en: "Slug is required",
+  link_required: {
+    en: "Link is required",
     ar: "الرابط مطلوب",
   },
-  slug_invalid: {
-    en: "Slug must contain only lowercase letters, numbers, and hyphens",
+  link_invalid: {
+    en: "Link must contain only lowercase letters, numbers, and hyphens",
     ar: "يجب أن يحتوي الرابط على أحرف صغيرة وأرقام وشرطات فقط",
   },
 };
 
 const collectionSchema = z.object({
-  name: z.object({
-    en: z.string().min(1, messages.name_en_required.en),
-    ar: z.string().min(1, messages.name_ar_required.ar),
-  }),
-  slug: z
+  nameEn: z.string().min(1, messages.name_en_required.en),
+  nameAr: z.string().min(1, messages.name_ar_required.ar),
+  link: z
     .string()
-    .min(1, messages.slug_required.en)
-    .regex(/^[a-z0-9-]+$/, messages.slug_invalid.en),
-  description: z.object({
-    en: z.string().optional(),
-    ar: z.string().optional(),
-  }),
-  short_description: z.object({
-    en: z.string().optional(),
-    ar: z.string().optional(),
-  }),
-  status: z.enum(["published", "draft", "pending"]),
-  is_featured: z.boolean(),
+    .min(1, messages.link_required.en)
+    .regex(/^[a-z0-9-]+$/, messages.link_invalid.en),
+  descriptionEn: z.string().optional(),
+  descriptionAr: z.string().optional(),
+  status: z.enum(["published", "draft"]),
+  isFeatures: z.boolean(),
   image: z.string().optional(),
 });
 
@@ -80,24 +89,83 @@ type CollectionFormData = z.infer<typeof collectionSchema>;
 // ---------------- Component ----------------
 export default function CreateCollectionPage() {
   const locale = useAppLocale();
+  const router = useRouter();
   const isAr = locale === "ar";
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const user = (session as any)?.user;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
 
   const [productQuery, setProductQuery] = useState("");
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  const [isFetchingProducts, setIsFetchingProducts] = useState(false);
+
+  // Fetch live products
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchProducts = async () => {
+      setIsFetchingProducts(true);
+      try {
+        const apiProducts = await getProducts(token);
+        // Map ApiProduct to frontend Product type
+        const mapped: Product[] = apiProducts.map((p) => ({
+          id: p._id,
+          sku: p.sku || "",
+          brand: { id: "", name: { en: "", ar: "" }, image: "", slug: "" }, // Added slug
+          model: { en: "", ar: "" },
+          category: { id: "", title: { en: "", ar: "" }, image: "", slug: "" }, // Added slug
+          title: { en: p.nameEn, ar: p.nameAr },
+          price: p.price || p.pricing?.originalPrice || 0,
+          images:
+            p.media?.galleryImages ||
+            (p.media?.featuredImages ? [p.media.featuredImages] : []),
+          rating: 0,
+          isBestSaller: false,
+          reviewCount: 0,
+          description: { en: "", ar: "" },
+          features: { en: [], ar: [] },
+          overview_desc: { en: "", ar: "" },
+          highlights: { en: [], ar: [] },
+          specifications: [],
+          shipping_fee: 0,
+          shippingMethod: { en: "standard", ar: "قياسي" },
+          weightKg: 0,
+          sellers: {
+            id: "",
+            name: "",
+            rating: 0,
+            isActive: true,
+            returnPolicy: { en: "", ar: "" },
+            itemShown: 0,
+            status: { en: "", ar: "" },
+          },
+        }));
+        setAllProducts(mapped);
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+      } finally {
+        setIsFetchingProducts(false);
+      }
+    };
+
+    fetchProducts();
+  }, [token]);
 
   const form = useForm<CollectionFormData>({
     resolver: zodResolver(collectionSchema),
     defaultValues: {
-      name: { en: "", ar: "" },
-      slug: "",
-      description: { en: "", ar: "" },
-      short_description: { en: "", ar: "" },
+      nameEn: "",
+      nameAr: "",
+      link: "",
+      descriptionEn: "",
+      descriptionAr: "",
       status: "published",
-      is_featured: false,
+      isFeatures: false,
       image: "",
     },
   });
@@ -113,7 +181,7 @@ export default function CreateCollectionPage() {
   // Simulate image upload
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      alert(
+      toast.error(
         locale === "en"
           ? "Please select an image file"
           : "يرجى اختيار ملف صورة",
@@ -124,27 +192,13 @@ export default function CreateCollectionPage() {
     setIsUploading(true);
 
     try {
-      // Simulate upload delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Create object URL for preview
-      const imageUrl = URL.createObjectURL(file);
+      const imageUrl = await uploadImage(file, "product-collections", token);
       setSelectedImage(imageUrl);
       form.setValue("image", imageUrl);
-
-      // In a real app, you would upload to your server here:
-      // const formData = new FormData();
-      // formData.append('image', file);
-      // const response = await fetch('/api/upload', {
-      //   method: 'POST',
-      //   body: formData
-      // });
-      // const data = await response.json();
-      // setSelectedImage(data.imageUrl);
-      // form.setValue("image", data.imageUrl);
+      toast.success(locale === "en" ? "Image uploaded" : "تم رفع الصورة");
     } catch (error) {
       console.error("Upload failed:", error);
-      alert(locale === "en" ? "Upload failed" : "فشل التحميل");
+      toast.error(locale === "en" ? "Upload failed" : "فشل التحميل");
     } finally {
       setIsUploading(false);
     }
@@ -182,32 +236,61 @@ export default function CreateCollectionPage() {
   };
 
   const handleNameChange = (lang: "en" | "ar", value: string) => {
-    form.setValue(`name.${lang}`, value);
+    const field = lang === "en" ? "nameEn" : "nameAr";
+    form.setValue(field, value);
 
-    // Auto-generate slug from English name
+    // Auto-generate link from English name
     if (lang === "en" && value.trim()) {
-      const generatedSlug = generateSlug(value);
-      form.setValue("slug", generatedSlug);
+      const generatedLink = generateSlug(value);
+      form.setValue("link", generatedLink);
     }
   };
 
   const onSubmit = async (data: CollectionFormData) => {
+    setIsUploading(true);
     try {
-      console.log("Collection Data:", { ...data, products: selectedProducts, scheduleDate });
-      // Add your API call here
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    } catch (error) {
+      const payload: CreateProductCollectionPayload = {
+        sellerId:
+          user?.role === "admin"
+            ? (user as any)?.id || "507f1f77bcf86cd799439011" // Use real user ID if admin, or a valid BSON dummy
+            : (user as any)?.storeId || (user as any)?.id || null,
+        nameAr: data.nameAr,
+        nameEn: data.nameEn,
+        link: data.link.startsWith("http")
+          ? data.link
+          : `https://medicova.net/collections/${data.link}`,
+        descriptionAr: data.descriptionAr || "",
+        descriptionEn: data.descriptionEn || "",
+        products: selectedProducts.map((p) => p.id),
+        descriptiveData: selectedProducts[0]?.id || "",
+        status: data.status === "published",
+        images: data.image ? [data.image] : [],
+        isFeatures: data.isFeatures,
+      };
+
+      await createProductCollection(payload, token);
+
+      toast.success(
+        isAr ? "تم إنشاء المجموعة بنجاح" : "Collection created successfully",
+      );
+
+      router.push("/admin/product-collections");
+    } catch (error: any) {
       console.error("Submission failed", error);
+      toast.error(
+        error.message ||
+          (isAr ? "فشل إنشاء المجموعة" : "Failed to create collection"),
+      );
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const t = {
     en: {
-      title: "Create Product Collection",
       name: "Name",
-      slug: "Slug",
+      link: "Link",
       description: "Description",
-      short_description: "Short description",
       publish: "Publish",
       save: "Save",
       saveExit: "Save & Exit",
@@ -236,9 +319,8 @@ export default function CreateCollectionPage() {
     ar: {
       title: "إنشاء مجموعة منتجات",
       name: "الاسم",
-      slug: "الرابط",
+      link: "الرابط",
       description: "الوصف",
-      short_description: "وصف مختصر",
       publish: "نشر",
       save: "حفظ",
       saveExit: "حفظ وخروج",
@@ -268,22 +350,27 @@ export default function CreateCollectionPage() {
 
   const filteredProducts = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
-    if (!q) return [];
     const selectedIds = new Set(selectedProducts.map((p) => p.id));
+
+    if (!q) {
+      // Show first 8 unselected products if no query
+      return allProducts.filter((p) => !selectedIds.has(p.id)).slice(0, 8);
+    }
+
     return allProducts
       .filter((p) => !selectedIds.has(p.id))
       .filter((p) => {
-        const title = p.title?.[locale] || p.title?.en || "";
-        const sku = p.sku || "";
-        const cat = p.category?.title?.[locale] || p.category?.title?.en || "";
-        return (
-          title.toLowerCase().includes(q) ||
-          sku.toLowerCase().includes(q) ||
-          cat.toLowerCase().includes(q)
-        );
+        const title = (p.title?.[locale] || p.title?.en || "").toLowerCase();
+        const sku = (p.sku || "").toLowerCase();
+        const cat = (
+          p.category?.title?.[locale] ||
+          p.category?.title?.en ||
+          ""
+        ).toLowerCase();
+        return title.includes(q) || sku.includes(q) || cat.includes(q);
       })
       .slice(0, 8);
-  }, [locale, productQuery, selectedProducts]);
+  }, [locale, productQuery, selectedProducts, allProducts]);
 
   const totalInventoryValue = useMemo(() => {
     return selectedProducts.reduce((sum, p) => sum + (p.price || 0), 0);
@@ -323,7 +410,7 @@ export default function CreateCollectionPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="mt-8">
             {/* keep required fields populated while matching the design */}
-            <input type="hidden" value={form.watch("slug") || ""} />
+            <input type="hidden" value={form.watch("link") || ""} />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
               {/* Left */}
@@ -341,11 +428,11 @@ export default function CreateCollectionPage() {
 
                   <div className="mt-5 space-y-5">
                     <FormField
-                      name="name.en"
+                      name="nameEn"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm font-semibold text-slate-700">
-                            {isAr ? "اسم المجموعة" : "Collection Name"}
+                            Name (En)
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -359,8 +446,8 @@ export default function CreateCollectionPage() {
                                 field.onChange(e);
                                 handleNameChange("en", e.target.value);
                                 // auto-fill arabic name for validation if empty
-                                if (!form.getValues("name.ar")) {
-                                  form.setValue("name.ar", e.target.value, {
+                                if (!form.getValues("nameAr")) {
+                                  form.setValue("nameAr", e.target.value, {
                                     shouldValidate: false,
                                   });
                                 }
@@ -372,31 +459,79 @@ export default function CreateCollectionPage() {
                         </FormItem>
                       )}
                     />
-
                     <FormField
-                      name="description.en"
+                      name="nameAr"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm font-semibold text-slate-700">
-                            {isAr ? "الوصف" : "Description"}
+                            Name (Ar)
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder={
+                                isAr
+                                  ? "مثال: مجموعة مستلزمات طبية"
+                                  : "e.g., Premium Antibacterial Surgical Scrubs 2024"
+                              }
+                              {...field}
+                              className="h-11 rounded-xl border-slate-200/80 bg-slate-50/40 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="link"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold text-slate-700">
+                            link *
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="summer-collection"
+                              {...field}
+                              className="h-11 rounded-xl border-slate-200/80 bg-slate-50/40 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      name="descriptionEn"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold text-slate-700">
+                            Description (En)
                           </FormLabel>
                           <FormControl>
                             <Textarea
-                              rows={5}
-                              placeholder={
-                                isAr
-                                  ? "أخبر عملاءك عن هذه المجموعة..."
-                                  : "Tell your customers about this collection. Describe the fabric quality, medical standards, or specific use cases..."
-                              }
+                              rows={4}
+                              placeholder="Tell your customers about this collection in English..."
                               {...field}
-                              onChange={(e) => {
-                                field.onChange(e);
-                                if (!form.getValues("description.ar")) {
-                                  form.setValue("description.ar", e.target.value, {
-                                    shouldValidate: false,
-                                  });
-                                }
-                              }}
+                              className="rounded-xl border-slate-200/80 bg-slate-50/40 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      name="descriptionAr"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold text-slate-700">
+                            Description (Ar)
+                          </FormLabel>
+                          <FormControl>
+                            <Textarea
+                              rows={4}
+                              placeholder="أخبر عملاءك عن هذه المجموعة بالعربية..."
+                              {...field}
                               className="rounded-xl border-slate-200/80 bg-slate-50/40 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
                             />
                           </FormControl>
@@ -433,81 +568,128 @@ export default function CreateCollectionPage() {
                       />
 
                       {filteredProducts.length > 0 ? (
-                        <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-                          {filteredProducts.map((p) => {
-                            const title = p.title?.[locale] || p.title?.en || "—";
+                        <div className="scroll-bar-minimal absolute z-10 mt-1 max-h-[400px] w-full overflow-y-auto rounded-md border bg-white shadow-lg">
+                          {filteredProducts.map((product, idx) => {
+                            const title = isAr
+                              ? (product as any).nameAr ||
+                                (product as any).title?.ar ||
+                                (product as any).name ||
+                                (product as any).title?.en ||
+                                "—"
+                              : (product as any).nameEn ||
+                                (product as any).title?.en ||
+                                (product as any).name ||
+                                (product as any).title?.ar ||
+                                "—";
+                            const imageUrl =
+                              (product as any).media?.featuredImages ||
+                              (product as any).media?.galleryImages?.[0] ||
+                              (product as any).images?.[0] ||
+                              "/images/placeholder.png";
+
                             return (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => addProduct(p)}
-                                className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
+                              <div
+                                key={product.id || `prod-${idx}`}
+                                className="flex cursor-pointer items-center gap-2 px-4 py-2 hover:bg-gray-100"
+                                onClick={() => addProduct(product)}
                               >
-                                <div className="h-9 w-9 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
-                                  {p.images?.[0] ? (
-                                    <Image
-                                      src={p.images[0]}
-                                      alt={title}
-                                      width={36}
-                                      height={36}
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : null}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-slate-900">
+                                <Image
+                                  src={imageUrl}
+                                  width={100}
+                                  height={100}
+                                  alt={title}
+                                  className="h-8 w-8 rounded-md object-cover"
+                                />
+                                <div>
+                                  <div className="text-sm font-medium">
                                     {title}
-                                  </p>
-                                  <p className="mt-0.5 text-xs text-slate-500">
-                                    {p.sku || "—"} • {formatCurrency(p.price || 0, locale)}
-                                  </p>
+                                  </div>
+                                  <div className="text-sm text-gray-600">
+                                    SKU: {product.sku || "—"}
+                                  </div>
                                 </div>
-                              </button>
+                              </div>
                             );
                           })}
+                        </div>
+                      ) : productQuery.length >= 2 ? (
+                        <div className="scroll-bar-minimal absolute z-10 mt-1 w-full rounded-md border bg-white p-4 text-center text-gray-500 shadow-lg">
+                          {isAr
+                            ? "لم يتم العثور على منتجات"
+                            : "No products found"}
                         </div>
                       ) : null}
                     </div>
 
                     {selectedProducts.length > 0 ? (
-                      <>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {selectedProducts.map((p) => {
-                            const title = p.title?.[locale] || p.title?.en || "—";
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                          {selectedProducts.map((p: any) => {
+                            const title = isAr
+                              ? p.nameAr ||
+                                p.title?.ar ||
+                                p.name ||
+                                p.title?.en ||
+                                "—"
+                              : p.nameEn ||
+                                p.title?.en ||
+                                p.name ||
+                                p.title?.ar ||
+                                "—";
+                            const imageUrl =
+                              p.media?.featuredImages ||
+                              p.media?.galleryImages?.[0] ||
+                              p.images?.[0] ||
+                              "";
                             return (
-                              <span
+                              <div
                                 key={p.id}
-                                className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100"
+                                className="group relative flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-all hover:border-emerald-200 hover:shadow-md"
                               >
-                                {title}
+                                <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-50 ring-1 ring-slate-100">
+                                  {imageUrl ? (
+                                    <Image
+                                      src={imageUrl}
+                                      alt={title}
+                                      width={64}
+                                      height={64}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center bg-slate-50">
+                                      <ImageIcon className="h-6 w-6 text-slate-300" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-bold text-slate-900">
+                                    {title}
+                                  </p>
+                                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                                    SKU: {p.sku || "—"}
+                                  </p>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => removeProduct(p.id)}
-                                  className="rounded-full p-0.5 text-emerald-700/80 hover:bg-emerald-100 hover:text-emerald-900"
+                                  className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-red-50 hover:text-red-500 hover:ring-red-200"
                                   aria-label={isAr ? "إزالة" : "Remove"}
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
-                              </span>
+                              </div>
                             );
                           })}
                         </div>
 
-                        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/40 p-5 text-center">
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/40 p-5 text-center">
                           <p className="text-sm font-semibold text-slate-700">
                             {isAr
-                              ? `${selectedProducts.length} منتجات محددة. إجمالي قيمة المخزون: ${formatCurrency(
-                                  totalInventoryValue,
-                                  locale,
-                                )}`
-                              : `${selectedProducts.length} products selected. Total inventory value: ${formatCurrency(
-                                  totalInventoryValue,
-                                  locale,
-                                )}`}
+                              ? `${selectedProducts.length} منتجات محددة.`
+                              : `${selectedProducts.length} products selected.`}
                           </p>
                         </div>
-                      </>
+                      </div>
                     ) : (
                       <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/40 p-5 text-center text-sm font-medium text-slate-500">
                         {isAr
@@ -527,9 +709,9 @@ export default function CreateCollectionPage() {
                     <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                       <ImageIcon className="h-4 w-4" />
                     </div>
-                    <h2 className="text-base font-extrabold text-slate-900">
-                      {isAr ? "صورة الغلاف" : "Cover Image"}
-                    </h2>
+                    <h3 className="text-lg font-semibold text-slate-800">
+                      images
+                    </h3>
                   </div>
 
                   <input
@@ -611,10 +793,7 @@ export default function CreateCollectionPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-800">
-                          {isAr ? "الظهور" : "Visibility"}
-                        </p>
-                        <p className="text-xs font-medium text-slate-500">
-                          {isAr ? "عام على السوق" : "Public on marketplace"}
+                          status
                         </p>
                       </div>
 
@@ -623,18 +802,42 @@ export default function CreateCollectionPage() {
                         render={({ field }) => {
                           const isOn = field.value === "published";
                           return (
-                            <FormItem>
+                            <FormItem className="flex items-center gap-2">
                               <FormControl>
                                 <Switch
                                   checked={isOn}
                                   onCheckedChange={(checked) =>
-                                    field.onChange(checked ? "published" : "draft")
+                                    field.onChange(
+                                      checked ? "published" : "draft",
+                                    )
                                   }
                                 />
                               </FormControl>
+                              <FormLabel className="!mt-0 text-sm font-semibold text-slate-800">
+                                {isAr
+                                  ? "عام على السوق"
+                                  : "Public on marketplace"}
+                              </FormLabel>
                             </FormItem>
                           );
                         }}
+                      />
+
+                      <FormField
+                        name="isFeatures"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2">
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="!mt-0 text-sm font-semibold text-slate-800">
+                              isFeatures
+                            </FormLabel>
+                          </FormItem>
+                        )}
                       />
                     </div>
 

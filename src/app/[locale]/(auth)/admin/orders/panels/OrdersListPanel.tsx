@@ -33,7 +33,8 @@ export default function OrdersListPanel({
 
   function hashToNumber(input: string) {
     let hash = 0;
-    for (let i = 0; i < input.length; i++) hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+    for (let i = 0; i < input.length; i++)
+      hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
     return hash;
   }
 
@@ -56,20 +57,31 @@ export default function OrdersListPanel({
   function formatDateLabel(raw: string) {
     // raw like "15/5/2025" (d/m/yyyy)
     const parts = raw.split("/").map((x) => Number.parseInt(x, 10));
-    const d = parts.length === 3 ? new Date(parts[2]!, (parts[1] || 1) - 1, parts[0] || 1) : new Date();
+    const d =
+      parts.length === 3
+        ? new Date(parts[2]!, (parts[1] || 1) - 1, parts[0] || 1)
+        : new Date();
     const loc = locale === "ar" ? "ar-EG" : "en-US";
-    return new Intl.DateTimeFormat(loc, { month: "short", day: "2-digit", year: "numeric" }).format(d);
+    return new Intl.DateTimeFormat(loc, {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    }).format(d);
   }
 
   const sellerOptions = useMemo(() => {
-    const unique = Array.from(new Set(orders.map((o) => o.seller))).filter(Boolean);
+    const unique = Array.from(new Set(orders.map((o) => o.seller))).filter(
+      Boolean,
+    );
     return unique.slice(0, 12);
   }, []);
 
   const enriched = useMemo(() => {
     return orders.map((o) => {
       const h = hashToNumber(`order:${o.id}:${o.seller}`);
-      const orderIdLabel = o.id.startsWith("#") ? o.id : `#HM-${o.id.replace(/\D+/g, "") || (9000 + (h % 999)).toString()}`;
+      const orderIdLabel = o.id.startsWith("#")
+        ? o.id
+        : `#HM-${o.id.replace(/\D+/g, "") || (9000 + (h % 999)).toString()}`;
       const customerSubtitle =
         h % 4 === 0
           ? isArabic
@@ -133,8 +145,12 @@ export default function OrdersListPanel({
         o.customer.name.toLowerCase().includes(q) ||
         o.customer.location.toLowerCase().includes(q) ||
         o.seller.toLowerCase().includes(q);
-      const sellerOk = sellerFilter === "all" ? true : o.seller === sellerFilter;
-      const fulfillmentOk = fulfillmentFilter === "any" ? true : o.fulfillmentStatus === fulfillmentFilter;
+      const sellerOk =
+        sellerFilter === "all" ? true : o.seller === sellerFilter;
+      const fulfillmentOk =
+        fulfillmentFilter === "any"
+          ? true
+          : o.fulfillmentStatus === fulfillmentFilter;
       const orderTypeOk =
         orderTypeFilter === "b2b-b2c" ? true : o.orderType === orderTypeFilter;
 
@@ -145,7 +161,9 @@ export default function OrdersListPanel({
 
   const metrics = useMemo(() => {
     const totalOrders = enriched.length;
-    const pendingFulfillment = enriched.filter((o) => o.fulfillmentStatus === "processing").length;
+    const pendingFulfillment = enriched.filter(
+      (o) => o.fulfillmentStatus === "processing",
+    ).length;
     const totalRevenue = enriched.reduce((acc, o) => acc + o.totalUSD, 0);
     const avgOrder = totalOrders ? totalRevenue / totalOrders : 0;
     return { totalOrders, pendingFulfillment, totalRevenue, avgOrder };
@@ -158,7 +176,8 @@ export default function OrdersListPanel({
     return filtered.slice(start, start + itemsPerPage);
   }, [filtered, safePage]);
 
-  const showFrom = filtered.length === 0 ? 0 : (safePage - 1) * itemsPerPage + 1;
+  const showFrom =
+    filtered.length === 0 ? 0 : (safePage - 1) * itemsPerPage + 1;
   const showTo = Math.min(safePage * itemsPerPage, filtered.length);
 
   return (
@@ -169,49 +188,44 @@ export default function OrdersListPanel({
           {
             label: isArabic ? "إجمالي الطلبات" : "Total Orders",
             value: metrics.totalOrders.toLocaleString(),
-            delta: "+12.5%",
             icon: ShoppingCart,
             iconTone: "bg-emerald-50 text-emerald-700 ring-emerald-100",
           },
           {
             label: isArabic ? "بانتظار التجهيز" : "Pending Fulfillment",
             value: metrics.pendingFulfillment.toLocaleString(),
-            delta: "-4.2%",
             icon: Package,
             iconTone: "bg-amber-50 text-amber-700 ring-amber-100",
           },
           {
             label: isArabic ? "إجمالي الإيراد" : "Total Revenue",
             value: formatMoneyUSD(metrics.totalRevenue),
-            delta: "+8.1%",
             icon: Receipt,
             iconTone: "bg-emerald-50 text-emerald-700 ring-emerald-100",
           },
           {
             label: isArabic ? "متوسط قيمة الطلب" : "Average Order Value",
             value: formatMoneyUSD(metrics.avgOrder),
-            delta: "+2.4%",
             icon: TrendingUp,
             iconTone: "bg-indigo-50 text-indigo-700 ring-indigo-100",
           },
         ].map((k) => (
-          <div key={k.label} className="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
+          <div
+            key={k.label}
+            className="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm"
+          >
             <div className="flex items-start justify-between">
               <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
                 {k.label}
               </div>
-              <div className={`flex h-9 w-9 items-center justify-center rounded-xl ring-1 ${k.iconTone}`}>
+              <div
+                className={`flex h-9 w-9 items-center justify-center rounded-xl ring-1 ${k.iconTone}`}
+              >
                 <k.icon className="h-4 w-4" />
               </div>
             </div>
             <div className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900">
               {k.value}
-            </div>
-            <div className="mt-1 text-xs font-semibold text-slate-500">
-              <span className={k.delta.startsWith("-") ? "text-rose-600" : "text-emerald-600"}>
-                {k.delta}
-              </span>{" "}
-              {isArabic ? "مقارنة بالشهر الماضي" : "vs last month"}
             </div>
           </div>
         ))}
@@ -253,9 +267,15 @@ export default function OrdersListPanel({
                 onChange={(e) => setDateRange(e.target.value)}
                 className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-10 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
-                <option value="last-30">{isArabic ? "آخر 30 يومًا" : "Last 30 Days"}</option>
-                <option value="last-7">{isArabic ? "آخر 7 أيام" : "Last 7 Days"}</option>
-                <option value="this-month">{isArabic ? "هذا الشهر" : "This Month"}</option>
+                <option value="last-30">
+                  {isArabic ? "آخر 30 يومًا" : "Last 30 Days"}
+                </option>
+                <option value="last-7">
+                  {isArabic ? "آخر 7 أيام" : "Last 7 Days"}
+                </option>
+                <option value="this-month">
+                  {isArabic ? "هذا الشهر" : "This Month"}
+                </option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             </div>
@@ -274,7 +294,9 @@ export default function OrdersListPanel({
                 }}
                 className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
-                <option value="all">{isArabic ? "كل البائعين" : "All Sellers"}</option>
+                <option value="all">
+                  {isArabic ? "كل البائعين" : "All Sellers"}
+                </option>
                 {sellerOptions.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -298,11 +320,21 @@ export default function OrdersListPanel({
                 }}
                 className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
-                <option value="any">{isArabic ? "أي حالة" : "Any Status"}</option>
-                <option value="processing">{isArabic ? "قيد المعالجة" : "Processing"}</option>
-                <option value="shipped">{isArabic ? "تم الشحن" : "Shipped"}</option>
-                <option value="delivered">{isArabic ? "تم التسليم" : "Delivered"}</option>
-                <option value="cancelled">{isArabic ? "ملغي" : "Cancelled"}</option>
+                <option value="any">
+                  {isArabic ? "أي حالة" : "Any Status"}
+                </option>
+                <option value="processing">
+                  {isArabic ? "قيد المعالجة" : "Processing"}
+                </option>
+                <option value="shipped">
+                  {isArabic ? "تم الشحن" : "Shipped"}
+                </option>
+                <option value="delivered">
+                  {isArabic ? "تم التسليم" : "Delivered"}
+                </option>
+                <option value="cancelled">
+                  {isArabic ? "ملغي" : "Cancelled"}
+                </option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             </div>
@@ -321,7 +353,9 @@ export default function OrdersListPanel({
                 }}
                 className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
-                <option value="b2b-b2c">{isArabic ? "B2B و B2C" : "B2B & B2C"}</option>
+                <option value="b2b-b2c">
+                  {isArabic ? "B2B و B2C" : "B2B & B2C"}
+                </option>
                 <option value="b2b">B2B</option>
                 <option value="b2c">B2C</option>
               </select>
@@ -347,14 +381,22 @@ export default function OrdersListPanel({
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                <th className="px-5 py-3">{isArabic ? "رقم الطلب" : "Order ID"}</th>
-                <th className="px-5 py-3">{isArabic ? "العميل" : "Customer"}</th>
+                <th className="px-5 py-3">
+                  {isArabic ? "رقم الطلب" : "Order ID"}
+                </th>
+                <th className="px-5 py-3">
+                  {isArabic ? "العميل" : "Customer"}
+                </th>
                 <th className="px-5 py-3">{isArabic ? "البائع" : "Seller"}</th>
                 <th className="px-5 py-3">{isArabic ? "التاريخ" : "Date"}</th>
                 <th className="px-5 py-3">{isArabic ? "الإجمالي" : "Total"}</th>
                 <th className="px-5 py-3">{isArabic ? "الدفع" : "Payment"}</th>
-                <th className="px-5 py-3">{isArabic ? "التجهيز" : "Fulfillment"}</th>
-                <th className="px-5 py-3 text-right">{isArabic ? "الإجراءات" : "Actions"}</th>
+                <th className="px-5 py-3">
+                  {isArabic ? "التجهيز" : "Fulfillment"}
+                </th>
+                <th className="px-5 py-3 text-right">
+                  {isArabic ? "الإجراءات" : "Actions"}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -378,7 +420,10 @@ export default function OrdersListPanel({
                 const slug = encodeURIComponent(o.id.replace(/^#/, ""));
 
                 return (
-                  <tr key={o.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40">
+                  <tr
+                    key={o.id}
+                    className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40"
+                  >
                     <td className="px-5 py-4">
                       <Link
                         href={`/admin/orders/${slug}`}
@@ -388,16 +433,26 @@ export default function OrdersListPanel({
                       </Link>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="font-extrabold text-slate-900">{o.customer.name}</div>
-                      <div className="text-xs font-semibold text-slate-500">{o.customerSubtitle}</div>
+                      <div className="font-extrabold text-slate-900">
+                        {o.customer.name}
+                      </div>
+                      <div className="text-xs font-semibold text-slate-500">
+                        {o.customerSubtitle}
+                      </div>
                     </td>
-                    <td className="px-5 py-4 text-sm font-semibold text-slate-700">{o.seller}</td>
-                    <td className="px-5 py-4 text-sm font-semibold text-slate-600">{o.dateLabel}</td>
+                    <td className="px-5 py-4 text-sm font-semibold text-slate-700">
+                      {o.seller}
+                    </td>
+                    <td className="px-5 py-4 text-sm font-semibold text-slate-600">
+                      {o.dateLabel}
+                    </td>
                     <td className="px-5 py-4 text-sm font-extrabold text-slate-900">
                       {formatMoneyUSD(o.totalUSD)}
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${paymentTone}`}>
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${paymentTone}`}
+                      >
                         {o.paymentStatus === "paid"
                           ? isArabic
                             ? "مدفوع"
@@ -412,7 +467,9 @@ export default function OrdersListPanel({
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${fulfillmentTone}`}>
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${fulfillmentTone}`}
+                      >
                         {o.fulfillmentStatus === "shipped"
                           ? isArabic
                             ? "تم الشحن"
@@ -460,7 +517,9 @@ export default function OrdersListPanel({
                       {isArabic ? "لا توجد طلبات" : "No orders found"}
                     </div>
                     <div className="mt-1 text-sm font-medium text-slate-500">
-                      {isArabic ? "جرّب تغيير الفلاتر." : "Try changing filters."}
+                      {isArabic
+                        ? "جرّب تغيير الفلاتر."
+                        : "Try changing filters."}
                     </div>
                   </td>
                 </tr>

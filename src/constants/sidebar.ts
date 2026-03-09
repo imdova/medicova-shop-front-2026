@@ -189,17 +189,17 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
       items: [
         {
           title: { en: "All Products", ar: "كل المنتجات" },
-          href: "/admin/products-2",
+          href: "/admin/products",
           icon: PackageSearch,
           subItems: [
             {
               title: { en: "All Products", ar: "كل المنتجات" },
-              href: "/admin/products-2",
+              href: "/admin/products",
               icon: PackageSearch,
             },
             {
               title: { en: "Create Product", ar: "إنشاء منتج" },
-              href: "/admin/create-product-2",
+              href: "/admin/create-product",
               icon: PackagePlus,
             },
             {
@@ -208,7 +208,7 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
             },
             {
               title: { en: "Product Settings", ar: "اعدادات المنتج" },
-              href: "/admin/product-settings-2",
+              href: "/admin/product-settings",
               icon: Settings,
             },
           ],

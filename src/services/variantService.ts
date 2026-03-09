@@ -16,8 +16,27 @@ export type VariantData = {
   optionsEn: VariantOptionValue[];
   optionsAr: VariantOptionValue[];
   createdBy: "admin" | "seller";
-  storeId?: string;
+  store?: string;
 };
+
+function sanitizeVariantData<T extends Partial<VariantData>>(data: T): T {
+  const sanitized = { ...data };
+  const strip = (opt: any) => {
+    const { color, colorHex, hex, ...rest } = opt;
+    return {
+      ...rest,
+      optionName: rest.optionName || color || colorHex || hex || "",
+    };
+  };
+
+  if (sanitized.optionsEn) {
+    sanitized.optionsEn = sanitized.optionsEn.map(strip);
+  }
+  if (sanitized.optionsAr) {
+    sanitized.optionsAr = sanitized.optionsAr.map(strip);
+  }
+  return sanitized;
+}
 
 function mapVariant(item: any): ProductOption {
   // Map new schema (optionsEn/optionsAr) to unified structure
@@ -103,10 +122,11 @@ export async function createVariant(data: VariantData, token?: string): Promise<
 
   while (attempt < maxRetries) {
     try {
+      const sanitized = sanitizeVariantData(currentData);
       const response = await apiClient<any>({
         endpoint: "/product-variants",
         method: "POST",
-        body: currentData as any,
+        body: sanitized as any,
         token,
       });
       console.log("DEBUG: Create variant success:", JSON.stringify(response, null, 2));
@@ -133,20 +153,7 @@ export async function createVariant(data: VariantData, token?: string): Promise<
 }
 
 export async function updateVariant(id: string, data: Partial<VariantData>, token?: string): Promise<ProductOption> {
-  // Strip `color` property from options — the API rejects it
-  const sanitized = { ...data };
-  if (sanitized.optionsEn) {
-    sanitized.optionsEn = sanitized.optionsEn.map(({ color, ...rest }: any) => ({
-      ...rest,
-      optionName: rest.optionName || color || "",
-    }));
-  }
-  if (sanitized.optionsAr) {
-    sanitized.optionsAr = sanitized.optionsAr.map(({ color, ...rest }: any) => ({
-      ...rest,
-      optionName: rest.optionName || color || "",
-    }));
-  }
+  const sanitized = sanitizeVariantData(data);
 
   console.log(`DEBUG: Updating variant ${id}. Payload:`, JSON.stringify(sanitized, null, 2), "Token present:", !!token);
   try {

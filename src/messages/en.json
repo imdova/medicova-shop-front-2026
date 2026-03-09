@@ -1028,7 +1028,8 @@
       "price": "Price",
       "save": "Save",
       "cancel": "Cancel",
-      "confirmDelete": "Are you sure you want to delete this variant?"
+      "confirmDelete": "Are you sure you want to delete this variant?",
+      "saving": "Saving..."
     }
   },
   "search": {

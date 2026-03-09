@@ -32,6 +32,7 @@ import { dummyTestimonials } from "@/constants/testimonials";
 import Loading from "@/app/[locale]/loading";
 import NotFound from "@/app/[locale]/not-found";
 import { useAppLocale } from "@/hooks/useAppLocale";
+import toast from "react-hot-toast";
 
 //
 // ------------- ZOD Schema -------------
@@ -95,7 +96,9 @@ export default function EditTestimonialForm() {
       slug: testimonial?.slug,
     });
     // Here you would typically make an API call to update the testimonial
-    alert(`Testimonial "${data.title.en}" updated successfully!`);
+    toast.success(
+      `${t.form_title} "${data.title.en}" ${locale === "en" ? "updated successfully" : "تم التحديث بنجاح"}!`,
+    );
   };
 
   const t = {

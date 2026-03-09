@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { useParams } from "next/navigation";
+import toast from "react-hot-toast";
 import { Upload, FileText, CircleDashed, X } from "lucide-react";
 import DynamicTable from "@/components/features/tables/DTable";
 import NotFound from "@/app/[locale]/not-found";
@@ -55,7 +56,7 @@ export default function ImportDetailPage() {
     setIsProcessing(true);
     await new Promise((res) => setTimeout(res, 2000));
     setIsProcessing(false);
-    alert(t.importSuccess);
+    toast.success(t.importSuccess);
   };
 
   const exampleColumns = config?.columns?.map((col) => ({
@@ -93,7 +94,6 @@ export default function ImportDetailPage() {
           data={config.exampleData ?? []}
           columns={exampleColumns ?? []}
           pagination={false}
-
           minWidth={600}
         />
       </div>
@@ -105,7 +105,6 @@ export default function ImportDetailPage() {
           data={config.rules ?? []}
           columns={ruleColumns}
           pagination={false}
-
           minWidth={400}
         />
       </div>

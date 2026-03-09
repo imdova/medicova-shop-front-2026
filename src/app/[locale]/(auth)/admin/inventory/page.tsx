@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { Database, ShieldCheck, Activity, Package } from "lucide-react";
+import toast from "react-hot-toast";
 
 // Types & Data
 import { ProductInventory } from "@/types/product";
@@ -90,7 +91,9 @@ export default function ProductInventoryPage() {
     data: { storefrontManagement: string; quantity: number },
   ) => {
     console.log("Saving inventory update:", id, data);
-    alert(`Inventory updated for ID: ${id}`);
+    toast.success(
+      `${t("Inventory updated for ID") || "Inventory updated for ID"}: ${id}`,
+    );
   };
 
   return (
