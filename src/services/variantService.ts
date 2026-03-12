@@ -16,8 +16,11 @@ export type VariantData = {
   optionsEn: VariantOptionValue[];
   optionsAr: VariantOptionValue[];
   createdBy: "admin" | "seller";
+  storeId?: string;
   store?: string;
 };
+
+const VARIANTS_CACHE_KEY = "medicova:variants:v1";
 
 function sanitizeVariantData<T extends Partial<VariantData>>(data: T): T {
   const sanitized = { ...data };
@@ -87,16 +90,37 @@ function mapVariant(item: any): ProductOption {
   };
 }
 
-export async function getVariants(token?: string): Promise<ProductOption[]> {
+function cacheVariants(variants: ProductOption[]) {
+  if (typeof window === "undefined") return;
   try {
-    const res = await apiClient<any>({
-      endpoint: "/product-variants",
-      method: "GET",
-      token,
-    });
+    window.localStorage.setItem(VARIANTS_CACHE_KEY, JSON.stringify(variants));
+  } catch {
+    // Ignore storage errors (private mode/quota exceeded).
+  }
+}
 
-    console.log("DEBUG: Raw Variants API Response:", JSON.stringify(res, null, 2));
+function readCachedVariants(): ProductOption[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(VARIANTS_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as ProductOption[]) : [];
+  } catch {
+    return [];
+  }
+}
 
+function variantIdentity(item: ProductOption, index: number): string {
+  const idKey = String(item.id || "").trim();
+  if (idKey) return `id:${idKey}`;
+  const en = String(item.name?.en || "").trim().toLowerCase();
+  const ar = String(item.name?.ar || "").trim().toLowerCase();
+  return `name:${en}|${ar}|${index}`;
+}
+
+export async function getVariants(token?: string): Promise<ProductOption[]> {
+  const parseVariants = (res: any): ProductOption[] => {
     let items = [];
     if (res.data) {
       if (Array.isArray(res.data)) items = res.data;
@@ -107,12 +131,68 @@ export async function getVariants(token?: string): Promise<ProductOption[]> {
     } else if (Array.isArray(res)) {
       items = res;
     }
-
     return items.map(mapVariant);
-  } catch (error: any) {
-    console.error("DEBUG: Error fetching variants:", error.message);
-    return [];
+  };
+
+  const normalizedToken = token?.trim();
+  if (!normalizedToken) {
+    return readCachedVariants();
   }
+
+  const candidateEndpoints = [
+    "/product-variants?createdBy=admin&storeId=null&limit=1000",
+    "/product-variants?createdBy=admin&storeId=&limit=1000",
+    "/product-variants?createdBy=admin&limit=1000",
+    "/product-variants?storeId=null&limit=1000",
+    "/product-variants?isGlobal=true&limit=1000",
+    "/product-variants?createdBy=admin&storeId=null",
+    "/product-variants?createdBy=admin",
+    "/product-variants?scope=public",
+    "/product-variants?limit=1000",
+    "/product-variants",
+  ];
+
+  const merged = new Map<string, ProductOption>();
+
+  for (const endpoint of candidateEndpoints) {
+    try {
+      const res = await apiClient<any>({
+        endpoint,
+        method: "GET",
+        token: normalizedToken,
+        suppressErrorLog: true,
+      });
+      const parsed = parseVariants(res);
+      console.log(
+        `DEBUG: Variants response from ${endpoint} | count=${parsed.length}`,
+      );
+      parsed.forEach((item, index) => {
+        const key = variantIdentity(item, index);
+        if (!merged.has(key)) merged.set(key, item);
+      });
+    } catch (error: any) {
+      const msg = String(error?.message || "").toLowerCase();
+      const isExpected =
+        msg.includes("permission") ||
+        msg.includes("forbidden") ||
+        msg.includes("unauthorized") ||
+        msg.includes("invalid refresh token");
+      if (!isExpected) {
+        console.error(
+          `DEBUG: Error fetching variants from ${endpoint}:`,
+          error?.message,
+        );
+      }
+    }
+  }
+
+  const finalVariants = Array.from(merged.values());
+  if (finalVariants.length) {
+    cacheVariants(finalVariants);
+    return finalVariants;
+  }
+
+  return readCachedVariants();
 }
 
 export async function createVariant(data: VariantData, token?: string): Promise<ProductOption> {

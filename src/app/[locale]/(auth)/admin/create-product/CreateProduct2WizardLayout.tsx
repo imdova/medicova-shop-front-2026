@@ -6,14 +6,13 @@ import {
   useProductForm,
   Step,
 } from "@/components/features/ProductCreationWizard/useProductForm";
-import { Step1CoreInfo } from "@/components/features/ProductCreationWizard/steps/Step1CoreInfo";
 import { Step2PricingInventory } from "@/components/features/ProductCreationWizard/steps/Step2PricingInventory";
 import { MediaStep } from "@/components/features/ProductCreationWizard/steps/MediaStep";
 import { Step3Settings } from "@/components/features/ProductCreationWizard/steps/Step3Settings";
 import { WizardHeader } from "@/components/features/ProductCreationWizard/WizardHeader";
 import DynamicButton from "@/components/shared/Buttons/DynamicButton";
 import { ChevronLeft, ChevronRight, Check, Save } from "lucide-react";
-import toast from "react-hot-toast";
+import Step1CoreInfo from "@/components/features/ProductCreationWizard/steps/Step1CoreInfo";
 
 export default function CreateProduct2WizardLayout() {
   const locale = useAppLocale();
@@ -29,6 +28,8 @@ export default function CreateProduct2WizardLayout() {
     isSubmitting,
     isLoading,
     isEditMode,
+    token,
+    userRole,
   } = useProductForm();
 
   const steps = [
@@ -58,7 +59,14 @@ export default function CreateProduct2WizardLayout() {
   const isLastStep = currentIndex === steps.length - 1;
 
   const renderStep = () => {
-    const commonProps = { product, errors, onUpdate: updateProduct, locale };
+    const commonProps = {
+      product,
+      errors,
+      onUpdate: updateProduct,
+      locale,
+      token,
+      userRole,
+    };
     switch (currentStep) {
       case "step1_core":
         return <Step1CoreInfo {...commonProps} />;
@@ -109,40 +117,22 @@ export default function CreateProduct2WizardLayout() {
           <div className="p-4 md:p-6">{renderStep()}</div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <DynamicButton
-              variant="outline"
-              onClick={() => {
-                // UI-only draft action for now (keeps original info untouched)
-                toast.success(
-                  isAr ? "تم حفظ المسودة محلياً." : "Draft saved locally.",
-                );
-              }}
-              className="h-10 rounded-xl px-4 text-xs font-bold"
-              label={isAr ? "حفظ كمسودة" : "Save Draft"}
-              icon={<Save size={14} />}
-              iconPosition="left"
-            />
-
-            <DynamicButton
-              variant="outline"
-              onClick={() => {
-                if (currentIndex > 0) goToStep(steps[currentIndex - 1].key);
-              }}
-              disabled={currentIndex === 0}
-              className="h-10 rounded-xl px-4 text-xs font-bold"
-              label={isAr ? "السابق" : "Back"}
-              icon={
-                isAr ? <ChevronRight size={14} /> : <ChevronLeft size={14} />
-              }
-              iconPosition="left"
-            />
-          </div>
+        <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+          <DynamicButton
+            variant="outline"
+            onClick={() => {
+              if (currentIndex > 0) goToStep(steps[currentIndex - 1].key);
+            }}
+            disabled={currentIndex === 0 || isSubmitting}
+            className="h-10 rounded-xl px-4 text-xs font-bold"
+            label={isAr ? "السابق" : "Back"}
+            icon={isAr ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+            iconPosition="left"
+          />
 
           <DynamicButton
             variant={isLastStep ? "success" : "primary"}
-            onClick={validateStep}
+            onClick={() => void validateStep({ submitMode: "publish" })}
             disabled={isSubmitting}
             style={{ backgroundColor: "lab(58.4941% -47.8529 35.5714)" }}
             className="h-10 rounded-xl px-6 text-xs font-extrabold text-white shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
@@ -169,6 +159,18 @@ export default function CreateProduct2WizardLayout() {
               )
             }
             iconPosition={isLastStep || !isAr ? "right" : "left"}
+          />
+
+          <DynamicButton
+            variant="outline"
+            onClick={() =>
+              void validateStep({ submitMode: "draft", forceSubmit: true })
+            }
+            disabled={isSubmitting}
+            className="h-10 rounded-xl px-4 text-xs font-bold"
+            label={isAr ? "حفظ كمسودة" : "Draft"}
+            icon={<Save size={14} />}
+            iconPosition="left"
           />
         </div>
       </div>

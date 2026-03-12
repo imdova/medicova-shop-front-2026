@@ -28,24 +28,39 @@ export interface Seller {
 }
 
 export async function getSellers(token?: string): Promise<Seller[]> {
+  if (!token?.trim()) {
+    return [];
+  }
+
   try {
     let res = await apiClient<any>({
       endpoint: "/users/all-sellers",
       method: "GET",
       token,
+      suppressErrorLog: true,
     });
     console.log("DEBUG: getSellers /users/all-sellers raw response:", JSON.stringify(res, null, 2));
 
     // Fallback if empty
     if (!res || (Array.isArray(res) && res.length === 0) || (res.data && Array.isArray(res.data) && res.data.length === 0)) {
       console.log("DEBUG: /users/all-sellers empty, trying /sellers...");
-      const res2 = await apiClient<any>({ endpoint: "/sellers", method: "GET", token }).catch(() => null);
+      const res2 = await apiClient<any>({
+        endpoint: "/sellers",
+        method: "GET",
+        token,
+        suppressErrorLog: true,
+      }).catch(() => null);
       if (res2) {
         res = res2;
         console.log("DEBUG: getSellers /sellers success:", JSON.stringify(res, null, 2));
       } else {
         console.log("DEBUG: /sellers failed, trying /users/sellers...");
-        const res3 = await apiClient<any>({ endpoint: "/users/sellers", method: "GET", token }).catch(() => null);
+        const res3 = await apiClient<any>({
+          endpoint: "/users/sellers",
+          method: "GET",
+          token,
+          suppressErrorLog: true,
+        }).catch(() => null);
         if (res3) {
             res = res3;
             console.log("DEBUG: getSellers /users/sellers success:", JSON.stringify(res, null, 2));
@@ -72,7 +87,13 @@ export async function getSellers(token?: string): Promise<Seller[]> {
     const msg =
       typeof (error as any)?.message === "string" ? (error as any).message : "";
     // Suppress expected auth-related errors to avoid console spam.
-    if (msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("invalid refresh token")) {
+    const lowered = msg.toLowerCase();
+    if (
+      lowered.includes("unauthorized") ||
+      lowered.includes("invalid refresh token") ||
+      lowered.includes("permission") ||
+      lowered.includes("forbidden")
+    ) {
       return [];
     }
     console.error("Error fetching sellers:", error);
@@ -81,11 +102,16 @@ export async function getSellers(token?: string): Promise<Seller[]> {
 }
 
 export async function getAdminSellers(token?: string): Promise<Seller[]> {
+  if (!token?.trim()) {
+    return [];
+  }
+
   try {
     const res = await apiClient<any>({
       endpoint: "/users/all-sellers?limit=1000",
       method: "GET",
       token,
+      suppressErrorLog: true,
     });
     
     const rawData = (res as any)?.data || res;

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ImageIcon,
   X,
+  Check,
   UploadCloud,
   Eye,
   Video,
@@ -16,7 +17,7 @@ import {
   Calendar,
 } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProductFormData } from "@/lib/validations/product-schema";
 import { Input } from "@/components/shared/input";
 import { Label } from "@/components/shared/label";
@@ -48,6 +49,7 @@ export const MediaStep = ({
     return Math.max(0, Math.min(100, Math.round(pct * 10) / 10));
   }, [discountActive, originalPrice, salePrice]);
   const discountPercentValue = discountActive ? String(discountPercent) : "";
+  const [dateRangeEnabled, setDateRangeEnabled] = useState(false);
 
   useEffect(() => {
     if (
@@ -62,8 +64,15 @@ export const MediaStep = ({
         },
       });
     }
+    if (!discountActive) setDateRangeEnabled(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [discountActive]);
+
+  useEffect(() => {
+    if (product.pricing.startDate || product.pricing.endDate) {
+      setDateRangeEnabled(true);
+    }
+  }, [product.pricing.endDate, product.pricing.startDate]);
 
   const handleUpload = useCallback(
     (files: FileList | null) => {
@@ -77,6 +86,17 @@ export const MediaStep = ({
   const handleRemove = useCallback(
     (index: number) => {
       onUpdate({ images: images.filter((_, i) => i !== index) });
+    },
+    [images, onUpdate],
+  );
+
+  const handleSetPrimary = useCallback(
+    (index: number) => {
+      if (index <= 0 || !images[index]) return;
+      const next = [...images];
+      const [picked] = next.splice(index, 1);
+      next.unshift(picked);
+      onUpdate({ images: next });
     },
     [images, onUpdate],
   );
@@ -213,67 +233,108 @@ export const MediaStep = ({
             </div>
 
             {discountActive ? (
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold text-gray-800">
-                    {isAr ? "تاريخ بداية الخصم" : "Discount Start Date"}
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type="date"
-                      value={
-                        product.pricing.startDate
-                          ? product.pricing.startDate.split("T")[0]
-                          : ""
-                      }
-                      onChange={(e) =>
-                        onUpdate({
-                          pricing: {
-                            ...product.pricing,
-                            startDate: e.target.value
-                              ? `${e.target.value}T00:00:00Z`
-                              : null,
-                          },
-                        })
-                      }
-                      className="h-10 rounded-xl border-gray-200 px-3 pl-9 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200/50"
-                    />
-                    <Calendar
-                      size={14}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"
-                    />
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextEnabled = !dateRangeEnabled;
+                    setDateRangeEnabled(nextEnabled);
+                    if (!nextEnabled) {
+                      onUpdate({
+                        pricing: {
+                          ...product.pricing,
+                          startDate: null,
+                          endDate: null,
+                        },
+                      });
+                    }
+                  }}
+                  className={`inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-bold transition-colors ${
+                    dateRangeEnabled
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <Calendar size={14} />
+                  {dateRangeEnabled
+                    ? isAr
+                      ? "إخفاء تحديد التاريخ"
+                      : "Hide date selection"
+                    : isAr
+                      ? "تحديد تاريخ الخصم"
+                      : "Set discount dates"}
+                </button>
+
+                {dateRangeEnabled ? (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-semibold text-gray-800">
+                        {isAr ? "تاريخ بداية الخصم" : "Discount Start Date"}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          type="date"
+                          value={
+                            product.pricing.startDate
+                              ? product.pricing.startDate.split("T")[0]
+                              : ""
+                          }
+                          onChange={(e) =>
+                            onUpdate({
+                              pricing: {
+                                ...product.pricing,
+                                startDate: e.target.value
+                                  ? `${e.target.value}T00:00:00Z`
+                                  : null,
+                              },
+                            })
+                          }
+                          className="h-10 rounded-xl border-gray-200 px-3 pl-9 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200/50"
+                        />
+                        <Calendar
+                          size={14}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-semibold text-gray-800">
+                        {isAr ? "تاريخ نهاية الخصم" : "Discount End Date"}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          type="date"
+                          value={
+                            product.pricing.endDate
+                              ? product.pricing.endDate.split("T")[0]
+                              : ""
+                          }
+                          onChange={(e) =>
+                            onUpdate({
+                              pricing: {
+                                ...product.pricing,
+                                endDate: e.target.value
+                                  ? `${e.target.value}T23:59:59Z`
+                                  : null,
+                              },
+                            })
+                          }
+                          className="h-10 rounded-xl border-gray-200 px-3 pl-9 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200/50"
+                        />
+                        <Calendar
+                          size={14}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold text-gray-800">
-                    {isAr ? "تاريخ نهاية الخصم" : "Discount End Date"}
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type="date"
-                      value={
-                        product.pricing.endDate
-                          ? product.pricing.endDate.split("T")[0]
-                          : ""
-                      }
-                      onChange={(e) =>
-                        onUpdate({
-                          pricing: {
-                            ...product.pricing,
-                            endDate: e.target.value
-                              ? `${e.target.value}T23:59:59Z`
-                              : null,
-                          },
-                        })
-                      }
-                      className="h-10 rounded-xl border-gray-200 px-3 pl-9 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200/50"
-                    />
-                    <Calendar
-                      size={14}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"
-                    />
+                ) : (
+                  <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/30 p-3 text-xs font-medium text-emerald-700/80">
+                    {isAr
+                      ? "بدون تحديد تاريخ: يبدأ الخصم من وقت إنشاء المنتج ويستمر بدون تاريخ انتهاء."
+                      : "Without date selection: discount starts at product creation and has no end date."}
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/40 p-3 text-xs font-medium text-gray-500">
@@ -355,6 +416,26 @@ export const MediaStep = ({
 
                       {/* Overlay Controls */}
                       <div className="absolute inset-0 flex items-center justify-center gap-1 bg-gray-900/40 opacity-0 backdrop-blur-[1px] transition-opacity group-hover:opacity-100">
+                        <button
+                          onClick={() => handleSetPrimary(index)}
+                          disabled={isMain}
+                          className={`flex h-7 w-7 items-center justify-center rounded-lg shadow-lg transition-transform active:scale-95 ${
+                            isMain
+                              ? "cursor-default bg-emerald-400/70 text-white"
+                              : "bg-emerald-500 text-white hover:scale-110"
+                          }`}
+                          title={
+                            isMain
+                              ? isAr
+                                ? "الصورة الرئيسية"
+                                : "Primary image"
+                              : isAr
+                                ? "تعيين كرئيسية"
+                                : "Set as primary"
+                          }
+                        >
+                          <Check size={14} />
+                        </button>
                         <button
                           onClick={() => handleRemove(index)}
                           className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-500 text-white shadow-lg transition-transform hover:scale-110 active:scale-95"

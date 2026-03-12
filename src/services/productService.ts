@@ -32,6 +32,15 @@ export interface CreateProductPayload {
     trackStock: boolean;
     stockQuantity: number;
     stockStatus: "in_stock" | "out_of_stock" | "on_backorder";
+    stock?: {
+      total: number;
+      remaining: number;
+    };
+    variantsStock?: Array<{
+      name: string;
+      total: number;
+      remaining: number;
+    }>;
   };
   variants: string[];
   specifications: Array<{
@@ -77,6 +86,7 @@ export interface CreateProductPayload {
   };
   approved: boolean;
   rate: number;
+  draft?: boolean;
 }
 
 export interface ApiProduct {
@@ -157,35 +167,83 @@ export async function createProduct(payload: CreateProductPayload, token?: strin
 }
 
 export async function getProducts(token?: string): Promise<ApiProduct[]> {
-  try {
-    const res = await apiClient({
-      endpoint: "/products?limit=1000",
-      method: "GET",
-      token,
-    });
+  const parseProducts = (res: any): ApiProduct[] => {
     const data = (res as any)?.data || res;
-    console.log("DEBUG getProducts raw response sample:", JSON.stringify(Array.isArray(data) ? data[0] : data, null, 2));
+    console.log(
+      "DEBUG getProducts raw response sample:",
+      JSON.stringify(Array.isArray(data) ? data[0] : data, null, 2),
+    );
     if (Array.isArray(data)) return data;
     if (data?.products && Array.isArray(data.products)) return data.products;
     if (data?.data && Array.isArray(data.data)) return data.data;
     console.warn("Unexpected getProducts response shape:", res);
     return [];
+  };
+
+  const fetchProducts = (authToken?: string) =>
+    apiClient({
+      endpoint: "/products?limit=1000",
+      method: "GET",
+      token: authToken,
+      suppressErrorLog: true,
+    });
+
+  try {
+    const res = await fetchProducts(token?.trim() || undefined);
+    return parseProducts(res);
   } catch (err) {
+    const msg = String((err as any)?.message || "").toLowerCase();
+    const isPermissionError =
+      msg.includes("permission") ||
+      msg.includes("forbidden") ||
+      msg.includes("unauthorized");
+
+    if (token?.trim() && isPermissionError) {
+      try {
+        const fallback = await fetchProducts(undefined);
+        return parseProducts(fallback);
+      } catch (fallbackErr) {
+        console.error("getProducts fallback failed:", fallbackErr);
+        return [];
+      }
+    }
+
     console.error("getProducts failed:", err);
     return [];
   }
 }
 
 export async function getProductById(id: string, token?: string): Promise<ApiProduct | null> {
-  try {
-    const res = await apiClient({
+  const fetchById = (authToken?: string) =>
+    apiClient({
       endpoint: `/products/${id}`,
       method: "GET",
-      token,
+      token: authToken,
+      suppressErrorLog: true,
     });
+
+  try {
+    const res = await fetchById(token?.trim() || undefined);
     const data = (res as any)?.data || res;
     return data as ApiProduct;
   } catch (err) {
+    const msg = String((err as any)?.message || "").toLowerCase();
+    const isPermissionError =
+      msg.includes("permission") ||
+      msg.includes("forbidden") ||
+      msg.includes("unauthorized");
+
+    if (token?.trim() && isPermissionError) {
+      try {
+        const fallback = await fetchById(undefined);
+        const data = (fallback as any)?.data || fallback;
+        return data as ApiProduct;
+      } catch (fallbackErr) {
+        console.error("getProductById fallback failed:", fallbackErr);
+        return null;
+      }
+    }
+
     console.error("getProductById failed:", err);
     return null;
   }

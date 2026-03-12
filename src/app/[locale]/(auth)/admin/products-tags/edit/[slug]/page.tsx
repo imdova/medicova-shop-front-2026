@@ -26,6 +26,11 @@ export default function EditTagPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     const loadData = async () => {
       setLoading(true);
       try {

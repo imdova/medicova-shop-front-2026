@@ -29,6 +29,11 @@ export default function TagsListPanel() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchData = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const [cats, fetchedTags] = await Promise.all([

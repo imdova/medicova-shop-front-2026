@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { Step1CoreInfo } from "./steps/Step1CoreInfo";
+import Step1CoreInfo from "./steps/Step1CoreInfo";
 import { Step3Settings } from "./steps/Step3Settings";
 import { MediaStep } from "./steps/MediaStep";
 import { Step2PricingInventory } from "./steps/Step2PricingInventory";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Plus, RefreshCw, Trash2, Truck, X } from "lucide-react";
+import { Check, Package, Plus, RefreshCw, Trash2, Truck, X } from "lucide-react";
 import { Input } from "@/components/shared/input";
 import toast from "react-hot-toast";
 import { Label } from "@/components/shared/label";
@@ -9,6 +9,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useSession } from "next-auth/react";
 import { getVariants } from "@/services/variantService";
+import {
+  createPackage,
+  deletePackage,
+  getPackages,
+} from "@/services/packageService";
+import { extractSessionToken } from "@/lib/auth/sessionToken";
+import { getProducts } from "@/services/productService";
 import { ProductOption } from "@/types/product";
 
 interface Step2PricingInventoryProps {
@@ -16,6 +23,8 @@ interface Step2PricingInventoryProps {
   onUpdate: (updates: Partial<ProductFormData>) => void;
   errors: Record<string, string>;
   locale: string;
+  token?: string;
+  userRole?: string;
 }
 
 const COLORS = {
@@ -61,17 +70,163 @@ function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function normalizeRole(value: unknown): string {
+  if (typeof value === "string") return value.trim().toLowerCase();
+  return "";
+}
+
+function normalizeStoreId(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized || normalized === "null" || normalized === "undefined") {
+      return null;
+    }
+    return normalized;
+  }
+  if (typeof value === "object") {
+    const id = (value as any)?._id || (value as any)?.id;
+    if (typeof id === "string" && id.trim()) return id.trim().toLowerCase();
+  }
+  return null;
+}
+
+function normalizePackageNumber(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function packageIdentity(item: ShippingPackage): string {
+  const id = String(item.id || "").trim();
+  if (id) return `id:${id}`;
+
+  const name = String(item.name || "").trim().toLowerCase();
+  return `shape:${name}|${item.weightKg ?? ""}|${item.lengthCm ?? ""}|${item.widthCm ?? ""}|${item.heightCm ?? ""}`;
+}
+
+function mergeShippingPackageLists(
+  current: ShippingPackage[],
+  incoming: ShippingPackage[],
+): ShippingPackage[] {
+  const merged = [...current];
+  const seen = new Set(current.map(packageIdentity));
+
+  incoming.forEach((item) => {
+    const normalized: ShippingPackage = {
+      id: String(item.id || makeId()),
+      name: String(item.name || "").trim(),
+      weightKg: normalizePackageNumber(item.weightKg),
+      lengthCm: normalizePackageNumber(item.lengthCm),
+      widthCm: normalizePackageNumber(item.widthCm),
+      heightCm: normalizePackageNumber(item.heightCm),
+    };
+    if (!normalized.name) return;
+
+    const key = packageIdentity(normalized);
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(normalized);
+  });
+
+  return merged;
+}
+
+function isColorVariant(item: ProductOption): boolean {
+  const names = [item.name?.en, item.name?.ar]
+    .map((x) => String(x || "").trim().toLowerCase())
+    .filter(Boolean);
+  return names.some(
+    (name) =>
+      name === "color" ||
+      name === "colors" ||
+      name === "اللون" ||
+      name === "الألوان",
+  );
+}
+
+function dedupeVariants(items: ProductOption[]): ProductOption[] {
+  const seen = new Set<string>();
+  const output: ProductOption[] = [];
+
+  items.forEach((item, index) => {
+    const key = item.id
+      ? `id:${item.id}`
+      : `name:${String(item.name?.en || "").toLowerCase()}|${String(item.name?.ar || "").toLowerCase()}|${index}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    output.push(item);
+  });
+
+  return output;
+}
+
+function resolveVisibleVariants(items: ProductOption[]): ProductOption[] {
+  const cleaned = dedupeVariants(items).filter(
+    (item) =>
+      Array.isArray(item.option_values) &&
+      item.option_values.length > 0 &&
+      !isColorVariant(item),
+  );
+
+  const strictAdminGlobal = cleaned.filter((item) => {
+    const role = normalizeRole(item.createdBy);
+    const storeId = normalizeStoreId((item as any).storeId);
+    return role === "admin" && storeId == null;
+  });
+  if (strictAdminGlobal.length) return strictAdminGlobal;
+
+  const adminOrUnknown = cleaned.filter(
+    (item) => normalizeRole(item.createdBy) !== "seller",
+  );
+  if (adminOrUnknown.length) return adminOrUnknown;
+
+  return cleaned;
+}
+
+function getTemplateOptionId(option: any): string {
+  const rawId = option?.id ?? option?._id;
+  if (rawId != null) {
+    const normalized = String(rawId).trim();
+    if (normalized) return normalized;
+  }
+  const en = String(option?.label?.en || "").trim().toLowerCase();
+  const ar = String(option?.label?.ar || "").trim().toLowerCase();
+  return `${en}|${ar}`;
+}
+
 export const Step2PricingInventory = ({
   product,
   onUpdate,
   errors,
   locale,
+  token: propToken,
+  userRole,
 }: Step2PricingInventoryProps) => {
   const isAr = locale === "ar";
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken as string | undefined;
+  const token = propToken || extractSessionToken(session);
+  const normalizedUserRole = normalizeRole(
+    userRole || (session as any)?.user?.role,
+  );
+  const sellerStoreId =
+    (session as any)?.user?.storeId ||
+    (session as any)?.user?.id ||
+    (session as any)?.user?._id ||
+    product.store ||
+    "";
+  const normalizeSku = useCallback((value: string) => value.trim().toUpperCase(), []);
 
   const objectUrlCacheRef = useRef<Map<File, string>>(new Map());
+  const initialSkuRef = useRef("");
+  const [knownSkuSet, setKnownSkuSet] = useState<Set<string>>(new Set());
+  const sellerPackagesHydratedRef = useRef(false);
+  const [sellerSavedPackages, setSellerSavedPackages] = useState<
+    ShippingPackage[]
+  >([]);
+  const [isSavingPackage, setIsSavingPackage] = useState(false);
+  const [deletingPackageId, setDeletingPackageId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     return () => {
@@ -79,6 +234,46 @@ export const Step2PricingInventory = ({
       objectUrlCacheRef.current.clear();
     };
   }, []);
+
+  useEffect(() => {
+    if (!initialSkuRef.current && product.identity?.sku) {
+      initialSkuRef.current = normalizeSku(product.identity.sku);
+    }
+  }, [product.identity?.sku, normalizeSku]);
+
+  useEffect(() => {
+    const normalizedToken = token?.trim();
+    if (!normalizedToken) return;
+    let cancelled = false;
+
+    const loadKnownSkus = async () => {
+      try {
+        const products = await getProducts(normalizedToken);
+        if (cancelled) return;
+        const nextSet = new Set<string>();
+        products.forEach((item: any) => {
+          if (item?.sku) nextSet.add(normalizeSku(String(item.sku)));
+          if (item?.identity?.sku) {
+            nextSet.add(normalizeSku(String(item.identity.sku)));
+          }
+        });
+        setKnownSkuSet(nextSet);
+      } catch {
+        if (!cancelled) setKnownSkuSet(new Set());
+      }
+    };
+
+    void loadKnownSkus();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, normalizeSku]);
+
+  const normalizedSku = normalizeSku(product.identity?.sku || "");
+  const isSkuTaken =
+    !!normalizedSku &&
+    knownSkuSet.has(normalizedSku) &&
+    normalizedSku !== initialSkuRef.current;
 
   const resolveImageSrc = useCallback((img: unknown) => {
     if (!img) return null;
@@ -133,36 +328,207 @@ export const Step2PricingInventory = ({
 
   useEffect(() => {
     const fetchAdminVariants = async () => {
-      if (!token) return;
+      if (!token) {
+        setAdminVariants([]);
+        return;
+      }
       setLoadingVariants(true);
       try {
         const allVariants = await getVariants(token);
-        const filtered = allVariants.filter(
-          (v) => v.createdBy === "admin" && v.storeId == null,
-        );
-        setAdminVariants(filtered);
+        const resolved = resolveVisibleVariants(allVariants);
+        if (resolved.length) {
+          setAdminVariants(resolved);
+        } else {
+          setAdminVariants([]);
+        }
       } catch (err) {
         console.error("Failed to fetch admin variants:", err);
+        setAdminVariants([]);
       } finally {
         setLoadingVariants(false);
       }
     };
     fetchAdminVariants();
-  }, [token]);
+  }, [token, userRole]);
 
-  const getParsedVariantValues = useCallback(
-    (variantNameEn: string) => {
-      const spec = (product.specifications || []).find(
-        (s) => (s?.keyEn || "").toLowerCase() === variantNameEn.toLowerCase(),
-      );
-      const raw = (spec?.valueEn || "").trim();
-      if (!raw) return [] as string[];
-      return raw
-        .split(",")
-        .map((s) => s.trim())
+  const findDraftVariantForTemplate = useCallback(
+    (template: ProductOption) => {
+      const templateId = String(template.id || "").trim();
+      return (product.productVariants || []).find((item: any) => {
+        const byTemplateId =
+          templateId &&
+          String((item as any)?.templateVariantId || "").trim() === templateId;
+        const byName =
+          String((item as any)?.nameEn || "")
+            .trim()
+            .toLowerCase() ===
+          String(template.name.en || "")
+            .trim()
+            .toLowerCase();
+        return byTemplateId || byName;
+      }) as any | undefined;
+    },
+    [product.productVariants],
+  );
+
+  const getSelectedOptionIdsForTemplate = useCallback(
+    (template: ProductOption): string[] => {
+      const draft = findDraftVariantForTemplate(template);
+      if (!draft || !Array.isArray(draft.optionsEn)) return [];
+
+      return template.option_values
+        .filter((opt) =>
+          draft.optionsEn.some((entry: any) => {
+            const optionName = String(entry?.optionName || "")
+              .trim()
+              .toLowerCase();
+            const enLabel = String((opt.label as any)?.en || "")
+              .trim()
+              .toLowerCase();
+            const arLabel = String((opt.label as any)?.ar || "")
+              .trim()
+              .toLowerCase();
+            return optionName && (optionName === enLabel || optionName === arLabel);
+          }),
+        )
+        .map((opt) => getTemplateOptionId(opt));
+    },
+    [findDraftVariantForTemplate],
+  );
+
+  const getSelectedVariantValues = useCallback(
+    (template: ProductOption): string[] => {
+      const draft = findDraftVariantForTemplate(template);
+      if (!draft || !Array.isArray(draft.optionsEn)) return [];
+
+      return draft.optionsEn
+        .map((entry: any) => String(entry?.optionName || "").trim())
         .filter(Boolean);
     },
-    [product.specifications],
+    [findDraftVariantForTemplate],
+  );
+
+  const upsertVariantSelectionFromTemplate = useCallback(
+    (template: ProductOption, selectedOptionIds: string[]) => {
+      const selectedSet = new Set(selectedOptionIds.map((id) => String(id)));
+      const selectedOptions = template.option_values.filter((opt) =>
+        selectedSet.has(getTemplateOptionId(opt)),
+      );
+      const templateId = String(template.id || "").trim();
+
+      const existingList = (product.productVariants || []) as any[];
+      const remaining = existingList.filter((item: any) => {
+        const byTemplateId =
+          templateId &&
+          String(item?.templateVariantId || "").trim() === templateId;
+        const byName =
+          String(item?.nameEn || "")
+            .trim()
+            .toLowerCase() ===
+          String(template.name.en || "")
+            .trim()
+            .toLowerCase();
+        return !(byTemplateId || byName);
+      });
+
+      if (!selectedOptions.length) {
+        onUpdate({ productVariants: remaining as any });
+        return;
+      }
+
+      const existing = existingList.find((item: any) => {
+        const byTemplateId =
+          templateId &&
+          String(item?.templateVariantId || "").trim() === templateId;
+        const byName =
+          String(item?.nameEn || "")
+            .trim()
+            .toLowerCase() ===
+          String(template.name.en || "")
+            .trim()
+            .toLowerCase();
+        return byTemplateId || byName;
+      }) as any;
+
+      const priceByName = new Map<string, number>();
+      selectedOptions.forEach((opt) => {
+        const enName = String((opt.label as any)?.en || "")
+          .trim()
+          .toLowerCase();
+        const arName = String((opt.label as any)?.ar || "")
+          .trim()
+          .toLowerCase();
+        const rawPrice = Number((opt as any)?.price || 0);
+        const price = Number.isFinite(rawPrice) ? rawPrice : 0;
+        if (enName) priceByName.set(enName, price);
+        if (arName) priceByName.set(arName, price);
+      });
+
+      const nextVariant = {
+        id: existing?.id,
+        nameEn: template.name.en,
+        nameAr: template.name.ar || template.name.en,
+        type: String((template as any).option_type || "dropdown"),
+        optionsEn: selectedOptions.map((opt) => ({
+          optionName:
+            String((opt.label as any)?.en || (opt.label as any)?.ar || "").trim(),
+          price: Number((opt as any)?.price || 0) || 0,
+          stock: 0,
+        })),
+        optionsAr: selectedOptions.map((opt) => ({
+          optionName:
+            String((opt.label as any)?.ar || (opt.label as any)?.en || "").trim(),
+          price: Number((opt as any)?.price || 0) || 0,
+          stock: 0,
+        })),
+        createdBy: normalizedUserRole === "admin" ? "admin" : "seller",
+        storeId:
+          normalizedUserRole === "admin"
+            ? product.store || sellerStoreId || ""
+            : sellerStoreId || product.store || "",
+        templateVariantId: template.id,
+      };
+
+      onUpdate({
+        productVariants: [...remaining, nextVariant as any].map((variant: any) => {
+          if (!Array.isArray(variant?.optionsEn) || !Array.isArray(variant?.optionsAr)) {
+            return variant;
+          }
+          return {
+            ...variant,
+            optionsEn: variant.optionsEn.map((opt: any) => {
+              const key = String(opt?.optionName || "").trim().toLowerCase();
+              const price = priceByName.get(key);
+              return {
+                optionName: String(opt?.optionName || "").trim(),
+                price:
+                  price ??
+                  (Number.isFinite(Number(opt?.price)) ? Number(opt.price) : 0),
+                stock: Number.isFinite(Number(opt?.stock)) ? Number(opt.stock) : 0,
+              };
+            }),
+            optionsAr: variant.optionsAr.map((opt: any) => {
+              const key = String(opt?.optionName || "").trim().toLowerCase();
+              const price = priceByName.get(key);
+              return {
+                optionName: String(opt?.optionName || "").trim(),
+                price:
+                  price ??
+                  (Number.isFinite(Number(opt?.price)) ? Number(opt.price) : 0),
+                stock: Number.isFinite(Number(opt?.stock)) ? Number(opt.stock) : 0,
+              };
+            }),
+          };
+        }) as any,
+      });
+    },
+    [
+      normalizedUserRole,
+      onUpdate,
+      product.productVariants,
+      product.store,
+      sellerStoreId,
+    ],
   );
 
   const getVariantCombinations = useMemo(() => {
@@ -177,9 +543,9 @@ export const Step2PricingInventory = ({
       });
     }
 
-    // Admin Variants
+    // Selected variants from seller selection
     adminVariants.forEach((v: any) => {
-      const vals = getParsedVariantValues(v.name.en);
+      const vals = getSelectedVariantValues(v);
       if (vals.length) {
         activeOptions.push({ key: v.name.en, values: vals });
       }
@@ -200,54 +566,7 @@ export const Step2PricingInventory = ({
     });
 
     return combinations;
-  }, [selectedColors, adminVariants, getParsedVariantValues]);
-
-  const specs = product.specifications || [];
-  const getSpecByKey = useCallback(
-    (keyEn: string) =>
-      specs.find(
-        (s) =>
-          String(s?.keyEn || "")
-            .trim()
-            .toLowerCase() === keyEn.toLowerCase(),
-      ),
-    [specs],
-  );
-
-  const upsertSpec = useCallback(
-    (item: {
-      keyEn: string;
-      keyAr: string;
-      valueEn: string;
-      valueAr: string;
-    }) => {
-      const key = item.keyEn.trim().toLowerCase();
-      const next = specs.filter(
-        (s) =>
-          String(s?.keyEn || "")
-            .trim()
-            .toLowerCase() !== key,
-      );
-      next.push(item as any);
-      onUpdate({ specifications: next as any });
-    },
-    [onUpdate, specs],
-  );
-
-  const removeSpecByKey = useCallback(
-    (keyEn: string) => {
-      const key = keyEn.trim().toLowerCase();
-      onUpdate({
-        specifications: specs.filter(
-          (s) =>
-            String(s?.keyEn || "")
-              .trim()
-              .toLowerCase() !== key,
-        ) as any,
-      });
-    },
-    [onUpdate, specs],
-  );
+  }, [selectedColors, adminVariants, getSelectedVariantValues]);
 
   const shippingRequired = product.shipping?.isPhysicalProduct ?? true;
 
@@ -270,6 +589,39 @@ export const Step2PricingInventory = ({
       heightCm: p?.heightCm !== undefined ? Number(p.heightCm) : undefined,
     }));
   }, [product.packages]);
+
+  useEffect(() => {
+    if (normalizedUserRole !== "seller") return;
+    const normalizedToken = token?.trim();
+    if (!normalizedToken) return;
+    if (sellerPackagesHydratedRef.current) return;
+    sellerPackagesHydratedRef.current = true;
+
+    let cancelled = false;
+    const hydrateSellerPackages = async () => {
+      try {
+        const sellerPackages = await getPackages(normalizedToken);
+        if (cancelled || !sellerPackages.length) return;
+
+        const remotePackages: ShippingPackage[] = sellerPackages.map((pkg) => ({
+          id: pkg.id,
+          name: pkg.name,
+          weightKg: pkg.weightKg,
+          lengthCm: pkg.lengthCm,
+          widthCm: pkg.widthCm,
+          heightCm: pkg.heightCm,
+        }));
+        setSellerSavedPackages(remotePackages);
+      } catch (error) {
+        console.error("Failed to preload seller packages:", error);
+      }
+    };
+
+    void hydrateSellerPackages();
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedUserRole, token]);
 
   const colorImagesSpec = useMemo(() => {
     return (product.specifications || []).find(
@@ -489,7 +841,7 @@ export const Step2PricingInventory = ({
   );
 
   const openVariantModal = (v: ProductOption) => {
-    const existing = getParsedVariantValues(v.name.en);
+    const existing = getSelectedOptionIdsForTemplate(v);
     setTempVariantValues(new Set(existing));
     setActiveVariantId(v.id);
     setVariantModalOpen(true);
@@ -530,6 +882,32 @@ export const Step2PricingInventory = ({
 
   const distributionEnabled = parsedVariantStock.length > 0;
   const canDistribute = selectedColors.length > 0;
+  const [distributionCap, setDistributionCap] = useState(0);
+
+  const colorHexByName = useMemo(() => {
+    const map = new Map<string, string>();
+    selectedColors.forEach((c) => {
+      map.set(c.name.trim().toLowerCase(), c.hex || "#9ca3af");
+    });
+    return map;
+  }, [selectedColors]);
+
+  useEffect(() => {
+    if (!distributionEnabled) return;
+    if (!distributionCap) {
+      setDistributionCap(
+        Math.max(
+          0,
+          Math.floor(product.inventory.stockQuantity || variantStockTotal || 0),
+        ),
+      );
+    }
+  }, [
+    distributionEnabled,
+    distributionCap,
+    product.inventory.stockQuantity,
+    variantStockTotal,
+  ]);
 
   const [draftPackage, setDraftPackage] = useState<ShippingPackage>({
     id: "",
@@ -539,6 +917,179 @@ export const Step2PricingInventory = ({
     widthCm: undefined,
     heightCm: undefined,
   });
+
+  const resetDraftPackage = useCallback(() => {
+    setDraftPackage({
+      id: "",
+      name: "",
+      weightKg: undefined,
+      lengthCm: undefined,
+      widthCm: undefined,
+      heightCm: undefined,
+    });
+  }, []);
+
+  const isPackageSelected = useCallback(
+    (candidate: ShippingPackage) =>
+      shippingPackages.some(
+        (item) =>
+          item.id === candidate.id ||
+          packageIdentity(item) === packageIdentity(candidate),
+      ),
+    [shippingPackages],
+  );
+
+  const togglePackageSelection = useCallback(
+    (candidate: ShippingPackage) => {
+      const selected = isPackageSelected(candidate);
+      if (selected) {
+        const nextList = shippingPackages.filter(
+          (item) =>
+            item.id !== candidate.id &&
+            packageIdentity(item) !== packageIdentity(candidate),
+        );
+        onUpdate({ packages: nextList });
+        return;
+      }
+
+      const nextList = mergeShippingPackageLists(shippingPackages, [candidate]);
+      onUpdate({ packages: nextList });
+    },
+    [isPackageSelected, onUpdate, shippingPackages],
+  );
+
+  const handleDeleteSavedPackage = useCallback(
+    async (candidate: ShippingPackage) => {
+      const packageId = String(candidate.id || "").trim();
+      if (!packageId) return;
+
+      const authToken = token?.trim();
+      if (!authToken) {
+        toast.error(isAr ? "يجب تسجيل الدخول أولًا." : "Please login first.");
+        return;
+      }
+
+      setDeletingPackageId(packageId);
+      try {
+        await deletePackage(packageId, authToken);
+
+        setSellerSavedPackages((prev) =>
+          prev.filter(
+            (item) =>
+              item.id !== packageId &&
+              packageIdentity(item) !== packageIdentity(candidate),
+          ),
+        );
+
+        const nextSelectedPackages = shippingPackages.filter(
+          (item) =>
+            item.id !== packageId &&
+            packageIdentity(item) !== packageIdentity(candidate),
+        );
+        onUpdate({ packages: nextSelectedPackages });
+
+        toast.success(
+          isAr ? "تم حذف الحزمة بنجاح." : "Package deleted successfully.",
+        );
+      } catch (error) {
+        console.error("Failed to delete seller package:", error);
+        toast.error(
+          isAr
+            ? "تعذر حذف الحزمة. حاول مرة أخرى."
+            : "Failed to delete package. Please try again.",
+        );
+      } finally {
+        setDeletingPackageId(null);
+      }
+    },
+    [isAr, onUpdate, shippingPackages, token],
+  );
+
+  const handleAddPackage = useCallback(async () => {
+    if (!shippingRequired) return;
+    const name = draftPackage.name.trim();
+    if (!name) return;
+
+    const payload = {
+      name,
+      weightKg: normalizePackageNumber(draftPackage.weightKg),
+      lengthCm: normalizePackageNumber(draftPackage.lengthCm),
+      widthCm: normalizePackageNumber(draftPackage.widthCm),
+      heightCm: normalizePackageNumber(draftPackage.heightCm),
+    };
+
+    const localPackage: ShippingPackage = {
+      id: makeId(),
+      name: payload.name,
+      weightKg: payload.weightKg,
+      lengthCm: payload.lengthCm,
+      widthCm: payload.widthCm,
+      heightCm: payload.heightCm,
+    };
+
+    let packageToAppend = localPackage;
+    let createdInSellerLibrary = false;
+
+    if (normalizedUserRole === "seller") {
+      const authToken = token?.trim();
+      if (authToken) {
+        setIsSavingPackage(true);
+        try {
+          const saved = await createPackage(payload, authToken);
+          packageToAppend = {
+            id: saved.id || localPackage.id,
+            name: saved.name,
+            weightKg: saved.weightKg,
+            lengthCm: saved.lengthCm,
+            widthCm: saved.widthCm,
+            heightCm: saved.heightCm,
+          };
+          setSellerSavedPackages((prev) =>
+            mergeShippingPackageLists(prev, [packageToAppend]),
+          );
+          createdInSellerLibrary = true;
+          toast.success(
+            isAr
+              ? "تم حفظ الحزمة. اضغط علامة الصح لإضافتها لهذا المنتج."
+              : "Package saved. Use the check button to include it in this product.",
+          );
+        } catch (error) {
+          console.error("Failed to persist seller package:", error);
+          toast.error(
+            isAr
+              ? "تعذر حفظ الحزمة في حسابك. تمت إضافتها لهذا المنتج فقط."
+              : "Could not save package to your account. Added to this product only.",
+          );
+        } finally {
+          setIsSavingPackage(false);
+        }
+      }
+    }
+
+    if (createdInSellerLibrary) {
+      resetDraftPackage();
+      return;
+    }
+
+    const nextList = mergeShippingPackageLists(shippingPackages, [
+      packageToAppend,
+    ]);
+    onUpdate({ packages: nextList });
+    resetDraftPackage();
+  }, [
+    shippingRequired,
+    draftPackage.name,
+    draftPackage.weightKg,
+    draftPackage.lengthCm,
+    draftPackage.widthCm,
+    draftPackage.heightCm,
+    normalizedUserRole,
+    token,
+    shippingPackages,
+    onUpdate,
+    resetDraftPackage,
+    isAr,
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -611,7 +1162,10 @@ export const Step2PricingInventory = ({
                   value={product.identity.sku || ""}
                   onChange={(e) =>
                     onUpdate({
-                      identity: { ...product.identity, sku: e.target.value },
+                      identity: {
+                        ...product.identity,
+                        sku: normalizeSku(e.target.value),
+                      },
                     })
                   }
                   className={`h-10 rounded-xl px-3 pr-9 ${errors["identity.sku"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
@@ -625,6 +1179,11 @@ export const Step2PricingInventory = ({
                   <RefreshCw size={14} />
                 </button>
               </div>
+              {isSkuTaken ? (
+                <p className="text-[10px] font-semibold text-red-500">
+                  {isAr ? "هذا الـ SKU مستخدم بالفعل." : "This SKU is already in use."}
+                </p>
+              ) : null}
               {errors["identity.sku"] ? (
                 <p className="text-[10px] font-medium text-red-500">
                   {errors["identity.sku"]}
@@ -730,7 +1289,7 @@ export const Step2PricingInventory = ({
 
           {/* Admin Variants (Dynamic) */}
           {adminVariants.map((v) => {
-            const values = getParsedVariantValues(v.name.en);
+            const values = getSelectedVariantValues(v);
             return (
               <div key={v.id} className="mt-5">
                 <div className="flex items-center justify-between gap-3">
@@ -756,7 +1315,7 @@ export const Step2PricingInventory = ({
 
                 {values.length ? (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {values.map((val) => (
+                    {values.map((val: string) => (
                       <span
                         key={val}
                         className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-100"
@@ -765,13 +1324,30 @@ export const Step2PricingInventory = ({
                         <button
                           type="button"
                           onClick={() => {
-                            const next = values.filter((x) => x !== val);
-                            upsertSpec({
-                              keyEn: v.name.en,
-                              keyAr: v.name.ar,
-                              valueEn: next.join(", "),
-                              valueAr: next.join(", "),
+                            const selectedIds =
+                              getSelectedOptionIdsForTemplate(v);
+                            const nextIds = selectedIds.filter((optionId) => {
+                              const targetOption = v.option_values.find(
+                                (opt) => getTemplateOptionId(opt) === optionId,
+                              );
+                              if (!targetOption) return false;
+
+                              const target = val.trim().toLowerCase();
+                              const enLabel = String(
+                                (targetOption.label as any)?.en || "",
+                              )
+                                .trim()
+                                .toLowerCase();
+                              const arLabel = String(
+                                (targetOption.label as any)?.ar || "",
+                              )
+                                .trim()
+                                .toLowerCase();
+
+                              return enLabel !== target && arLabel !== target;
                             });
+
+                            upsertVariantSelectionFromTemplate(v, nextIds);
                           }}
                           className="rounded-full p-0.5 text-emerald-700 transition-colors hover:bg-emerald-100"
                           aria-label={isAr ? "حذف" : "Remove"}
@@ -818,13 +1394,16 @@ export const Step2PricingInventory = ({
                 >
                   {isAr ? "كمية المخزون (الإجمالي)" : "Total stock quantity"}:{" "}
                   {distributionEnabled
-                    ? variantStockTotal
+                    ? `${variantStockTotal}${distributionCap ? ` / ${distributionCap}` : ""}`
                     : product.inventory.stockQuantity || 0}
                 </span>
                 {distributionEnabled ? (
                   <button
                     type="button"
-                    onClick={clearVariantStock}
+                    onClick={() => {
+                      clearVariantStock();
+                      setDistributionCap(0);
+                    }}
                     className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
                   >
                     {isAr ? "مسح التوزيع" : "Clear distribution"}
@@ -835,20 +1414,16 @@ export const Step2PricingInventory = ({
                     disabled={!canDistribute}
                     onClick={() => {
                       if (!canDistribute) return;
-                      const initial: VariantStockEntry[] = [];
                       const seedTotal = Math.max(
                         0,
                         Math.floor(product.inventory.stockQuantity || 0),
                       );
-                      let first = true;
-                      getVariantCombinations.forEach((combo) => {
-                        const stock = first ? seedTotal : 0;
-                        first = false;
-                        initial.push({
+                      setDistributionCap(seedTotal);
+                      const initial: VariantStockEntry[] =
+                        getVariantCombinations.map((combo) => ({
                           options: combo,
-                          stock,
-                        });
-                      });
+                          stock: 0,
+                        }));
                       setVariantStockEntries(initial);
                     }}
                     className="h-9 rounded-xl bg-emerald-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-200"
@@ -883,9 +1458,10 @@ export const Step2PricingInventory = ({
                       const key = keys.map((k) => `${k}:${combo[k]}`).join("|");
                       const current = variantStockMap.get(key)?.stock ?? 0;
 
-                      // Display string: "Red / Cotton / Large"
-                      const displayParts = keys.map((k) => combo[k]);
-                      const displayStr = displayParts.join(" / ");
+                      const isColorKey = (k: string) => {
+                        const normalized = k.trim().toLowerCase();
+                        return normalized === "colors" || normalized === "color";
+                      };
 
                       return (
                         <div
@@ -893,7 +1469,34 @@ export const Step2PricingInventory = ({
                           className="grid grid-cols-[1fr_160px] items-center px-3 py-3"
                         >
                           <div className="px-2 text-sm font-bold text-gray-900">
-                            {displayStr}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {keys.map((k, idx) => {
+                                const value = combo[k];
+                                const hex = isColorKey(k)
+                                  ? colorHexByName.get(
+                                      String(value).trim().toLowerCase(),
+                                    ) || "#9ca3af"
+                                  : null;
+
+                                return (
+                                  <span
+                                    key={`${key}-${k}-${value}`}
+                                    className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-0.5 text-xs font-bold text-gray-800 ring-1 ring-gray-200"
+                                  >
+                                    {hex ? (
+                                      <span
+                                        className="h-2.5 w-2.5 rounded-full ring-1 ring-black/10"
+                                        style={{ backgroundColor: hex }}
+                                      />
+                                    ) : null}
+                                    <span>{value}</span>
+                                    {idx < keys.length - 1 ? (
+                                      <span className="text-gray-400">/</span>
+                                    ) : null}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           </div>
                           <div className="px-2">
                             <Input
@@ -901,11 +1504,44 @@ export const Step2PricingInventory = ({
                               min={0}
                               value={current}
                               onChange={(e) => {
-                                const nextValue = Math.max(
+                                const requestedValue = Math.max(
                                   0,
                                   parseInt(e.target.value || "0"),
                                 );
                                 const nextEntries: VariantStockEntry[] = [];
+                                let totalWithoutCurrent = 0;
+
+                                getVariantCombinations.forEach((c) => {
+                                  const cKeys = Object.keys(c).sort();
+                                  const cKey = cKeys
+                                    .map((x) => `${x}:${c[x]}`)
+                                    .join("|");
+                                  if (cKey !== key) {
+                                    totalWithoutCurrent +=
+                                      variantStockMap.get(cKey)?.stock ?? 0;
+                                  }
+                                });
+
+                                const cap = Math.max(
+                                  0,
+                                  Math.floor(distributionCap || 0),
+                                );
+                                const maxForCurrent = Math.max(
+                                  0,
+                                  cap - totalWithoutCurrent,
+                                );
+                                const nextValue = Math.min(
+                                  requestedValue,
+                                  maxForCurrent,
+                                );
+
+                                if (requestedValue > maxForCurrent) {
+                                  toast.error(
+                                    isAr
+                                      ? `لا يمكن تجاوز إجمالي المخزون (${cap}).`
+                                      : `Cannot exceed total stock (${cap}).`,
+                                  );
+                                }
 
                                 getVariantCombinations.forEach((c) => {
                                   const cKeys = Object.keys(c).sort();
@@ -1054,25 +1690,11 @@ export const Step2PricingInventory = ({
                 </div>
                 <button
                   type="button"
-                  disabled={!shippingRequired || !draftPackage.name.trim()}
+                  disabled={
+                    !shippingRequired || !draftPackage.name.trim() || isSavingPackage
+                  }
                   onClick={() => {
-                    const nextList = [
-                      ...shippingPackages,
-                      {
-                        ...draftPackage,
-                        id: makeId(),
-                        name: draftPackage.name.trim(),
-                      },
-                    ];
-                    onUpdate({ packages: nextList });
-                    setDraftPackage({
-                      id: "",
-                      name: "",
-                      weightKg: undefined,
-                      lengthCm: undefined,
-                      widthCm: undefined,
-                      heightCm: undefined,
-                    });
+                    void handleAddPackage();
                   }}
                   className="inline-flex h-9 items-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white disabled:bg-emerald-200"
                 >
@@ -1173,6 +1795,62 @@ export const Step2PricingInventory = ({
                   </div>
                 </div>
               </div>
+
+              {normalizedUserRole === "seller" && sellerSavedPackages.length ? (
+                <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/30 p-3">
+                  <p className="text-xs font-bold text-emerald-800">
+                    {isAr
+                      ? "حزمك المحفوظة (اضغط علامة الصح لإضافتها للمنتج)"
+                      : "Your saved packages (tap check to add to this product)"}
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {sellerSavedPackages.map((pkg) => {
+                      const selected = isPackageSelected(pkg);
+                      return (
+                        <div
+                          key={`saved-${packageIdentity(pkg)}`}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-white px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-gray-900">
+                              {pkg.name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {pkg.lengthCm ?? 0}×{pkg.widthCm ?? 0}×
+                              {pkg.heightCm ?? 0} cm • {pkg.weightKg ?? 0} kg
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void handleDeleteSavedPackage(pkg);
+                              }}
+                              disabled={deletingPackageId === pkg.id}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              aria-label={isAr ? "حذف الحزمة" : "Delete package"}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => togglePackageSelection(pkg)}
+                              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+                                selected
+                                  ? "border-emerald-300 bg-emerald-100 text-emerald-700"
+                                  : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                              }`}
+                              aria-label={isAr ? "تحديد الحزمة" : "Select package"}
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
 
               {shippingPackages.length ? (
                 <div className="mt-4 space-y-2">
@@ -1532,8 +2210,17 @@ export const Step2PricingInventory = ({
                       if (Array.isArray(parsed)) {
                         const pruned: VariantStockEntry[] = parsed.filter(
                           (x: any) => {
-                            const color =
+                            const directColor =
                               typeof x?.color === "string" ? x.color : "";
+                            const optionColor =
+                              x?.options && typeof x.options === "object"
+                                ? typeof x.options?.Color === "string"
+                                  ? x.options.Color
+                                  : typeof x.options?.Colors === "string"
+                                    ? x.options.Colors
+                                    : ""
+                                : "";
+                            const color = directColor || optionColor;
                             const colorOk =
                               !color || nextColorNames.includes(color);
                             return colorOk;
@@ -1681,10 +2368,11 @@ export const Step2PricingInventory = ({
                 {activeVariant.option_values.map((opt) => {
                   const label =
                     (opt.label as any)[locale] || opt.label.en || "";
-                  const checked = tempVariantValues.has(label);
+                  const optionId = getTemplateOptionId(opt);
+                  const checked = tempVariantValues.has(optionId);
                   return (
                     <label
-                      key={opt.id}
+                      key={optionId}
                       className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm transition-colors hover:bg-gray-50"
                     >
                       <input
@@ -1692,8 +2380,8 @@ export const Step2PricingInventory = ({
                         checked={checked}
                         onChange={(e) => {
                           const next = new Set(tempVariantValues);
-                          if (e.target.checked) next.add(label);
-                          else next.delete(label);
+                          if (e.target.checked) next.add(optionId);
+                          else next.delete(optionId);
                           setTempVariantValues(next);
                         }}
                         className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-200"
@@ -1719,12 +2407,7 @@ export const Step2PricingInventory = ({
                 type="button"
                 onClick={() => {
                   const selected = Array.from(tempVariantValues);
-                  upsertSpec({
-                    keyEn: activeVariant.name.en,
-                    keyAr: activeVariant.name.ar,
-                    valueEn: selected.join(", "),
-                    valueAr: selected.join(", "),
-                  });
+                  upsertVariantSelectionFromTemplate(activeVariant, selected);
                   setVariantModalOpen(false);
                 }}
                 className="h-10 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"

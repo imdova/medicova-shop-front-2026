@@ -37,8 +37,9 @@ import {
   Seller as SellerServiceType,
 } from "@/services/sellerService";
 import { getTags } from "@/services/tagService";
+import { extractSessionToken } from "@/lib/auth/sessionToken";
+import { getProducts } from "@/services/productService";
 import { MultiCategory, Brand } from "@/types";
-import { apiClient } from "@/lib/apiClient";
 import Image from "next/image";
 import { ProductTag } from "@/types/product";
 
@@ -51,7 +52,6 @@ interface Step1CoreInfoProps {
   userRole?: string;
 }
 
-// Standardized Design Tokens
 const COLORS = {
   brand: "lab(58.4941% -47.8529 35.5714)",
   border: "border-gray-200",
@@ -207,8 +207,8 @@ export const Step1CoreInfo = ({
   token: propToken,
   userRole: propUserRole,
 }: Step1CoreInfoProps) => {
-  const { data: session } = useSession();
-  const token = propToken || (session as any)?.accessToken;
+  const { data: session, status: sessionStatus } = useSession();
+  const token = propToken || extractSessionToken(session);
   const userRole = propUserRole || (session as any)?.user?.role;
   const [categories, setCategories] = useState<MultiCategory[]>([]);
   const [subCategories, setSubCategories] = useState<MultiCategory[]>([]);
@@ -221,7 +221,28 @@ export const Step1CoreInfo = ({
   const [availableTags, setAvailableTags] = useState<ProductTag[]>([]);
   const [tagQuery, setTagQuery] = useState("");
   const [tagOpen, setTagOpen] = useState(false);
+  const [knownSlugEn, setKnownSlugEn] = useState<Set<string>>(new Set());
+  const [knownSlugAr, setKnownSlugAr] = useState<Set<string>>(new Set());
   const tagBoxRef = useRef<HTMLDivElement>(null);
+  const initialSlugEnRef = useRef("");
+  const initialSlugArRef = useRef("");
+
+  const normalizeSlug = useCallback((value: string) => value.trim().toLowerCase(), []);
+  const normalizeSlugEnInput = useCallback(
+    (value: string) =>
+      value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .replace(/-{2,}/g, "-"),
+    [],
+  );
+  const normalizeSlugArInput = useCallback(
+    (value: string) =>
+      value.trim().replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, ""),
+    [],
+  );
 
   useEffect(() => {
     const imgs = (product.images || []) as any[];
@@ -275,6 +296,17 @@ export const Step1CoreInfo = ({
     [onUpdate, product.images],
   );
 
+  const handleSetPrimaryImageAt = useCallback(
+    (idx: number) => {
+      const current = [...(product.images || [])];
+      if (!current[idx] || idx === 0) return;
+      const [picked] = current.splice(idx, 1);
+      current.unshift(picked);
+      onUpdate({ images: current });
+    },
+    [onUpdate, product.images],
+  );
+
   const selectedTagIds = product.tags || [];
   const toggleTag = useCallback(
     (tagId: string) => {
@@ -299,11 +331,73 @@ export const Step1CoreInfo = ({
   }, []);
 
   useEffect(() => {
-    if (!token) return;
-    getTags(token).then(setAvailableTags);
-  }, [token]);
+    if (!token && sessionStatus === "loading") return;
+
+    let cancelled = false;
+    const loadTags = async () => {
+      const tags = await getTags(token);
+      if (!cancelled) setAvailableTags(tags);
+    };
+    void loadTags();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, sessionStatus]);
 
   useEffect(() => {
+    if (!initialSlugEnRef.current && product.slugEn) {
+      initialSlugEnRef.current = normalizeSlug(product.slugEn);
+    }
+    if (!initialSlugArRef.current && product.slugAr) {
+      initialSlugArRef.current = normalizeSlug(product.slugAr);
+    }
+  }, [product.slugAr, product.slugEn, normalizeSlug]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    const loadKnownSlugs = async () => {
+      try {
+        const products = await getProducts(token);
+        if (cancelled) return;
+
+        const enSet = new Set<string>();
+        const arSet = new Set<string>();
+        products.forEach((item: any) => {
+          if (item?.slugEn) enSet.add(normalizeSlug(String(item.slugEn)));
+          if (item?.slugAr) arSet.add(normalizeSlug(String(item.slugAr)));
+        });
+        setKnownSlugEn(enSet);
+        setKnownSlugAr(arSet);
+      } catch (error) {
+        if (!cancelled) {
+          setKnownSlugEn(new Set());
+          setKnownSlugAr(new Set());
+        }
+      }
+    };
+
+    void loadKnownSlugs();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, normalizeSlug]);
+
+  const normalizedSlugEn = normalizeSlug(product.slugEn || "");
+  const normalizedSlugAr = normalizeSlug(product.slugAr || "");
+  const isSlugEnTaken =
+    !!normalizedSlugEn &&
+    knownSlugEn.has(normalizedSlugEn) &&
+    normalizedSlugEn !== initialSlugEnRef.current;
+  const isSlugArTaken =
+    !!normalizedSlugAr &&
+    knownSlugAr.has(normalizedSlugAr) &&
+    normalizedSlugAr !== initialSlugArRef.current;
+
+  useEffect(() => {
+    if (!token) return;
+
     const init = async () => {
       console.log(
         "DEBUG: Step1CoreInfo init called | token:",
@@ -554,7 +648,7 @@ export const Step1CoreInfo = ({
                     onChange={(e) =>
                       onUpdate({
                         title: { ...product.title, en: e.target.value },
-                        slugEn: e.target.value.toLowerCase().replace(/ /g, "-"),
+                        slugEn: normalizeSlugEnInput(e.target.value),
                       })
                     }
                     className={`h-10 rounded-lg px-3 ${errors["title.en"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
@@ -574,9 +668,18 @@ export const Step1CoreInfo = ({
                   <Input
                     placeholder="premium-antimicrobial-scrub-top"
                     value={product.slugEn || ""}
-                    onChange={(e) => onUpdate({ slugEn: e.target.value })}
+                    onChange={(e) =>
+                      onUpdate({ slugEn: normalizeSlugEnInput(e.target.value) })
+                    }
                     className={`h-10 rounded-lg px-3 font-mono text-xs ${errors.slugEn ? "border-red-300" : "border-gray-200"} ${COLORS.focus} bg-gray-50/30`}
                   />
+                  {isSlugEnTaken ? (
+                    <p className="text-[10px] font-semibold text-red-500">
+                      {locale === "ar"
+                        ? "هذا الرابط مستخدم بالفعل."
+                        : "This slug is already in use."}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label
@@ -622,7 +725,7 @@ export const Step1CoreInfo = ({
                     onChange={(e) =>
                       onUpdate({
                         title: { ...product.title, ar: e.target.value },
-                        slugAr: e.target.value.replace(/ /g, "-"),
+                        slugAr: normalizeSlugArInput(e.target.value),
                       })
                     }
                     className={`h-10 rounded-lg px-3 text-right ${errors["title.ar"] ? "border-red-300" : "border-gray-200"} ${COLORS.focus} text-sm placeholder:text-gray-300`}
@@ -642,9 +745,18 @@ export const Step1CoreInfo = ({
                   <Input
                     placeholder="سكراب-طبي-ممتاز"
                     value={product.slugAr || ""}
-                    onChange={(e) => onUpdate({ slugAr: e.target.value })}
+                    onChange={(e) =>
+                      onUpdate({ slugAr: normalizeSlugArInput(e.target.value) })
+                    }
                     className={`h-10 rounded-lg px-3 text-right font-mono text-xs ${errors.slugAr ? "border-red-300" : "border-gray-200"} ${COLORS.focus} bg-gray-50/30`}
                   />
+                  {isSlugArTaken ? (
+                    <p className="text-[10px] font-semibold text-red-500">
+                      {locale === "ar"
+                        ? "هذا الرابط مستخدم بالفعل."
+                        : "This slug is already in use."}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label
@@ -983,13 +1095,34 @@ export const Step1CoreInfo = ({
                       key={`${s.keyEn || "spec"}-${idx}`}
                       className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-gray-900">
-                          {s.keyEn}
-                        </p>
-                        <p className="truncate text-xs text-gray-500">
-                          {s.valueEn}
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          <div className="rounded-lg border border-gray-100 bg-gray-50/60 px-2.5 py-2">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                              EN
+                            </p>
+                            <p className="mt-0.5 truncate text-sm font-bold text-gray-900">
+                              {s.keyEn || "—"}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-gray-500">
+                              {s.valueEn || "—"}
+                            </p>
+                          </div>
+                          <div
+                            dir="rtl"
+                            className="rounded-lg border border-gray-100 bg-gray-50/60 px-2.5 py-2"
+                          >
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                              AR
+                            </p>
+                            <p className="mt-0.5 truncate text-sm font-bold text-gray-900">
+                              {s.keyAr || s.keyEn || "—"}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-gray-500">
+                              {s.valueAr || s.valueEn || "—"}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                       <button
                         type="button"
@@ -1125,18 +1258,36 @@ export const Step1CoreInfo = ({
                         className="object-cover"
                         sizes="72px"
                       />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleRemoveImageAt(idx);
-                        }}
-                        className="absolute right-1 top-1 rounded-md bg-white/90 p-1 text-gray-400 opacity-0 shadow-sm transition-opacity hover:text-rose-600 group-hover:opacity-100"
-                        aria-label={locale === "ar" ? "إزالة" : "Remove"}
-                      >
-                        <X size={12} />
-                      </button>
+                      <div className="absolute right-1 top-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSetPrimaryImageAt(idx);
+                          }}
+                          className="rounded-md bg-white/90 p-1 text-emerald-600 shadow-sm transition-colors hover:bg-emerald-50"
+                          aria-label={
+                            locale === "ar"
+                              ? "تعيين كرئيسية"
+                              : "Set as primary"
+                          }
+                        >
+                          <Check size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveImageAt(idx);
+                          }}
+                          className="rounded-md bg-white/90 p-1 text-gray-400 shadow-sm transition-colors hover:text-rose-600"
+                          aria-label={locale === "ar" ? "إزالة" : "Remove"}
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

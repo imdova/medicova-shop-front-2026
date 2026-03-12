@@ -6,6 +6,7 @@ interface ApiRequestConfig {
   body?: Record<string, unknown> | FormData;
   headers?: Record<string, string>;
   token?: string;
+  suppressErrorLog?: boolean;
 }
 
 function getBaseUrl(): string {
@@ -23,23 +24,28 @@ function getBaseUrl(): string {
   return baseUrl.replace(/\/$/, "");
 }
 
-
-
 export async function apiClient<T = unknown>({
   endpoint,
   method = "POST",
   body,
   headers,
   token,
+  suppressErrorLog = false,
 }: ApiRequestConfig): Promise<T> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
-
-
+  const normalizedToken = token?.trim();
+  const authorizationHeader = normalizedToken
+    ? /^Bearer\s+/i.test(normalizedToken)
+      ? normalizedToken
+      : `Bearer ${normalizedToken}`
+    : undefined;
 
   const isFormData = body instanceof FormData;
 
-  console.log(`DEBUG [apiClient]: ${method} ${url} | Token: ${token ? `${token.substring(0, 10)}...` : "MISSING"}`);
+  console.log(
+    `DEBUG [apiClient]: ${method} ${url} | Token: ${authorizationHeader ? "PRESENT" : "MISSING"}`,
+  );
 
   const fetchOptions: RequestInit = {
     method,
@@ -47,7 +53,7 @@ export async function apiClient<T = unknown>({
       ...(!isFormData && method !== "GET" && method !== "DELETE"
         ? { "Content-Type": "application/json" }
         : {}),
-      ...(token ? { Authorization: `Bearer ${token.trim()}` } : {}),
+      ...(authorizationHeader ? { Authorization: authorizationHeader } : {}),
       ...headers,
     },
   };
@@ -78,7 +84,12 @@ export async function apiClient<T = unknown>({
 
   if (!response.ok) {
     // Log API error details to help debugging
-    console.error(`API Error (${response.status} ${url}):`, JSON.stringify(data, null, 2));
+    if (!suppressErrorLog) {
+      console.error(
+        `API Error (${response.status} ${url}):`,
+        JSON.stringify(data, null, 2),
+      );
+    }
 
     const errorMsg =
       data.errors?.message?.[0] ||
