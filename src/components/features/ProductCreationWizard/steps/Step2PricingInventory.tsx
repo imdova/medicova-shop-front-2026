@@ -1027,16 +1027,18 @@ export const Step2PricingInventory = ({
       heightCm: payload.heightCm,
     };
 
-    let packageToAppend = localPackage;
-    let createdInSellerLibrary = false;
-
     if (normalizedUserRole === "seller") {
+      // Show immediately in seller package library, then reconcile with server response.
+      setSellerSavedPackages((prev) =>
+        mergeShippingPackageLists(prev, [localPackage]),
+      );
+
       const authToken = token?.trim();
       if (authToken) {
         setIsSavingPackage(true);
         try {
           const saved = await createPackage(payload, authToken);
-          packageToAppend = {
+          const persistedPackage: ShippingPackage = {
             id: saved.id || localPackage.id,
             name: saved.name,
             weightKg: saved.weightKg,
@@ -1045,9 +1047,11 @@ export const Step2PricingInventory = ({
             heightCm: saved.heightCm,
           };
           setSellerSavedPackages((prev) =>
-            mergeShippingPackageLists(prev, [packageToAppend]),
+            mergeShippingPackageLists(
+              prev.filter((item) => item.id !== localPackage.id),
+              [persistedPackage],
+            ),
           );
-          createdInSellerLibrary = true;
           toast.success(
             isAr
               ? "تم حفظ الحزمة. اضغط علامة الصح لإضافتها لهذا المنتج."
@@ -1057,23 +1061,25 @@ export const Step2PricingInventory = ({
           console.error("Failed to persist seller package:", error);
           toast.error(
             isAr
-              ? "تعذر حفظ الحزمة في حسابك. تمت إضافتها لهذا المنتج فقط."
-              : "Could not save package to your account. Added to this product only.",
+              ? "تعذر حفظ الحزمة على السيرفر. تمت إضافتها محليًا ويمكنك اختيارها الآن."
+              : "Could not save package on server. It was added locally and can be selected now.",
           );
         } finally {
           setIsSavingPackage(false);
         }
+      } else {
+        toast.error(
+          isAr
+            ? "التوكن غير متاح. تمت إضافة الحزمة محليًا ويمكنك اختيارها."
+            : "Token is missing. Package was added locally and can be selected.",
+        );
       }
-    }
 
-    if (createdInSellerLibrary) {
       resetDraftPackage();
       return;
     }
 
-    const nextList = mergeShippingPackageLists(shippingPackages, [
-      packageToAppend,
-    ]);
+    const nextList = mergeShippingPackageLists(shippingPackages, [localPackage]);
     onUpdate({ packages: nextList });
     resetDraftPackage();
   }, [
@@ -1796,59 +1802,67 @@ export const Step2PricingInventory = ({
                 </div>
               </div>
 
-              {normalizedUserRole === "seller" && sellerSavedPackages.length ? (
+              {normalizedUserRole === "seller" ? (
                 <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/30 p-3">
                   <p className="text-xs font-bold text-emerald-800">
                     {isAr
                       ? "حزمك المحفوظة (اضغط علامة الصح لإضافتها للمنتج)"
                       : "Your saved packages (tap check to add to this product)"}
                   </p>
-                  <div className="mt-2 space-y-2">
-                    {sellerSavedPackages.map((pkg) => {
-                      const selected = isPackageSelected(pkg);
-                      return (
-                        <div
-                          key={`saved-${packageIdentity(pkg)}`}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-white px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-gray-900">
-                              {pkg.name}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {pkg.lengthCm ?? 0}×{pkg.widthCm ?? 0}×
-                              {pkg.heightCm ?? 0} cm • {pkg.weightKg ?? 0} kg
-                            </p>
+                  {sellerSavedPackages.length ? (
+                    <div className="mt-2 space-y-2">
+                      {sellerSavedPackages.map((pkg) => {
+                        const selected = isPackageSelected(pkg);
+                        return (
+                          <div
+                            key={`saved-${packageIdentity(pkg)}`}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-white px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-gray-900">
+                                {pkg.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {pkg.lengthCm ?? 0}×{pkg.widthCm ?? 0}×
+                                {pkg.heightCm ?? 0} cm • {pkg.weightKg ?? 0} kg
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void handleDeleteSavedPackage(pkg);
+                                }}
+                                disabled={deletingPackageId === pkg.id}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                aria-label={isAr ? "حذف الحزمة" : "Delete package"}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => togglePackageSelection(pkg)}
+                                className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+                                  selected
+                                    ? "border-emerald-300 bg-emerald-100 text-emerald-700"
+                                    : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                                }`}
+                                aria-label={isAr ? "تحديد الحزمة" : "Select package"}
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void handleDeleteSavedPackage(pkg);
-                              }}
-                              disabled={deletingPackageId === pkg.id}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                              aria-label={isAr ? "حذف الحزمة" : "Delete package"}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => togglePackageSelection(pkg)}
-                              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
-                                selected
-                                  ? "border-emerald-300 bg-emerald-100 text-emerald-700"
-                                  : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
-                              }`}
-                              aria-label={isAr ? "تحديد الحزمة" : "Select package"}
-                            >
-                              <Check className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-emerald-700/80">
+                      {isAr
+                        ? "لا توجد حزم محفوظة حتى الآن. أضف حزمة جديدة من الأعلى."
+                        : "No saved packages yet. Add one above first."}
+                    </p>
+                  )}
                 </div>
               ) : null}
 

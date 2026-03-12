@@ -29,6 +29,7 @@ export function ProductsContent({ state, actions }: ProductsContentProps) {
           categoryMap={state.lookups.categoryMap}
           publishStatus={state.publishStatus}
           approvingId={state.approvingId}
+          duplicatingId={state.duplicatingId}
           currentPage={state.currentPage}
           totalItems={state.filteredProducts.length}
           itemsPerPage={state.itemsPerPage}
@@ -36,10 +37,12 @@ export function ProductsContent({ state, actions }: ProductsContentProps) {
           editPath={state.routes.editPath}
           onSetPublish={actions.setPublishValue}
           onToggleApprove={actions.toggleApprove}
+          onDuplicate={actions.duplicateProduct}
           onDelete={actions.requestDelete}
         />
       ) : (
         <ProductsTableView
+          mode={state.mode}
           items={state.paginatedProducts}
           locale={state.locale}
           isAr={state.isAr}
@@ -49,6 +52,7 @@ export function ProductsContent({ state, actions }: ProductsContentProps) {
           childCategoryMap={state.lookups.childCategoryMap}
           publishStatus={state.publishStatus}
           approvingId={state.approvingId}
+          duplicatingId={state.duplicatingId}
           currentPage={state.currentPage}
           totalItems={state.filteredProducts.length}
           itemsPerPage={state.itemsPerPage}
@@ -56,6 +60,7 @@ export function ProductsContent({ state, actions }: ProductsContentProps) {
           editPath={state.routes.editPath}
           onSetPublish={actions.setPublishValue}
           onToggleApprove={actions.toggleApprove}
+          onDuplicate={actions.duplicateProduct}
           onDelete={actions.requestDelete}
         />
       )}

@@ -167,12 +167,107 @@ export function getStockStatus(product: ApiProduct): {
   label: string;
   dot: "green" | "red" | "orange";
 } {
-  const quantity =
-    product.stock ?? product.stockQuantity ?? product.inventory?.stockQuantity;
-  if (quantity === null || quantity === undefined) {
+  const toNumber = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  };
+
+  const normalizeStockPair = (
+    value: unknown,
+  ): { remaining: number; total: number } | null => {
+    if (!value || typeof value !== "object") return null;
+    const stockObj = value as Record<string, unknown>;
+    const remainingRaw =
+      toNumber(stockObj.remaining) ??
+      toNumber(stockObj.available) ??
+      toNumber(stockObj.left);
+    const totalRaw =
+      toNumber(stockObj.total) ??
+      toNumber(stockObj.stockQuantity) ??
+      toNumber(stockObj.quantity);
+
+    if (remainingRaw === null && totalRaw === null) return null;
+
+    const remaining = Math.max(
+      0,
+      Math.floor(remainingRaw ?? totalRaw ?? 0),
+    );
+    const total = Math.max(0, Math.floor(totalRaw ?? remaining));
+    return { remaining, total };
+  };
+
+  const fromInventoryObject = normalizeStockPair(
+    (product as any)?.inventory?.stock,
+  );
+  const fromRootObject = normalizeStockPair((product as any)?.stock);
+  const fromNumeric = toNumber(
+    (product as any)?.inventory?.stockQuantity ??
+      (product as any)?.stockQuantity ??
+      (typeof (product as any)?.stock === "number"
+        ? (product as any)?.stock
+        : undefined),
+  );
+
+  const resolved =
+    fromInventoryObject ??
+    fromRootObject ??
+    (fromNumeric !== null
+      ? {
+          remaining: Math.max(0, Math.floor(fromNumeric)),
+          total: Math.max(0, Math.floor(fromNumeric)),
+        }
+      : null);
+
+  if (!resolved) {
     return { label: "—", dot: "green" };
   }
-  if (quantity === 0) return { label: "Out of Stock", dot: "red" };
-  if (quantity < 10) return { label: `${quantity} in stock (Low)`, dot: "orange" };
-  return { label: `${quantity} in stock`, dot: "green" };
+
+  const { remaining, total } = resolved;
+  const lowThreshold = total > 0 ? Math.max(1, Math.ceil(total * 0.1)) : 10;
+  const dot =
+    remaining <= 0 ? "red" : remaining <= lowThreshold ? "orange" : "green";
+
+  return { label: `${remaining} / ${total}`, dot };
+}
+
+export function getProductPrimaryImage(product: ApiProduct): string {
+  const pickUrl = (value: unknown): string => {
+    if (!value) return "";
+    if (typeof value === "string") return value.trim();
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const picked = pickUrl(item);
+        if (picked) return picked;
+      }
+      return "";
+    }
+    if (typeof value === "object") {
+      const obj = value as Record<string, unknown>;
+      return (
+        pickUrl(obj.url) ||
+        pickUrl(obj.src) ||
+        pickUrl(obj.imageUrl) ||
+        pickUrl(obj.path) ||
+        ""
+      );
+    }
+    return "";
+  };
+
+  const media = (product as any)?.media;
+
+  return (
+    pickUrl(media?.featuredImages) ||
+    pickUrl(media?.galleryImages) ||
+    pickUrl((product as any)?.featuredImages) ||
+    pickUrl((product as any)?.galleryImages) ||
+    pickUrl((product as any)?.images) ||
+    pickUrl((product as any)?.image) ||
+    pickUrl(media?.productVideo?.imageUrl) ||
+    ""
+  );
 }

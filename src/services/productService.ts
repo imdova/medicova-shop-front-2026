@@ -84,6 +84,7 @@ export interface CreateProductPayload {
       imageUrl?: string;
     };
   };
+  tags?: string[];
   approved: boolean;
   rate: number;
   draft?: boolean;

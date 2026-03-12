@@ -3,7 +3,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
-import { approveProduct, ApiProduct, deleteProduct, getProducts } from "@/services/productService";
+import {
+  approveProduct,
+  ApiProduct,
+  createProduct,
+  CreateProductPayload,
+  deleteProduct,
+  getProductById,
+  getProducts,
+} from "@/services/productService";
 import { getAllSubCategoryChildren, getCategories, getSubCategories } from "@/services/categoryService";
 import { getSellers, Seller } from "@/services/sellerService";
 import { LanguageType } from "@/util/translations";
@@ -13,6 +21,312 @@ import { computeStats, filterProducts } from "./computations";
 import { mapCategoryTitles, mapSellersById } from "./lookupMaps";
 
 interface UseProductManagementArgs { mode: ProductManagementMode; locale: LanguageType; }
+
+function normalizeId(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const objectValue = value as { _id?: string; id?: string };
+    return String(objectValue._id || objectValue.id || "").trim();
+  }
+  return "";
+}
+
+function normalizeArrayOfStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => String(entry || "").trim())
+    .filter(Boolean);
+}
+
+function getNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toStockStatus(value: unknown): "in_stock" | "out_of_stock" | "on_backorder" {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "out_of_stock") return "out_of_stock";
+  if (raw === "on_backorder") return "on_backorder";
+  return "in_stock";
+}
+
+function slugifyEn(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
+function slugifyAr(value: string): string {
+  return value
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function addCopySuffix(base: string, suffix: string, separator = " "): string {
+  const trimmed = String(base || "").trim();
+  if (!trimmed) return suffix;
+  return `${trimmed}${separator}${suffix}`;
+}
+
+function normalizeSpecification(spec: any): {
+  keyEn?: string;
+  keyAr?: string;
+  valueEn?: string;
+  valueAr?: string;
+} {
+  return {
+    keyEn: typeof spec?.keyEn === "string" ? spec.keyEn : undefined,
+    keyAr: typeof spec?.keyAr === "string" ? spec.keyAr : undefined,
+    valueEn: typeof spec?.valueEn === "string" ? spec.valueEn : undefined,
+    valueAr: typeof spec?.valueAr === "string" ? spec.valueAr : undefined,
+  };
+}
+
+function buildDuplicatePayload(
+  source: any,
+  options: {
+    mode: ProductManagementMode;
+    userStoreId: string;
+    copySuffix: string;
+  },
+): CreateProductPayload {
+  const modeCreatedBy = options.mode === "admin" ? "admin" : "seller";
+  const sourceCreatedBy =
+    source?.createdBy === "admin" || source?.createdBy === "seller"
+      ? source.createdBy
+      : modeCreatedBy;
+  const createdBy = modeCreatedBy || sourceCreatedBy;
+
+  const sourceStore =
+    normalizeId(source?.store) ||
+    normalizeId(source?.sellerId) ||
+    normalizeId(source?.seller);
+  const store =
+    options.mode === "seller"
+      ? options.userStoreId || sourceStore
+      : sourceStore || options.userStoreId;
+
+  const identitySku = String(
+    source?.identity?.sku || source?.sku || "",
+  ).trim();
+
+  const baseNameEn = String(source?.nameEn || source?.title?.en || "").trim();
+  const baseNameAr = String(source?.nameAr || source?.title?.ar || "").trim();
+
+  const baseSlugEn = String(
+    source?.slugEn || slugifyEn(baseNameEn),
+  ).trim();
+  const baseSlugAr = String(
+    source?.slugAr || slugifyAr(baseNameAr),
+  ).trim();
+
+  const duplicatedNameEn = addCopySuffix(baseNameEn, options.copySuffix, " ");
+  const duplicatedNameAr = addCopySuffix(baseNameAr, options.copySuffix, " ");
+
+  const duplicatedSlugEn = `${baseSlugEn || slugifyEn(duplicatedNameEn)}-${options.copySuffix
+    .toLowerCase()
+    .replace(/\s+/g, "-")}`.replace(/-{2,}/g, "-");
+  const duplicatedSlugAr = `${baseSlugAr || slugifyAr(duplicatedNameAr)}-${options.copySuffix
+    .toLowerCase()
+    .replace(/\s+/g, "-")}`.replace(/-{2,}/g, "-");
+
+  const duplicatedSku = identitySku
+    ? `${identitySku}-${options.copySuffix.toUpperCase().replace(/\s+/g, "-")}`
+    : options.copySuffix.toUpperCase().replace(/\s+/g, "-");
+
+  const pricing = source?.pricing || {};
+  const inventory = source?.inventory || {};
+  const inventoryStock = inventory?.stock || source?.stock || {};
+  const sourceShipping = source?.shipping || {};
+  const sourcePackages = Array.isArray(sourceShipping?.packages)
+    ? sourceShipping.packages
+    : Array.isArray(source?.packages)
+      ? source.packages
+      : [];
+  const media = source?.media || {};
+  const mediaGalleryImages = normalizeArrayOfStrings(media?.galleryImages);
+  const rootGalleryImages = normalizeArrayOfStrings(source?.galleryImages);
+  const rootImages = normalizeArrayOfStrings(source?.images);
+  const galleryImages = mediaGalleryImages.length
+    ? mediaGalleryImages
+    : rootGalleryImages.length
+      ? rootGalleryImages
+      : rootImages;
+
+  const featuredImage = String(
+    media?.featuredImages || source?.featuredImages || galleryImages[0] || "",
+  ).trim();
+
+  const specs = Array.isArray(source?.specifications)
+    ? source.specifications.map(normalizeSpecification)
+    : [];
+
+  const variants = Array.isArray(source?.variants)
+    ? source.variants
+        .map((variant: any) => normalizeId(variant))
+        .filter(Boolean)
+    : [];
+
+  const variantsStock = Array.isArray(inventory?.variantsStock)
+    ? inventory.variantsStock
+        .map((entry: any) => ({
+          name: String(entry?.name || "").trim(),
+          total: Math.max(0, Math.floor(getNumber(entry?.total, 0))),
+          remaining: Math.max(0, Math.floor(getNumber(entry?.remaining, 0))),
+        }))
+        .filter((entry: any) => entry.name)
+    : [];
+
+  const stockTotal = Math.max(
+    0,
+    Math.floor(
+      getNumber(
+        inventoryStock?.total,
+        getNumber(inventory?.stockQuantity, getNumber(source?.stockQuantity, 0)),
+      ),
+    ),
+  );
+  const stockRemaining = Math.max(
+    0,
+    Math.floor(getNumber(inventoryStock?.remaining, stockTotal)),
+  );
+
+  return {
+    nameEn: duplicatedNameEn,
+    nameAr: duplicatedNameAr,
+    slugEn: duplicatedSlugEn,
+    slugAr: duplicatedSlugAr,
+    highlightsEn: normalizeArrayOfStrings(source?.highlightsEn),
+    highlightsAr: normalizeArrayOfStrings(source?.highlightsAr),
+    identity: {
+      sku: duplicatedSku,
+      skuMode:
+        source?.identity?.skuMode === "auto" ? "auto" : "manual",
+    },
+    classification: {
+      category: normalizeId(source?.classification?.category || source?.category),
+      subcategory: normalizeId(
+        source?.classification?.subcategory || source?.subcategory,
+      ),
+      childCategory: normalizeId(
+        source?.classification?.childCategory || source?.childCategory,
+      ),
+      brand: normalizeId(source?.classification?.brand || source?.brand),
+      productType:
+        source?.classification?.productType === "Digital Product"
+          ? "Digital Product"
+          : "Physical Product",
+    },
+    descriptions: {
+      descriptionEn: String(
+        source?.descriptions?.descriptionEn || source?.descriptionEn || "",
+      ).trim(),
+      descriptionAr: String(
+        source?.descriptions?.descriptionAr || source?.descriptionAr || "",
+      ).trim(),
+    },
+    pricing: {
+      originalPrice: getNumber(
+        pricing?.originalPrice,
+        getNumber(source?.originalPrice, getNumber(source?.price, 0)),
+      ),
+      salePrice: getNumber(
+        pricing?.salePrice,
+        getNumber(source?.salePrice, getNumber(source?.sale_price, 0)),
+      ),
+      startDate:
+        typeof pricing?.startDate === "string" && pricing.startDate.trim()
+          ? pricing.startDate
+          : null,
+      endDate:
+        typeof pricing?.endDate === "string" && pricing.endDate.trim()
+          ? pricing.endDate
+          : null,
+    },
+    inventory: {
+      trackStock:
+        typeof inventory?.trackStock === "boolean" ? inventory.trackStock : true,
+      stockQuantity: Math.max(
+        0,
+        Math.floor(getNumber(inventory?.stockQuantity, stockTotal)),
+      ),
+      stockStatus: toStockStatus(inventory?.stockStatus || source?.stockStatus),
+      stock: {
+        total: stockTotal,
+        remaining: stockRemaining,
+      },
+      variantsStock,
+    },
+    variants,
+    specifications: specs,
+    shipping: {
+      isPhysicalProduct:
+        typeof sourceShipping?.isPhysicalProduct === "boolean"
+          ? sourceShipping.isPhysicalProduct
+          : true,
+      shippingCostInsideCairo: getNumber(
+        sourceShipping?.shippingCostInsideCairo,
+        getNumber(source?.shippingCostInsideCairo, 0),
+      ),
+      shippingCostRegion1: getNumber(
+        sourceShipping?.shippingCostRegion1,
+        getNumber(source?.shippingCostRegion1, 0),
+      ),
+      shippingCostRegion2: getNumber(
+        sourceShipping?.shippingCostRegion2,
+        getNumber(source?.shippingCostRegion2, 0),
+      ),
+      packages: sourcePackages
+        .map((pkg: any) => ({
+          name: String(pkg?.name || "").trim(),
+          weightKg: getNumber(pkg?.weightKg, 0),
+          lengthCm: getNumber(pkg?.lengthCm, 0),
+          widthCm: getNumber(pkg?.widthCm, 0),
+          heightCm: getNumber(pkg?.heightCm, 0),
+        }))
+        .filter((pkg: any) => pkg.name),
+    },
+    store,
+    sellerId: store || null,
+    createdBy,
+    media: {
+      featuredImages: featuredImage || "",
+      galleryImages,
+      productVideo:
+        source?.media?.productVideo || source?.productVideo
+          ? {
+              vedioUrl: String(
+                source?.media?.productVideo?.vedioUrl ||
+                  source?.productVideo?.vedioUrl ||
+                  "",
+              ).trim(),
+              imageUrl: String(
+                source?.media?.productVideo?.imageUrl ||
+                  source?.productVideo?.imageUrl ||
+                  "",
+              ).trim(),
+            }
+          : undefined,
+    },
+    approved:
+      typeof source?.approved === "boolean"
+        ? source.approved
+        : options.mode === "admin",
+    rate: getNumber(source?.rate, 4),
+    draft: Boolean(source?.draft),
+    tags: Array.isArray(source?.tags)
+      ? source.tags
+          .map((tag: any) => normalizeId(tag) || String(tag || "").trim())
+          .filter(Boolean)
+      : [],
+  };
+}
 
 export function useProductManagement({ mode, locale }: UseProductManagementArgs) {
   const { data: session } = useSession();
@@ -50,6 +364,7 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
   const [childCategoryMap, setChildCategoryMap] = useState<Record<string, { en: string; ar: string }>>({});
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchQuery, setSearchQuery] = useState("");
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [sellerFilter, setSellerFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [subCategoryFilter, setSubCategoryFilter] = useState("");
@@ -173,6 +488,75 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
     }
   };
 
+  const duplicateProduct = useCallback(
+    async (product: ApiProduct) => {
+      if (!token) {
+        toast.error(
+          isAr
+            ? "انتهت الجلسة، برجاء تسجيل الدخول مرة أخرى"
+            : "Session expired. Please sign in again.",
+        );
+        return;
+      }
+
+      setDuplicatingId(product._id);
+      try {
+        const sourceProduct = await getProductById(product._id, token);
+        if (!sourceProduct) {
+          throw new Error("Failed to load source product details");
+        }
+
+        const userStoreId = sellerIds[0] || "";
+        let created = false;
+        let lastError: unknown = null;
+
+        for (let attempt = 1; attempt <= 12; attempt++) {
+          const copySuffix = attempt === 1 ? "copy" : `copy-${attempt}`;
+          const payload = buildDuplicatePayload(sourceProduct, {
+            mode,
+            userStoreId,
+            copySuffix,
+          });
+
+          try {
+            await createProduct(payload, token);
+            created = true;
+            break;
+          } catch (error: unknown) {
+            lastError = error;
+            const message =
+              error instanceof Error
+                ? error.message.toLowerCase()
+                : String(error || "").toLowerCase();
+            const isDuplicateConflict =
+              message.includes("duplicate") ||
+              message.includes("already") ||
+              message.includes("exist") ||
+              message.includes("unique");
+            if (!isDuplicateConflict) break;
+          }
+        }
+
+        if (!created) {
+          throw lastError || new Error("Failed to duplicate product");
+        }
+
+        toast.success(
+          isAr ? "تم نسخ المنتج بنجاح" : "Product duplicated successfully",
+        );
+        await refreshProducts();
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "";
+        toast.error(
+          message || (isAr ? "فشل نسخ المنتج" : "Failed to duplicate product"),
+        );
+      } finally {
+        setDuplicatingId(null);
+      }
+    },
+    [token, isAr, sellerIds, mode, refreshProducts],
+  );
+
   return {
     locale,
     isAr,
@@ -186,6 +570,7 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
     itemsPerPage,
     viewMode,
     approvingId,
+    duplicatingId,
     isDeleting,
     productToDelete,
     showDeleteConfirm,
@@ -222,5 +607,6 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
     closeDeleteModal: () => setShowDeleteConfirm(false),
     confirmDelete,
     toggleApprove,
+    duplicateProduct,
   };
 }

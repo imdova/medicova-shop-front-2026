@@ -11,6 +11,7 @@ import {
 interface ProductsFilterGridProps {
   isAr: boolean;
   hasActiveFilters: boolean;
+  showSellerFilter: boolean;
   sellersList: Seller[];
   categoryMap: Record<string, { en: string; ar: string }>;
   subCategoryMap: Record<string, { en: string; ar: string }>;
@@ -40,6 +41,7 @@ const selectClass =
 export function ProductsFilterGrid({
   isAr,
   hasActiveFilters,
+  showSellerFilter,
   sellersList,
   categoryMap,
   subCategoryMap,
@@ -61,19 +63,25 @@ export function ProductsFilterGrid({
   onDateChange,
   onClearAll,
 }: ProductsFilterGridProps) {
+  const gridClass = showSellerFilter
+    ? "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8"
+    : "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7";
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-      <div className="flex flex-col gap-1">
-        <label className={`${labelClass} ${isAr ? "text-right" : ""}`}>{isAr ? "البائع" : "Seller"}</label>
-        <select value={sellerFilter} onChange={(e) => onSellerChange(e.target.value)} className={selectClass}>
-          <option value="">{isAr ? "الكل" : "All"}</option>
-          {sellersList.map((seller) => (
-            <option key={seller.id} value={seller.name}>
-              {seller.name}
-            </option>
-          ))}
-        </select>
-      </div>
+    <div className={gridClass}>
+      {showSellerFilter ? (
+        <div className="flex flex-col gap-1">
+          <label className={`${labelClass} ${isAr ? "text-right" : ""}`}>{isAr ? "البائع" : "Seller"}</label>
+          <select value={sellerFilter} onChange={(e) => onSellerChange(e.target.value)} className={selectClass}>
+            <option value="">{isAr ? "الكل" : "All"}</option>
+            {sellersList.map((seller) => (
+              <option key={seller.id} value={seller.name}>
+                {seller.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-1">
         <label className={`${labelClass} ${isAr ? "text-right" : ""}`}>{isAr ? "الفئة" : "Category"}</label>

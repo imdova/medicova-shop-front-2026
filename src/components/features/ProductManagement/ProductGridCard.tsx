@@ -8,7 +8,13 @@ import { LanguageType } from "@/util/translations";
 import { ProductRowActions } from "./ProductRowActions";
 import { ApprovalSwitch } from "./ApprovalSwitch";
 import { PublishDropdown } from "./PublishDropdown";
-import { formatCreatedAt, formatPrice, getCategoryName, getStockStatus } from "./utils";
+import {
+  formatCreatedAt,
+  formatPrice,
+  getCategoryName,
+  getProductPrimaryImage,
+  getStockStatus,
+} from "./utils";
 
 interface ProductGridCardProps {
   item: ApiProduct;
@@ -17,10 +23,12 @@ interface ProductGridCardProps {
   categoryMap: Record<string, { en: string; ar: string }>;
   publishValue: "Published" | "Draft";
   isApproving: boolean;
+  isDuplicating: boolean;
   detailsPath: string;
   editPath: string;
   onSetPublish: (value: "Published" | "Draft") => void;
   onToggleApprove: (item: ApiProduct) => void;
+  onDuplicate: (item: ApiProduct) => void;
   onDelete: (item: ApiProduct) => void;
 }
 
@@ -39,18 +47,19 @@ export function ProductGridCard({
   categoryMap,
   publishValue,
   isApproving,
+  isDuplicating,
   detailsPath,
   editPath,
   onSetPublish,
   onToggleApprove,
+  onDuplicate,
   onDelete,
 }: ProductGridCardProps) {
   const name = isAr ? item.nameAr || item.nameEn : item.nameEn || item.nameAr;
   const sku = item.sku ?? item.identity?.sku ?? item._id.slice(-6).toUpperCase();
   const price = getProductPrice(item);
   const stock = getStockStatus(item);
-  const media = item.media as { featuredImages?: string; galleryImages?: string[] } | undefined;
-  const image = media?.featuredImages || media?.galleryImages?.[0];
+  const image = getProductPrimaryImage(item);
 
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -79,7 +88,13 @@ export function ProductGridCard({
             <p className="mt-1 text-xs text-slate-500">SKU: {sku}</p>
           </div>
 
-          <ProductRowActions isAr={isAr} editPath={editPath} onDelete={() => onDelete(item)} />
+          <ProductRowActions
+            isAr={isAr}
+            editPath={editPath}
+            onDuplicate={() => onDuplicate(item)}
+            isDuplicating={isDuplicating}
+            onDelete={() => onDelete(item)}
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

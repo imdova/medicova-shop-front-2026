@@ -745,6 +745,9 @@ export const useProductForm = (productId?: string) => {
 
         console.log("DEBUG: Final Product Payload:", JSON.stringify(payload, null, 2));
 
+        const nextProductsPath =
+          user?.role === "admin" ? "/admin/products" : "/seller/products";
+
         let response;
         if (isEditMode && productId) {
           response = await updateProductApi(productId, payload, token);
@@ -754,6 +757,7 @@ export const useProductForm = (productId?: string) => {
               ? "Draft updated successfully!"
               : "Product Updated Successfully!",
           );
+          router.push(nextProductsPath);
         } else {
           response = await createProduct(payload, token);
           console.log("Product Created Successfully:", response);
@@ -762,8 +766,6 @@ export const useProductForm = (productId?: string) => {
               ? "Draft saved successfully!"
               : "Product Created Successfully!",
           );
-          const nextProductsPath =
-            user?.role === "admin" ? "/admin/products" : "/seller/products";
           router.push(nextProductsPath);
         }
         setIsSubmitting(false);

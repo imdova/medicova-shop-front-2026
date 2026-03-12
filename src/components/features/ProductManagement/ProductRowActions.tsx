@@ -1,17 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { Copy, Pencil, Trash2 } from "lucide-react";
+import { Copy, Loader2, Pencil, Trash2 } from "lucide-react";
 
 interface ProductRowActionsProps {
   isAr: boolean;
   editPath: string;
+  onDuplicate: () => void;
+  isDuplicating?: boolean;
   onDelete: () => void;
 }
 
 export function ProductRowActions({
   isAr,
   editPath,
+  onDuplicate,
+  isDuplicating = false,
   onDelete,
 }: ProductRowActionsProps) {
   return (
@@ -26,11 +30,16 @@ export function ProductRowActions({
 
       <button
         type="button"
-        onClick={() => {}}
-        className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+        onClick={onDuplicate}
+        disabled={isDuplicating}
+        className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
         aria-label={isAr ? "نسخ" : "Copy"}
       >
-        <Copy className="h-4 w-4" />
+        {isDuplicating ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Copy className="h-4 w-4" />
+        )}
       </button>
 
       <button

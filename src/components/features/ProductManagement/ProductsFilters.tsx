@@ -22,11 +22,14 @@ function getDateLabel(dateFilter: string, isAr: boolean): string {
 function buildFilterChips(
   state: ProductManagementViewState,
   actions: ProductManagementActions,
+  showSellerFilter: boolean,
 ): FilterChip[] {
   const { isAr, filters } = state;
   return [
     { key: "search", label: isAr ? "بحث" : "Search", value: filters.searchQuery, clear: () => actions.setSearchQuery("") },
-    { key: "seller", label: isAr ? "البائع" : "Seller", value: filters.sellerFilter, clear: () => actions.setSellerFilter("") },
+    ...(showSellerFilter
+      ? [{ key: "seller", label: isAr ? "البائع" : "Seller", value: filters.sellerFilter, clear: () => actions.setSellerFilter("") }]
+      : []),
     { key: "category", label: isAr ? "الفئة" : "Category", value: filters.categoryFilter, clear: () => actions.setCategoryFilter("") },
     { key: "subcategory", label: isAr ? "الفئة الفرعية" : "Subcategory", value: filters.subCategoryFilter, clear: () => actions.setSubCategoryFilter("") },
     { key: "childCategory", label: isAr ? "الفئة الفرعية للطفل" : "Child Category", value: filters.childCategoryFilter, clear: () => actions.setChildCategoryFilter("") },
@@ -52,8 +55,9 @@ function buildFilterChips(
 }
 
 export function ProductsFilters({ state, actions }: ProductsFiltersProps) {
+  const showSellerFilter = state.mode === "admin";
   const hasActiveFilters = Object.values(state.filters).some(Boolean);
-  const chips = buildFilterChips(state, actions);
+  const chips = buildFilterChips(state, actions, showSellerFilter);
 
   return (
     <div className="mb-6 rounded-2xl border border-slate-200/60 bg-white/90 p-4 shadow-sm backdrop-blur-sm">
@@ -72,6 +76,7 @@ export function ProductsFilters({ state, actions }: ProductsFiltersProps) {
         <ProductsFilterGrid
           isAr={state.isAr}
           hasActiveFilters={hasActiveFilters}
+          showSellerFilter={showSellerFilter}
           sellersList={state.lookups.sellersList}
           categoryMap={state.lookups.categoryMap}
           subCategoryMap={state.lookups.subCategoryMap}

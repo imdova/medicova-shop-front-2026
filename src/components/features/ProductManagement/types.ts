@@ -57,6 +57,7 @@ export interface ProductManagementViewState {
   itemsPerPage: number;
   viewMode: ProductViewMode;
   approvingId: string | null;
+  duplicatingId: string | null;
   isDeleting: boolean;
   productToDelete: ApiProduct | null;
   showDeleteConfirm: boolean;
@@ -83,4 +84,5 @@ export interface ProductManagementActions {
   closeDeleteModal: () => void;
   confirmDelete: () => Promise<void>;
   toggleApprove: (product: ApiProduct) => Promise<void>;
+  duplicateProduct: (product: ApiProduct) => Promise<void>;
 }

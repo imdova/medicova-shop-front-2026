@@ -12,6 +12,7 @@ interface ProductsGridViewProps {
   categoryMap: Record<string, { en: string; ar: string }>;
   publishStatus: Record<string, "Published" | "Draft">;
   approvingId: string | null;
+  duplicatingId: string | null;
   currentPage: number;
   totalItems: number;
   itemsPerPage: number;
@@ -19,6 +20,7 @@ interface ProductsGridViewProps {
   editPath: (id: string) => string;
   onSetPublish: (id: string, value: "Published" | "Draft") => void;
   onToggleApprove: (item: ApiProduct) => void;
+  onDuplicate: (item: ApiProduct) => void;
   onDelete: (item: ApiProduct) => void;
 }
 
@@ -29,6 +31,7 @@ export function ProductsGridView({
   categoryMap,
   publishStatus,
   approvingId,
+  duplicatingId,
   currentPage,
   totalItems,
   itemsPerPage,
@@ -36,6 +39,7 @@ export function ProductsGridView({
   editPath,
   onSetPublish,
   onToggleApprove,
+  onDuplicate,
   onDelete,
 }: ProductsGridViewProps) {
   return (
@@ -50,10 +54,12 @@ export function ProductsGridView({
             categoryMap={categoryMap}
             publishValue={publishStatus[item._id] ?? "Published"}
             isApproving={approvingId === item._id}
+            isDuplicating={duplicatingId === item._id}
             detailsPath={detailsPath(item._id)}
             editPath={editPath(item._id)}
             onSetPublish={(value) => onSetPublish(item._id, value)}
             onToggleApprove={onToggleApprove}
+            onDuplicate={onDuplicate}
             onDelete={onDelete}
           />
         ))}

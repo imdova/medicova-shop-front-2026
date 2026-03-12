@@ -32,6 +32,7 @@ export default function ProductsManagementPage({
     itemsPerPage: model.itemsPerPage,
     viewMode: model.viewMode,
     approvingId: model.approvingId,
+    duplicatingId: model.duplicatingId,
     isDeleting: model.isDeleting,
     productToDelete: model.productToDelete,
     showDeleteConfirm: model.showDeleteConfirm,
@@ -58,11 +59,12 @@ export default function ProductsManagementPage({
     closeDeleteModal: model.closeDeleteModal,
     confirmDelete: model.confirmDelete,
     toggleApprove: model.toggleApprove,
+    duplicateProduct: model.duplicateProduct,
   };
 
   return (
-    <div className="animate-in fade-in min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 duration-700">
-      <div className="mx-auto max-w-[1440px] p-4 md:p-8">
+    <div className="animate-in fade-in min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 duration-700">
+      <div className="mx-auto max-w-[1440px] min-w-0 p-4 md:p-8">
         <ProductsHeader
           isAr={state.isAr}
           createPath={state.routes.createPath}

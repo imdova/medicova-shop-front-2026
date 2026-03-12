@@ -16,6 +16,7 @@ import {
   getCategoryName,
   getChildCategoryName,
   getInitials,
+  getProductPrimaryImage,
   getSellerName,
   getStockStatus,
   getSubCategoryName,
@@ -31,10 +32,12 @@ interface ProductsTableRowProps {
   childCategoryMap: Record<string, { en: string; ar: string }>;
   publishValue: "Published" | "Draft";
   isApproving: boolean;
+  isDuplicating: boolean;
   detailsPath: string;
   editPath: string;
   onSetPublish: (value: "Published" | "Draft") => void;
   onToggleApprove: (item: ApiProduct) => void;
+  onDuplicate: (item: ApiProduct) => void;
   onDelete: (item: ApiProduct) => void;
 }
 
@@ -56,10 +59,12 @@ export function ProductsTableRow({
   childCategoryMap,
   publishValue,
   isApproving,
+  isDuplicating,
   detailsPath,
   editPath,
   onSetPublish,
   onToggleApprove,
+  onDuplicate,
   onDelete,
 }: ProductsTableRowProps) {
   const name = isAr ? item.nameAr || item.nameEn : item.nameEn || item.nameAr;
@@ -68,8 +73,7 @@ export function ProductsTableRow({
   const orders = item.orders ?? item.total_orders ?? item.totalOrders;
   const revenue = item.revenue ?? item.total_revenue ?? item.totalRevenue;
   const price = getProductPrice(item);
-  const media = item.media as { featuredImages?: string; galleryImages?: string[] } | undefined;
-  const image = media?.featuredImages || media?.galleryImages?.[0];
+  const image = getProductPrimaryImage(item);
   const sellerName = getSellerName(item, sellerMap);
 
   return (
@@ -120,7 +124,15 @@ export function ProductsTableRow({
 
       <td className="whitespace-nowrap px-5 py-3.5"><ApprovalSwitch product={item} isDisabled={isApproving} onToggle={onToggleApprove} /></td>
       <td className="whitespace-nowrap px-5 py-3.5"><PublishDropdown value={publishValue} onChange={onSetPublish} /></td>
-      <td className="whitespace-nowrap px-5 py-3.5"><ProductRowActions isAr={isAr} editPath={editPath} onDelete={() => onDelete(item)} /></td>
+      <td className="whitespace-nowrap px-5 py-3.5">
+        <ProductRowActions
+          isAr={isAr}
+          editPath={editPath}
+          onDuplicate={() => onDuplicate(item)}
+          isDuplicating={isDuplicating}
+          onDelete={() => onDelete(item)}
+        />
+      </td>
     </tr>
   );
 }
