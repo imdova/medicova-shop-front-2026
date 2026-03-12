@@ -11,14 +11,17 @@ import {
   deleteProduct,
   getProductById,
   getProducts,
+  updateProductApi,
 } from "@/services/productService";
 import { getAllSubCategoryChildren, getCategories, getSubCategories } from "@/services/categoryService";
 import { getSellers, Seller } from "@/services/sellerService";
+import { getBrands } from "@/services/brandService";
+import { getSellerBrandsMe } from "@/services/sellerBrandService";
 import { LanguageType } from "@/util/translations";
 import { ProductDateFilter, ProductManagementMode, ProductPublishFilter } from "./types";
 import { collectCurrentSellerIds, productBelongsToSeller } from "./ownership";
 import { computeStats, filterProducts } from "./computations";
-import { mapCategoryTitles, mapSellersById } from "./lookupMaps";
+import { mapBrandsToLookup, mapCategoryTitles, mapSellersById } from "./lookupMaps";
 
 interface UseProductManagementArgs { mode: ProductManagementMode; locale: LanguageType; }
 
@@ -74,6 +77,11 @@ function addCopySuffix(base: string, suffix: string, separator = " "): string {
   return `${trimmed}${separator}${suffix}`;
 }
 
+function stripCopySuffix(base: string): string {
+  // REMOVED stripping logic as user requested additive suffixes now.
+  return base;
+}
+
 function normalizeSpecification(spec: any): {
   keyEn?: string;
   keyAr?: string;
@@ -126,8 +134,8 @@ function buildDuplicatePayload(
     source?.slugAr || slugifyAr(baseNameAr),
   ).trim();
 
-  const duplicatedNameEn = addCopySuffix(baseNameEn, options.copySuffix, " ");
-  const duplicatedNameAr = addCopySuffix(baseNameAr, options.copySuffix, " ");
+  const duplicatedNameEn = addCopySuffix(baseNameEn, `- ${options.copySuffix}`, " ");
+  const duplicatedNameAr = addCopySuffix(baseNameAr, `- ${options.copySuffix}`, " ");
 
   const duplicatedSlugEn = `${baseSlugEn || slugifyEn(duplicatedNameEn)}-${options.copySuffix
     .toLowerCase()
@@ -224,12 +232,16 @@ function buildDuplicatePayload(
           : "Physical Product",
     },
     descriptions: {
-      descriptionEn: String(
-        source?.descriptions?.descriptionEn || source?.descriptionEn || "",
-      ).trim(),
-      descriptionAr: String(
-        source?.descriptions?.descriptionAr || source?.descriptionAr || "",
-      ).trim(),
+      descriptionEn: addCopySuffix(
+        String(source?.descriptions?.descriptionEn || source?.descriptionEn || ""),
+        `- ${options.copySuffix}`,
+        " ",
+      ),
+      descriptionAr: addCopySuffix(
+        String(source?.descriptions?.descriptionAr || source?.descriptionAr || ""),
+        `- ${options.copySuffix}`,
+        " ",
+      ),
     },
     pricing: {
       originalPrice: getNumber(
@@ -315,16 +327,11 @@ function buildDuplicatePayload(
           : undefined,
     },
     approved:
-      typeof source?.approved === "boolean"
-        ? source.approved
-        : options.mode === "admin",
+      options.mode === "admin"
+        ? (typeof source?.approved === "boolean" ? source.approved : true)
+        : false,
     rate: getNumber(source?.rate, 4),
-    draft: Boolean(source?.draft),
-    tags: Array.isArray(source?.tags)
-      ? source.tags
-          .map((tag: any) => normalizeId(tag) || String(tag || "").trim())
-          .filter(Boolean)
-      : [],
+    draft: options.mode === "admin" ? Boolean(source?.draft) : true,
   };
 }
 
@@ -365,10 +372,14 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [brandsList, setBrandsList] = useState<any[]>([]);
+  const [brandMap, setBrandMap] = useState<Record<string, { en: string; ar: string }>>({});
   const [sellerFilter, setSellerFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [subCategoryFilter, setSubCategoryFilter] = useState("");
   const [childCategoryFilter, setChildCategoryFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
   const [approvalFilter, setApprovalFilter] = useState<"" | "approved" | "pending">("");
   const [publishFilter, setPublishFilter] = useState<ProductPublishFilter>("");
   const [dateFilter, setDateFilter] = useState<ProductDateFilter>("");
@@ -379,8 +390,8 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
 
   const sellerIds = useMemo(() => collectCurrentSellerIds(user), [user]);
   const filters = useMemo(
-    () => ({ searchQuery, sellerFilter, categoryFilter, subCategoryFilter, childCategoryFilter, approvalFilter, publishFilter, dateFilter }),
-    [searchQuery, sellerFilter, categoryFilter, subCategoryFilter, childCategoryFilter, approvalFilter, publishFilter, dateFilter],
+    () => ({ searchQuery, sellerFilter, categoryFilter, subCategoryFilter, childCategoryFilter, brandFilter, approvalFilter, publishFilter, dateFilter }),
+    [searchQuery, sellerFilter, categoryFilter, subCategoryFilter, childCategoryFilter, brandFilter, approvalFilter, publishFilter, dateFilter],
   );
 
   const refreshProducts = useCallback(async () => {
@@ -394,18 +405,41 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
 
   const refreshLookups = useCallback(async () => {
     if (!token) return;
-    const [catsRes, subsRes, childrenRes, sellersRes] = await Promise.allSettled([
-      getCategories(token),
-      getSubCategories(undefined, token),
-      getAllSubCategoryChildren(token),
-      getSellers(token),
-    ]);
-    if (catsRes.status === "fulfilled") setCategoryMap(mapCategoryTitles(catsRes.value));
-    if (subsRes.status === "fulfilled") setSubCategoryMap(mapCategoryTitles(subsRes.value));
-    if (childrenRes.status === "fulfilled") setChildCategoryMap(mapCategoryTitles(childrenRes.value));
+    const [catsRes, subsRes, childrenRes, sellersRes, brandsRes, sellerBrandsRes] =
+      await Promise.allSettled([
+        getCategories(token),
+        getSubCategories(undefined, token),
+        getAllSubCategoryChildren(token),
+        getSellers(token),
+        getBrands(token),
+        getSellerBrandsMe(token),
+      ]);
+
+    if (catsRes.status === "fulfilled")
+      setCategoryMap(mapCategoryTitles(catsRes.value));
+    if (subsRes.status === "fulfilled")
+      setSubCategoryMap(mapCategoryTitles(subsRes.value));
+    if (childrenRes.status === "fulfilled")
+      setChildCategoryMap(mapCategoryTitles(childrenRes.value));
     if (sellersRes.status === "fulfilled") {
       setSellersList(sellersRes.value);
       setSellerMap(mapSellersById(sellersRes.value));
+    }
+    if (brandsRes.status === "fulfilled") {
+      const adminBrands = brandsRes.value;
+      const sellerBrands =
+        sellerBrandsRes.status === "fulfilled"
+          ? (sellerBrandsRes.value as any[]).map((b) => ({
+              id: b._id,
+              name: { en: b.brandName, ar: b.brandName },
+              image: b.brandLogo || "/images/placeholder.jpg",
+              isSellerBrand: true,
+            }))
+          : [];
+
+      const mergedBrands = [...adminBrands, ...sellerBrands];
+      setBrandsList(mergedBrands);
+      setBrandMap(mapBrandsToLookup(mergedBrands));
     }
   }, [token]);
 
@@ -418,8 +452,8 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
   );
 
   const filteredProducts = useMemo(
-    () => filterProducts({ products: scopedProducts, filters, sellerMap, categoryMap, subCategoryMap, childCategoryMap, publishStatus, locale, isAr }),
-    [scopedProducts, filters, sellerMap, categoryMap, subCategoryMap, childCategoryMap, publishStatus, locale, isAr],
+    () => filterProducts({ products: scopedProducts, filters, sellerMap, categoryMap, subCategoryMap, childCategoryMap, brandMap, publishStatus, locale, isAr }),
+    [scopedProducts, filters, sellerMap, categoryMap, subCategoryMap, childCategoryMap, brandMap, publishStatus, locale, isAr],
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
@@ -510,7 +544,7 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
         let created = false;
         let lastError: unknown = null;
 
-        for (let attempt = 1; attempt <= 12; attempt++) {
+        for (let attempt = 1; attempt <= 100; attempt++) {
           const copySuffix = attempt === 1 ? "copy" : `copy-${attempt}`;
           const payload = buildDuplicatePayload(sourceProduct, {
             mode,
@@ -519,7 +553,7 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
           });
 
           try {
-            await createProduct(payload, token);
+            await createProduct(payload, token, true);
             created = true;
             break;
           } catch (error: unknown) {
@@ -528,12 +562,19 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
               error instanceof Error
                 ? error.message.toLowerCase()
                 : String(error || "").toLowerCase();
+            
+            // Broaden detection to catch any SKU or conflict terminology
             const isDuplicateConflict =
               message.includes("duplicate") ||
               message.includes("already") ||
               message.includes("exist") ||
-              message.includes("unique");
+              message.includes("unique") ||
+              message.includes("sku") ||
+              message.includes("conflict") ||
+              message.includes("400");
+              
             if (!isDuplicateConflict) break;
+            console.warn(`Duplication attempt ${attempt} failed with conflict ("${message}"), retrying with unique suffix...`);
           }
         }
 
@@ -557,6 +598,28 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
     [token, isAr, sellerIds, mode, refreshProducts],
   );
 
+  const setPublishValue = useCallback(
+    async (id: string, value: "Published" | "Draft") => {
+      if (!token) return;
+      setPublishingId(id);
+      try {
+        await updateProductApi(id, { draft: value === "Draft" }, token);
+        setPublishStatus((prev) => ({ ...prev, [id]: value }));
+        setProducts((prev) =>
+          prev.map((p) =>
+            p._id === id ? { ...p, draft: value === "Draft" } : p,
+          ),
+        );
+        toast.success(isAr ? "تم تحديث حالة النشر" : "Publish status updated");
+      } catch (error) {
+        toast.error(isAr ? "فشل تحديث حالة النشر" : "Failed to update publish status");
+      } finally {
+        setPublishingId(null);
+      }
+    },
+    [token, isAr],
+  );
+
   return {
     locale,
     isAr,
@@ -571,12 +634,13 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
     viewMode,
     approvingId,
     duplicatingId,
+    publishingId,
     isDeleting,
     productToDelete,
     showDeleteConfirm,
     publishStatus,
     filters,
-    lookups: { sellersList, sellerMap, categoryMap, subCategoryMap, childCategoryMap },
+    lookups: { sellersList, sellerMap, categoryMap, subCategoryMap, childCategoryMap, brandMap, brandsList },
     stats,
     routes: {
       createPath: `/${locale}/${mode}/create-product`,
@@ -589,6 +653,7 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
     setCategoryFilter,
     setSubCategoryFilter,
     setChildCategoryFilter,
+    setBrandFilter,
     setApprovalFilter,
     setPublishFilter,
     setDateFilter,
@@ -598,11 +663,13 @@ export function useProductManagement({ mode, locale }: UseProductManagementArgs)
       setCategoryFilter("");
       setSubCategoryFilter("");
       setChildCategoryFilter("");
+      setBrandFilter("");
       setApprovalFilter("");
       setPublishFilter("");
       setDateFilter("");
     },
-    setPublishValue: (id: string, value: "Published" | "Draft") => setPublishStatus((prev) => ({ ...prev, [id]: value })),
+    setPublishValue,
+    setPublishValueLocal: (id: string, value: "Published" | "Draft") => setPublishStatus((prev) => ({ ...prev, [id]: value })),
     requestDelete,
     closeDeleteModal: () => setShowDeleteConfirm(false),
     confirmDelete,

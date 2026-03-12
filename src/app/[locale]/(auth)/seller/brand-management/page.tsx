@@ -4,141 +4,104 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   PencilIcon,
   TrashIcon,
-  Search,
-  Plus,
-  CheckCircle,
-  XCircle,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { motion, AnimatePresence } from "framer-motion";
+import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
+import Image from "next/image";
+import { motion } from "framer-motion";
 
 import DynamicTable from "@/components/features/tables/DTable";
-import BrandApprovalModal from "../components/BrandApprovalModal";
 import { useAppLocale } from "@/hooks/useAppLocale";
-
-// Modular Components
 import { BrandHeader } from "./components/BrandHeader";
-import { BrandChecker } from "./components/BrandChecker";
 import { BrandFilters } from "./components/BrandFilters";
-
-type Brand = {
-  id: string;
-  name: string;
-  status: "pending" | "approved" | "rejected";
-  createdAt: string;
-};
+import CreateSellerBrandModal from "./components/CreateSellerBrandModal";
+import { 
+  getSellerBrandsMe, 
+  deleteSellerBrand, 
+  SellerBrand 
+} from "@/services/sellerBrandService";
+import { extractSessionToken } from "@/lib/auth/sessionToken";
 
 const BrandsPage = () => {
-  const t = useTranslations("seller_brand_management");
-  const locale = useAppLocale();
+  const t = useTranslations("admin");
+  const ts = useTranslations("seller_brand_management");
+  const locale = useAppLocale() as "en" | "ar";
+  const { data: session } = useSession();
+  const token = extractSessionToken(session);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [brands, setBrands] = useState<Brand[]>([]);
+  const [editItem, setEditItem] = useState<SellerBrand | null>(null);
+  const [brands, setBrands] = useState<SellerBrand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
 
-  // Fetch initial data
-  useEffect(() => {
-    const fetchBrands = async () => {
-      setIsLoading(true);
-      // Simulate API call
-      await new Promise((r) => setTimeout(r, 800));
-      const mockBrands: Brand[] = [
-        { id: "1", name: "Nike", status: "approved", createdAt: "2023-01-15" },
-        {
-          id: "2",
-          name: "Adidas",
-          status: "approved",
-          createdAt: "2023-02-20",
-        },
-        { id: "3", name: "Puma", status: "pending", createdAt: "2023-03-10" },
-        {
-          id: "4",
-          name: "Reebok",
-          status: "rejected",
-          createdAt: "2023-04-05",
-        },
-        {
-          id: "5",
-          name: "Under Armour",
-          status: "pending",
-          createdAt: "2023-05-12",
-        },
-      ];
-      setBrands(mockBrands);
+  const fetchData = useCallback(async () => {
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      const data = await getSellerBrandsMe(token);
+      setBrands(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
       setIsLoading(false);
-    };
-    fetchBrands();
-  }, []);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const filteredBrands = useMemo(() => {
-    return brands.filter((brand) => {
-      const matchesSearch = brand.name
+    const list = Array.isArray(brands) ? brands : [];
+    return list.filter((brand) => {
+      return (brand.brandName || "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "all" || brand.status === statusFilter;
-      return matchesSearch && matchesStatus;
     });
-  }, [brands, searchTerm, statusFilter]);
+  }, [brands, searchTerm]);
 
-  const handleBrandCheck = useCallback(
-    async (name: string) => {
-      // Simulate lookup in Noon's master brands list
-      await new Promise((r) => setTimeout(r, 500));
-      const exists = brands.some(
-        (b) => b.name.toLowerCase() === name.trim().toLowerCase(),
-      );
-      return exists ? "exists" : "not-exists";
-    },
-    [brands],
-  );
+  const handleDelete = useCallback(async (id: string) => {
+    if (!token) return;
+    try {
+      await deleteSellerBrand(id, token);
+      toast.success(t("deletedSuccessfully"));
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.message || t("deleteFailed"));
+    }
+  }, [token, t, fetchData]);
 
   const columns = useMemo(
     () => [
       {
-        key: "name",
-        header: t("table.name"),
-        sortable: true,
-        render: (item: Brand) => (
-          <span className="font-black text-gray-900">{item.name}</span>
+        key: "logo",
+        header: t("brandImage"),
+        render: (item: SellerBrand) => (
+          <div className="relative h-12 w-12 overflow-hidden rounded-2xl border-2 border-white bg-gray-50 shadow-sm ring-1 ring-gray-100">
+            <Image
+              fill
+              src={item.brandLogo || "/images/placeholder.jpg"}
+              alt={item.brandName}
+              className="object-contain p-1 transition-transform duration-300 hover:scale-110"
+            />
+          </div>
         ),
       },
       {
-        key: "status",
-        header: t("table.status"),
-        render: (item: Brand) => (
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-wider ${
-              item.status === "approved"
-                ? "bg-emerald-50 text-emerald-600 shadow-sm shadow-emerald-100"
-                : item.status === "pending"
-                  ? "bg-amber-50 text-amber-600 shadow-sm shadow-amber-100"
-                  : "bg-rose-50 text-rose-600 shadow-sm shadow-rose-100"
-            }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                item.status === "approved"
-                  ? "bg-emerald-500"
-                  : item.status === "pending"
-                    ? "bg-amber-500"
-                    : "bg-rose-500"
-              }`}
-            />
-            {t(`filters.status.${item.status}`)}
-          </span>
+        key: "name",
+        header: t("brandName"),
+        render: (item: SellerBrand) => (
+          <span className="font-bold text-gray-900">{item.brandName}</span>
         ),
       },
       {
         key: "createdAt",
-        header: t("table.createdAt"),
-        sortable: true,
-        render: (item: Brand) => (
+        header: t("date"),
+        render: (item: SellerBrand) => (
           <span className="text-sm font-medium text-gray-500">
-            {item.createdAt}
+            {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "N/A"}
           </span>
         ),
       },
@@ -152,16 +115,15 @@ const BrandsPage = () => {
       animate={{ opacity: 1 }}
       className="min-h-screen pb-20"
     >
-      <BrandHeader onCreateClick={() => setIsModalOpen(true)} />
-
-      <BrandChecker onCheck={handleBrandCheck} />
+      <BrandHeader onCreateClick={() => {
+        setEditItem(null);
+        setIsModalOpen(true);
+      }} />
 
       <div className="space-y-6">
         <BrandFilters
           search={searchTerm}
-          status={statusFilter}
           onSearchChange={setSearchTerm}
-          onStatusChange={setStatusFilter}
           locale={locale}
         />
 
@@ -171,36 +133,39 @@ const BrandsPage = () => {
             columns={columns}
             pagination
             itemsPerPage={10}
-            selectable
             locale={locale}
             emptyMessage={{
-              en: isLoading ? t("table.loading") : t("table.noResults"),
-              ar: isLoading ? t("table.loading") : t("table.noResults"),
+              en: isLoading ? ts("table.loading") : ts("table.noResults"),
+              ar: isLoading ? ts("table.loading") : ts("table.noResults"),
             }}
-            actions={[
+            solidActions={[
               {
-                label: { en: "Edit", ar: "تعديل" },
-                onClick: (item) => console.log("Edit", item),
-                className:
-                  "bg-white/50 text-gray-700 hover:text-black hover:bg-white shadow-sm",
+                label: locale === "ar" ? "تعديل" : "Edit",
+                onClick: (item) => {
+                    setEditItem(item as SellerBrand);
+                    setIsModalOpen(true);
+                },
+                className: "bg-white/50 text-gray-700 hover:text-black hover:bg-white shadow-sm",
                 icon: <PencilIcon className="h-4 w-4" />,
+                color: "black",
               },
               {
-                label: { en: "Delete", ar: "حذف" },
-                onClick: (item) => console.log("Delete", item),
-                className:
-                  "bg-rose-50/50 text-rose-600 hover:bg-rose-100 shadow-sm",
+                label: locale === "ar" ? "حذف" : "Delete",
+                onClick: (item) => handleDelete((item as SellerBrand)._id),
+                className: "bg-rose-50/50 text-rose-600 hover:bg-rose-100 shadow-sm",
                 icon: <TrashIcon className="h-4 w-4" />,
+                color: "#dc2626",
               },
             ]}
           />
         </div>
       </div>
 
-      <BrandApprovalModal
-        isModalOpen={isModalOpen}
-        setIsModalOpen={setIsModalOpen}
-        locale={locale as any}
+      <CreateSellerBrandModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        editItem={editItem}
+        onSuccess={fetchData}
       />
     </motion.div>
   );

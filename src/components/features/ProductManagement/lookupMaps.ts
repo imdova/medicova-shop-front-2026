@@ -8,3 +8,9 @@ export function mapCategoryTitles(items: MultiCategory[]) {
 export function mapSellersById(items: Seller[]) {
   return Object.fromEntries(items.map((seller) => [seller.id, seller.name]));
 }
+
+export function mapBrandsToLookup(items: any[]) {
+  return Object.fromEntries(
+    items.map((brand) => [brand.id, { en: brand.name.en, ar: brand.name.ar }]),
+  );
+}

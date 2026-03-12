@@ -4,6 +4,7 @@ import { ProductComputedStats, ProductFilterState } from "./types";
 import {
   getCategoryName,
   getChildCategoryName,
+  getBrandName,
   getSellerName,
   getSubCategoryName,
 } from "./utils";
@@ -15,6 +16,7 @@ interface FilterProductsArgs {
   categoryMap: Record<string, { en: string; ar: string }>;
   subCategoryMap: Record<string, { en: string; ar: string }>;
   childCategoryMap: Record<string, { en: string; ar: string }>;
+  brandMap: Record<string, { en: string; ar: string }>;
   publishStatus: Record<string, "Published" | "Draft">;
   locale: LanguageType;
   isAr: boolean;
@@ -27,6 +29,7 @@ export function filterProducts({
   categoryMap,
   subCategoryMap,
   childCategoryMap,
+  brandMap,
   publishStatus,
   locale,
   isAr,
@@ -34,7 +37,7 @@ export function filterProducts({
   return products.filter((product) => {
     const name = isAr ? product.nameAr || product.nameEn : product.nameEn || product.nameAr;
     const sku = product.sku ?? product.identity?.sku ?? "";
-    const publish = publishStatus[product._id] ?? "Published";
+    const publish = publishStatus[product._id] || (product.draft ? "Draft" : "Published");
     const createdTime = product.createdAt ? new Date(product.createdAt).getTime() : null;
 
     const matchesSearch = !filters.searchQuery || name?.toLowerCase().includes(filters.searchQuery.toLowerCase()) || String(sku).toLowerCase().includes(filters.searchQuery.toLowerCase());
@@ -42,6 +45,7 @@ export function filterProducts({
     const matchesCategory = !filters.categoryFilter || getCategoryName(product, locale, categoryMap) === filters.categoryFilter;
     const matchesSubCategory = !filters.subCategoryFilter || getSubCategoryName(product, locale, subCategoryMap) === filters.subCategoryFilter;
     const matchesChildCategory = !filters.childCategoryFilter || getChildCategoryName(product, locale, childCategoryMap) === filters.childCategoryFilter;
+    const matchesBrand = !filters.brandFilter || getBrandName(product, locale, brandMap) === filters.brandFilter;
     const matchesApproval = !filters.approvalFilter || (filters.approvalFilter === "approved" ? product.approved : !product.approved);
     const matchesPublish = !filters.publishFilter || publish === filters.publishFilter;
 
@@ -55,7 +59,7 @@ export function filterProducts({
       return diff <= 90 * day;
     })();
 
-    return matchesSearch && matchesSeller && matchesCategory && matchesSubCategory && matchesChildCategory && matchesApproval && matchesPublish && matchesDate;
+    return matchesSearch && matchesSeller && matchesCategory && matchesSubCategory && matchesChildCategory && matchesBrand && matchesApproval && matchesPublish && matchesDate;
   });
 }
 

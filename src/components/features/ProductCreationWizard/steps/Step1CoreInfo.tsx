@@ -31,6 +31,7 @@ import {
   getSubCategoryChildren,
 } from "@/services/categoryService";
 import { getBrands } from "@/services/brandService";
+import { getSellerBrandsMe } from "@/services/sellerBrandService";
 import {
   getSellers,
   getSellerById,
@@ -405,7 +406,7 @@ export const Step1CoreInfo = ({
         "| userRole:",
         userRole,
       );
-      const [cats, brs] = await Promise.all([
+      const [cats, adminBrands, sellerBrands] = await Promise.all([
         getCategories(token).catch((err) => {
           console.error("getCategories fail:", err);
           return [];
@@ -414,9 +415,23 @@ export const Step1CoreInfo = ({
           console.error("getBrands fail:", err);
           return [];
         }),
+        getSellerBrandsMe(token).catch((err) => {
+          console.error("getSellerBrandsMe fail:", err);
+          return [];
+        }),
       ]);
+
+      const normalizedSellerBrands = (sellerBrands as any[]).map((b) => ({
+        id: b._id,
+        name: { en: b.brandName, ar: b.brandName },
+        image: b.brandLogo || "/images/placeholder.jpg",
+        slug: "",
+        slugAr: "",
+        hasStore: true,
+      })) as Brand[];
+
       setCategories(cats);
-      setBrands(brs);
+      setBrands([...adminBrands, ...normalizedSellerBrands]);
 
       if (userRole === "admin") {
         console.log("DEBUG: Admin detected, fetching sellers...");

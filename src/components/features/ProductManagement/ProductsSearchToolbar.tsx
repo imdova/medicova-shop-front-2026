@@ -14,6 +14,8 @@ interface ProductsSearchToolbarProps {
   onSearchChange: (value: string) => void;
   viewMode: ProductViewMode;
   onViewModeChange: (mode: ProductViewMode) => void;
+  hasActiveFilters: boolean;
+  onClearAll: () => void;
 }
 
 export function ProductsSearchToolbar({
@@ -25,6 +27,8 @@ export function ProductsSearchToolbar({
   onSearchChange,
   viewMode,
   onViewModeChange,
+  hasActiveFilters,
+  onClearAll,
 }: ProductsSearchToolbarProps) {
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -43,9 +47,19 @@ export function ProductsSearchToolbar({
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={isAr ? "البحث بالاسم أو SKU..." : "Search by name or SKU..."}
-            className={`w-full rounded-xl border border-slate-200/80 bg-slate-50/50 py-2 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${isAr ? "pl-4 pr-10" : "pl-10 pr-4"}`}
+            className={`w-[80%] rounded-xl border border-slate-200/80 bg-slate-50/50 py-2 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${isAr ? "pl-4 pr-10" : "pl-10 pr-4"}`}
           />
         </div>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="flex h-10 w-fit shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-100 sm:h-9"
+          >
+            {isAr ? "مسح الكل" : "Clear all"}
+          </button>
+        )}
 
         <p className="shrink-0 text-xs font-medium text-slate-500">
           {isAr ? "النتائج" : "Results"}: <span className="font-semibold text-slate-700">{formatNumber(filteredCount, locale)}</span>

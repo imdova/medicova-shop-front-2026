@@ -99,6 +99,18 @@ export function getChildCategoryName(
   );
 }
 
+export function getBrandName(
+  product: ApiProduct,
+  locale: LanguageType,
+  lookup?: Record<string, { en: string; ar: string }>,
+): string {
+  return getLookupName(
+    product.brand || product.classification?.brand,
+    locale,
+    lookup,
+  );
+}
+
 export function formatCreatedAt(
   createdAt: string | null | undefined,
   locale: LanguageType,

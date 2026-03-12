@@ -149,6 +149,7 @@ export interface ApiProduct {
   totalRevenue?: number;
   createdAt?: string;
   sellerId?: string | null;
+  draft?: boolean;
   seller?: {
     _id?: string;
     name?: string;
@@ -158,12 +159,13 @@ export interface ApiProduct {
   sellers?: any; // sometimes plural in dummy data
 }
 
-export async function createProduct(payload: CreateProductPayload, token?: string) {
+export async function createProduct(payload: CreateProductPayload, token?: string, suppressErrorLog?: boolean) {
   return apiClient({
     endpoint: "/products",
     method: "POST",
     body: payload as any,
     token,
+    suppressErrorLog,
   });
 }
 

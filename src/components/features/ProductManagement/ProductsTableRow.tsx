@@ -21,9 +21,11 @@ import {
   getStockStatus,
   getSubCategoryName,
 } from "./utils";
+import { ProductManagementMode } from "./types";
 
 interface ProductsTableRowProps {
   item: ApiProduct;
+  mode: ProductManagementMode;
   locale: LanguageType;
   isAr: boolean;
   sellerMap: Record<string, string>;
@@ -51,6 +53,7 @@ function getProductPrice(item: ApiProduct): number | string | null {
 
 export function ProductsTableRow({
   item,
+  mode,
   locale,
   isAr,
   sellerMap,
@@ -122,7 +125,9 @@ export function ProductsTableRow({
         </span>
       </td>
 
-      <td className="whitespace-nowrap px-5 py-3.5"><ApprovalSwitch product={item} isDisabled={isApproving} onToggle={onToggleApprove} /></td>
+      {mode === "admin" && (
+        <td className="whitespace-nowrap px-5 py-3.5"><ApprovalSwitch product={item} isDisabled={isApproving} onToggle={onToggleApprove} /></td>
+      )}
       <td className="whitespace-nowrap px-5 py-3.5"><PublishDropdown value={publishValue} onChange={onSetPublish} /></td>
       <td className="whitespace-nowrap px-5 py-3.5">
         <ProductRowActions

@@ -21,13 +21,16 @@ interface ProductsFilterGridProps {
   categoryFilter: string;
   subCategoryFilter: string;
   childCategoryFilter: string;
+  brandFilter: string;
   approvalFilter: ProductApprovalFilter;
   publishFilter: ProductPublishFilter;
   dateFilter: ProductDateFilter;
+  brandMap: Record<string, { en: string; ar: string }>;
   onSellerChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
   onSubCategoryChange: (value: string) => void;
   onChildCategoryChange: (value: string) => void;
+  onBrandChange: (value: string) => void;
   onApprovalChange: (value: ProductApprovalFilter) => void;
   onPublishChange: (value: ProductPublishFilter) => void;
   onDateChange: (value: ProductDateFilter) => void;
@@ -51,21 +54,24 @@ export function ProductsFilterGrid({
   categoryFilter,
   subCategoryFilter,
   childCategoryFilter,
+  brandFilter,
   approvalFilter,
   publishFilter,
   dateFilter,
+  brandMap,
   onSellerChange,
   onCategoryChange,
   onSubCategoryChange,
   onChildCategoryChange,
+  onBrandChange,
   onApprovalChange,
   onPublishChange,
   onDateChange,
   onClearAll,
 }: ProductsFilterGridProps) {
   const gridClass = showSellerFilter
-    ? "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8"
-    : "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7";
+    ? "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-9"
+    : "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8";
 
   return (
     <div className={gridClass}>
@@ -120,6 +126,18 @@ export function ProductsFilterGrid({
       </div>
 
       <div className="flex flex-col gap-1">
+        <label className={`${labelClass} ${isAr ? "text-right" : ""}`}>{isAr ? "البراند" : "Brand"}</label>
+        <select value={brandFilter} onChange={(e) => onBrandChange(e.target.value)} className={selectClass}>
+          <option value="">{isAr ? "الكل" : "All"}</option>
+          {Object.entries(brandMap).map(([id, title]) => (
+            <option key={id} value={title[locale] || title.en}>
+              {title[locale] || title.en}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
         <label className={`${labelClass} ${isAr ? "text-right" : ""}`}>{isAr ? "الحالة" : "Status"}</label>
         <select value={approvalFilter} onChange={(e) => onApprovalChange(e.target.value as ProductApprovalFilter)} className={selectClass}>
           <option value="">{isAr ? "الكل" : "All"}</option>
@@ -148,18 +166,7 @@ export function ProductsFilterGrid({
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
-        <div className="hidden text-xs font-semibold text-slate-700 xl:block"> </div>
-        <button
-          type="button"
-          disabled={!hasActiveFilters}
-          onClick={onClearAll}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white"
-        >
-          <X className="h-4 w-4" />
-          {isAr ? "مسح الكل" : "Clear all"}
-        </button>
-      </div>
+      <div className="hidden xl:block"></div>
     </div>
   );
 }

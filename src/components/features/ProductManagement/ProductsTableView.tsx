@@ -165,7 +165,7 @@ export function ProductsTableView({
                   onToggle={onToggleApprove}
                 />
                 <PublishDropdown
-                  value={publishStatus[item._id] ?? "Published"}
+                  value={publishStatus[item._id] || (item.draft ? "Draft" : "Published")}
                   onChange={(value) => onSetPublish(item._id, value)}
                 />
               </div>
@@ -188,7 +188,9 @@ export function ProductsTableView({
               <th className="whitespace-nowrap px-5 py-3.5">{isAr ? "الطلبات" : "Orders"}</th>
               <th className="whitespace-nowrap px-5 py-3.5">{isAr ? "الإيراد" : "Revenue"}</th>
               <th className="whitespace-nowrap px-5 py-3.5">{isAr ? "المخزون" : "Stock"}</th>
-              <th className="whitespace-nowrap px-5 py-3.5">{isAr ? "الحالة" : "Status"}</th>
+              {mode === "admin" && (
+                <th className="whitespace-nowrap px-5 py-3.5">{isAr ? "الحالة" : "Status"}</th>
+              )}
               <th className="whitespace-nowrap px-5 py-3.5">{isAr ? "النشر" : "Publish"}</th>
               <th className="whitespace-nowrap px-5 py-3.5">{isAr ? "إجراءات" : "Actions"}</th>
             </tr>
@@ -199,13 +201,14 @@ export function ProductsTableView({
               <ProductsTableRow
                 key={item._id}
                 item={item}
+                mode={mode}
                 locale={locale}
                 isAr={isAr}
                 sellerMap={sellerMap}
                 categoryMap={categoryMap}
                 subCategoryMap={subCategoryMap}
                 childCategoryMap={childCategoryMap}
-                publishValue={publishStatus[item._id] ?? "Published"}
+                publishValue={publishStatus[item._id] || (item.draft ? "Draft" : "Published")}
                 isApproving={approvingId === item._id}
                 isDuplicating={duplicatingId === item._id}
                 detailsPath={detailsPath(item._id)}

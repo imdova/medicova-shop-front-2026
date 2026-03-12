@@ -50,6 +50,7 @@ export default function ProductsManagementPage({
     setCategoryFilter: model.setCategoryFilter,
     setSubCategoryFilter: model.setSubCategoryFilter,
     setChildCategoryFilter: model.setChildCategoryFilter,
+    setBrandFilter: model.setBrandFilter,
     setApprovalFilter: model.setApprovalFilter,
     setPublishFilter: model.setPublishFilter,
     setDateFilter: model.setDateFilter,

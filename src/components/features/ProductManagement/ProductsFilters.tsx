@@ -33,6 +33,7 @@ function buildFilterChips(
     { key: "category", label: isAr ? "الفئة" : "Category", value: filters.categoryFilter, clear: () => actions.setCategoryFilter("") },
     { key: "subcategory", label: isAr ? "الفئة الفرعية" : "Subcategory", value: filters.subCategoryFilter, clear: () => actions.setSubCategoryFilter("") },
     { key: "childCategory", label: isAr ? "الفئة الفرعية للطفل" : "Child Category", value: filters.childCategoryFilter, clear: () => actions.setChildCategoryFilter("") },
+    { key: "brand", label: isAr ? "البراند" : "Brand", value: filters.brandFilter, clear: () => actions.setBrandFilter("") },
     {
       key: "status",
       label: isAr ? "الحالة" : "Status",
@@ -71,6 +72,8 @@ export function ProductsFilters({ state, actions }: ProductsFiltersProps) {
           onSearchChange={actions.setSearchQuery}
           viewMode={state.viewMode}
           onViewModeChange={actions.setViewMode}
+          hasActiveFilters={hasActiveFilters}
+          onClearAll={actions.clearAllFilters}
         />
 
         <ProductsFilterGrid
@@ -81,11 +84,13 @@ export function ProductsFilters({ state, actions }: ProductsFiltersProps) {
           categoryMap={state.lookups.categoryMap}
           subCategoryMap={state.lookups.subCategoryMap}
           childCategoryMap={state.lookups.childCategoryMap}
+          brandMap={state.lookups.brandMap}
           locale={state.locale as "en" | "ar"}
           sellerFilter={state.filters.sellerFilter}
           categoryFilter={state.filters.categoryFilter}
           subCategoryFilter={state.filters.subCategoryFilter}
           childCategoryFilter={state.filters.childCategoryFilter}
+          brandFilter={state.filters.brandFilter}
           approvalFilter={state.filters.approvalFilter}
           publishFilter={state.filters.publishFilter}
           dateFilter={state.filters.dateFilter}
@@ -93,6 +98,7 @@ export function ProductsFilters({ state, actions }: ProductsFiltersProps) {
           onCategoryChange={actions.setCategoryFilter}
           onSubCategoryChange={actions.setSubCategoryFilter}
           onChildCategoryChange={actions.setChildCategoryFilter}
+          onBrandChange={actions.setBrandFilter}
           onApprovalChange={actions.setApprovalFilter}
           onPublishChange={actions.setPublishFilter}
           onDateChange={actions.setDateFilter}

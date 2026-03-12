@@ -168,7 +168,7 @@ export default function CreateProduct2WizardLayout() {
             }
             disabled={isSubmitting}
             className="h-10 rounded-xl px-4 text-xs font-bold"
-            label={isAr ? "حفظ كمسودة" : "Draft"}
+            label={isAr ? "حفظ كمسودة" : "Save as Draft"}
             icon={<Save size={14} />}
             iconPosition="left"
           />

@@ -18,6 +18,8 @@ export interface ProductLookupMaps {
   childCategoryMap: Record<string, { en: string; ar: string }>;
   sellerMap: Record<string, string>;
   sellersList: Seller[];
+  brandMap: Record<string, { en: string; ar: string }>;
+  brandsList: any[];
 }
 
 export interface ProductFilterState {
@@ -26,6 +28,7 @@ export interface ProductFilterState {
   categoryFilter: string;
   subCategoryFilter: string;
   childCategoryFilter: string;
+  brandFilter: string;
   approvalFilter: ProductApprovalFilter;
   publishFilter: ProductPublishFilter;
   dateFilter: ProductDateFilter;
@@ -75,6 +78,7 @@ export interface ProductManagementActions {
   setCategoryFilter: (value: string) => void;
   setSubCategoryFilter: (value: string) => void;
   setChildCategoryFilter: (value: string) => void;
+  setBrandFilter: (value: string) => void;
   setApprovalFilter: (value: ProductApprovalFilter) => void;
   setPublishFilter: (value: ProductPublishFilter) => void;
   setDateFilter: (value: ProductDateFilter) => void;
