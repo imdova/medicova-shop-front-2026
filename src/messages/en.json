@@ -751,6 +751,8 @@
     "parentSubCategory": "Parent Sub Category",
     "priority": "Priority",
     "headline": "Headline",
+    "headlineEn": "Headline (English)",
+    "headlineAr": "Headline (Arabic)",
     "logo": "Logo",
     "categoryImage": "Category Image",
     "brandImage": "Brand Image",

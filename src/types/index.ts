@@ -146,6 +146,8 @@ export interface CategoryType {
     image: string;
     url: string;
   };
+  description?: LocalizedTitle;
+  headline?: LocalizedTitle;
 }
 // Brand type
 export interface Brand {

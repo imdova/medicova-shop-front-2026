@@ -746,6 +746,8 @@
     "parentSubCategory": "الفئة الفرعية الأب",
     "priority": "الأولوية",
     "headline": "العنوان الرئيسي",
+    "headlineEn": "العنوان (الإنجليزية)",
+    "headlineAr": "العنوان (العربية)",
     "logo": "الشعار",
     "categoryImage": "صورة الفئة",
     "brandImage": "صورة العلامة التجارية",

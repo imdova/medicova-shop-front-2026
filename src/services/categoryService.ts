@@ -41,6 +41,10 @@ export function mapCategory(item: any): MultiCategory {
       url: item.banner.url || "#",
     } : undefined,
     subCategories: rawSubCategories.map((sub: any) => mapCategory(sub)), 
+    headline: {
+      en: item.headline || item.headlineEn || "",
+      ar: item.headlineAr || item.headline || item.headlineAr || "" 
+    }
   };
 }
 

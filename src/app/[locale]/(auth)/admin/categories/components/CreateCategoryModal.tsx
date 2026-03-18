@@ -36,6 +36,8 @@ const CreateCategoryModal: React.FC<Props> = ({
   const [nameAr, setNameAr] = useState("");
   const [slugEn, setSlugEn] = useState("");
   const [slugAr, setSlugAr] = useState("");
+  const [headlineEn, setHeadlineEn] = useState("");
+  const [headlineAr, setHeadlineAr] = useState("");
   const [description, setDescription] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -49,6 +51,8 @@ const CreateCategoryModal: React.FC<Props> = ({
     setImagePreview(editItem.image || null);
     setSlugEn(editItem.slug || "");
     setSlugAr(editItem.slugAr || "");
+    setHeadlineEn(editItem.headline?.en || "");
+    setHeadlineAr(editItem.headline?.ar || "");
     setDescription(editItem.description || "");
 
     const itemId = (editItem as any)._id || editItem.id;
@@ -59,6 +63,8 @@ const CreateCategoryModal: React.FC<Props> = ({
         if (data.nameAr) setNameAr(data.nameAr);
         if (data.slug) setSlugEn(data.slug);
         if (data.slugAr) setSlugAr(data.slugAr);
+        if (data.headlineEn) setHeadlineEn(data.headlineEn);
+        if (data.headlineAr) setHeadlineAr(data.headlineAr);
         if (data.description) setDescription(data.description);
         if (data.image) setImagePreview(data.image);
       })
@@ -70,6 +76,8 @@ const CreateCategoryModal: React.FC<Props> = ({
     setNameAr("");
     setSlugEn("");
     setSlugAr("");
+    setHeadlineEn("");
+    setHeadlineAr("");
     setDescription("");
     setImagePreview(null);
     setImageFile(null);
@@ -112,6 +120,8 @@ const CreateCategoryModal: React.FC<Props> = ({
         const body: Record<string, unknown> = {
           name: nameEn.trim(),
           nameAr: nameAr.trim(),
+          headlineEn: headlineEn.trim(),
+          headlineAr: headlineAr.trim(),
           description: description.trim(),
         };
         if (imageUrl) body.image = imageUrl;
@@ -142,6 +152,8 @@ const CreateCategoryModal: React.FC<Props> = ({
       nameAr,
       slugEn,
       slugAr,
+      headlineEn,
+      headlineAr,
       description,
       imageFile,
       imagePreview,
@@ -252,6 +264,41 @@ const CreateCategoryModal: React.FC<Props> = ({
               value={slugAr}
               onChange={(e) => setSlugAr(e.target.value)}
               placeholder={t("slugPlaceholder")}
+              className={inputCls}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="cat-headline-en"
+              className="mb-1.5 block text-sm font-semibold text-gray-700"
+            >
+              {t("headlineEn") || "Headline (EN)"}
+            </label>
+            <input
+              id="cat-headline-en"
+              type="text"
+              value={headlineEn}
+              onChange={(e) => setHeadlineEn(e.target.value)}
+              placeholder="e.g. Best deals"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="cat-headline-ar"
+              className="mb-1.5 block text-sm font-semibold text-gray-700"
+            >
+              {t("headlineAr") || "Headline (AR)"}
+            </label>
+            <input
+              id="cat-headline-ar"
+              type="text"
+              dir="rtl"
+              value={headlineAr}
+              onChange={(e) => setHeadlineAr(e.target.value)}
+              placeholder="مثال: أفضل العروض"
               className={inputCls}
             />
           </div>

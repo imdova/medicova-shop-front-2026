@@ -1,7 +1,7 @@
 // hooks/useGetProductsByCategory.ts
 import { useEffect, useState } from "react";
 import { Product } from "@/types/product";
-import { products } from "@/data";
+import { getProducts, mapApiProductToProduct } from "@/services/productService";
 
 interface UseGetProductsByCategoryProps {
   categorySlug?: string;
@@ -27,36 +27,36 @@ export function useGetProductsByCategory({
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // if (!categorySlug) {
-    //   setProductsData([]);
-    //   setTotalProducts(0);
-    //   return;
-    // }
-
     const fetchProducts = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Uncomment and replace with your real API call
-        // const response = await fetch(
-        //   `/api/products/category/${categorySlug}?page=${page}&limit=${limit}`,
-        // );
+        // Fetch products from API
+        const allApiProducts = await getProducts();
+        
+        // Map and filter products
+        let filtered = allApiProducts.map(mapApiProductToProduct);
 
-        // if (!response.ok) {
-        //   throw new Error("Failed to fetch products");
-        // }
+        if (categorySlug) {
+          // Attempt to filter by category slug, ID, or subcategory slug
+          filtered = filtered.filter((p: any) => 
+            p.category?.id === categorySlug || 
+            p.category?.slug === categorySlug ||
+            p.subcategory?.slug === categorySlug ||
+            p.category?.title?.en?.toLowerCase() === categorySlug.toLowerCase() ||
+            p.subcategory?.title?.en?.toLowerCase() === categorySlug.toLowerCase()
+          );
+        }
 
-        // const data = await response.json();
+        const count = filtered.length;
+        
+        // Handle pagination locally for now as getProducts returns all (limit=1000)
+        const startIndex = (page - 1) * limit;
+        const paginated = filtered.slice(startIndex, startIndex + limit);
 
-        // Mock data for example purposes — replace with actual data
-        const data = {
-          products: products,
-          total: 0,
-        };
-
-        setProductsData(data.products);
-        setTotalProducts(data.total);
+        setProductsData(paginated);
+        setTotalProducts(count);
       } catch (err) {
         setError(err instanceof Error ? err : new Error("An error occurred"));
         console.error("Error fetching products:", err);

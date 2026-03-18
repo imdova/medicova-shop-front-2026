@@ -1,17 +1,17 @@
 "use client";
-import { Pagination } from "@/components/shared/Pagination";
-import { Banner } from "@/components/features/Banner";
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import ProductCard from "@/components/features/cards/ProductCard";
-import CategorySlider from "@/components/features/sliders/CategorySlider";
-import ProductsSlider from "@/components/features/sliders/ProductsSlider";
-import { products } from "@/data";
-import { useGetProductsByCategory } from "@/hooks/useGetProductsByCategory";
+
+import { useAppLocale } from "@/hooks/useAppLocale";
 import { MultiCategory } from "@/types";
 import { useSearchParams } from "next/navigation";
-import { useAppLocale } from "@/hooks/useAppLocale";
-import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { useGetProductsByCategory } from "@/hooks/useGetProductsByCategory";
+import { products } from "@/data";
+
+// Redesigned Components
+import CategoryHero from "../components/CategoryHero";
+import BestsellerBanner from "../components/BestsellerBanner";
+import SubcategoryChips from "../components/SubcategoryChips";
+import ProductGrid from "../components/ProductGrid";
+import FAQSection from "../components/FAQSection";
 
 interface RenderComponentProps {
   category: MultiCategory;
@@ -24,145 +24,97 @@ export default function RenderComponent({
 }: RenderComponentProps) {
   const searchParams = useSearchParams();
   const locale = useAppLocale();
-  const t = useTranslations();
   const isArabic = locale === "ar";
 
-  const categorySlugParam = searchParams.get("categorySlug");
-  const slug = categorySlugParam ?? undefined;
-
+  // Pagination & Filtering Logic
   const pageParam = searchParams.get("page");
   const currentPage = pageParam ? Number(pageParam) : 1;
   const itemsPerPage = 12;
 
-  const { productsData, totalProducts } = useGetProductsByCategory({
-    categorySlug: slug,
+  const categorySlugParam = searchParams.get("categorySlug");
+  const subcategoryParam = searchParams.get("subcategory");
+  const activeSlug = subcategoryParam ?? categorySlugParam ?? undefined;
+
+  const { productsData, totalProducts, isLoading } = useGetProductsByCategory({
+    categorySlug: activeSlug || category.id,
     page: currentPage,
     limit: itemsPerPage,
   });
 
-  const isSingleCategory =
-    !category.subCategories || category.subCategories.length === 0;
+  // Dynamic Bestsellers (reverted to dummy as per user request, excluding "Man Clothes")
+  const displayBestsellers = products
+    .filter(p => {
+      const titleEn = p.title?.en?.toLowerCase() || "";
+      const catEn = p.category?.title?.en?.toLowerCase() || "";
+      const titleAr = p.title?.ar || "";
+      const catAr = p.category?.title?.ar || "";
+      
+      const isMens = 
+        titleEn.includes("man") || titleEn.includes("men") || 
+        catEn.includes("man") || catEn.includes("men") ||
+        titleAr.includes("رجالي") || catAr.includes("رجالي");
+        
+      return !isMens;
+    })
+    .slice(0, 8);
+  
+  const mockFAQs = [
+    {
+      question: isArabic ? "ما هي سياسة الإرجاع لهذا القسم؟" : "What is the return policy for this category?",
+      answer: isArabic 
+        ? "يمكنك إرجاع المنتجات خلال 14 يوماً من تاريخ الاستلام بشرط أن تكون في حالتها الأصلية." 
+        : "You can return products within 14 days of receipt as long as they are in their original condition."
+    },
+    {
+      question: isArabic ? "كيف يمكنني معرفة حجم المنتج؟" : "How do I know the product size?",
+      answer: isArabic 
+        ? "يرجى مراجعة دليل المقاسات الموجود في صفحة كل منتج للحصول على أدق المعلومات." 
+        : "Please check the size guide on each product page for the most accurate information."
+    },
+    {
+       question: isArabic ? "هل تتوفر عروض خاصة حالياً؟" : "Are there any special offers available?",
+       answer: isArabic 
+         ? "نعم، يمكنك دائماً مراجعة قسم العروض والخصومات في أعلى الصفحة أو متابعة نشرتنا البريدية." 
+         : "Yes, you can always check the offers and discounts section at the top of the page or follow our newsletter."
+    }
+  ];
+
   return (
-    <>
+    <div className="bg-white">
+      {/* 1. Hero Section */}
+      <CategoryHero 
+        category={category} 
+        fullPath={fullPath} 
+        itemCount={totalProducts} 
+      />
+
       <div className="container mx-auto px-4 lg:max-w-[98%]">
+        {/* 2. Bestseller Section */}
+        <BestsellerBanner 
+          products={displayBestsellers} 
+          categoryName={category.title[locale]} 
+        />
+
+        {/* 3. Subcategory Chips / Filters */}
         {category.subCategories && (
-          <CategorySlider
-            locale={locale}
-            path={fullPath}
-            cardSize="large"
-            inCategory
-            categories={category.subCategories}
+          <SubcategoryChips 
+            subcategories={category.subCategories} 
+            currentPath={fullPath || ""} 
+            activeSlug={activeSlug}
           />
         )}
 
-        <div className="my-4">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-bold sm:text-2xl">
-              {t("home.shopFavorite")} {category.title[locale]}
-            </h2>
-            <Link
-              href={`/category/${fullPath}`}
-              className="bg-primary/10 hover:bg-primary/20 group flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-primary transition-colors"
-            >
-              <span>{t("common.shopNow")}</span>
-              {isArabic ? (
-                <ArrowLeft
-                  size={16}
-                  className="transition-transform duration-300 group-hover:-translate-x-1"
-                />
-              ) : (
-                <ArrowRight
-                  size={16}
-                  className="transition-transform duration-300 group-hover:translate-x-1"
-                />
-              )}
-            </Link>
-          </div>
-          <ProductsSlider>
-            {products.map((product) => (
-              <div
-                key={product.id}
-                className="w-[200px] flex-shrink-0 px-1 py-4 md:w-[240px]"
-              >
-                <ProductCard product={product} />
-              </div>
-            ))}
-          </ProductsSlider>
-        </div>
-        <div className="my-6">
-          <Banner
-            image={category.banner?.image ?? "/images/placeholder.jpg"}
-            url={category.banner?.url ?? "#"}
-          />
-        </div>
+        {/* 4. Main Product Grid */}
+        <ProductGrid 
+          products={productsData} 
+          totalProducts={totalProducts} 
+          currentPage={currentPage} 
+          itemsPerPage={itemsPerPage} 
+        />
 
-        <div>
-          {category.subCategories &&
-            category.subCategories.map((category) => {
-              return (
-                <div key={category.id} className="my-4">
-                  <div className="mb-6 flex items-center justify-between gap-4">
-                    <h2 className="text-lg font-bold sm:text-2xl">
-                      {category.title[locale]}
-                    </h2>
-                    <Link
-                      href={`/category/${fullPath}/${isArabic ? category.slugAr || category.slug : category.slug}`.replace(
-                        /\/+/g,
-                        "/",
-                      )}
-                      className="bg-primary/10 hover:bg-primary/20 group flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-primary transition-colors"
-                    >
-                      <span>{t("common.shopNow")}</span>
-                      {isArabic ? (
-                        <ArrowLeft
-                          size={16}
-                          className="transition-transform duration-300 group-hover:-translate-x-1"
-                        />
-                      ) : (
-                        <ArrowRight
-                          size={16}
-                          className="transition-transform duration-300 group-hover:translate-x-1"
-                        />
-                      )}
-                    </Link>
-                  </div>
-                  <ProductsSlider>
-                    {products.map((product) => (
-                      <div
-                        key={product.id}
-                        className="w-[200px] flex-shrink-0 px-1 py-4 md:w-[240px]"
-                      >
-                        <ProductCard product={product} />
-                      </div>
-                    ))}
-                  </ProductsSlider>
-                </div>
-              );
-            })}
-        </div>
-        {isSingleCategory && (
-          <div className="my-4">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <h2 className="text-lg font-bold uppercase sm:text-2xl">
-                {t("home.shopAllIn")} {category.title[locale]}
-              </h2>
-            </div>
-            <div className="grid grid-cols-2 gap-4 py-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {productsData.map((product) => (
-                <div key={product.id} className="w-full flex-shrink-0">
-                  <ProductCard product={product} />
-                </div>
-              ))}
-            </div>
-            {/* Add Pagination */}
-            <Pagination
-              totalItems={totalProducts}
-              itemsPerPage={itemsPerPage}
-              currentPage={currentPage}
-            />
-          </div>
-        )}
+        {/* 5. FAQ Section */}
+        <FAQSection faqs={mockFAQs} />
       </div>
-    </>
+    </div>
   );
 }

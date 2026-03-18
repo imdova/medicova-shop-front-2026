@@ -194,6 +194,24 @@ export async function getVariants(token?: string): Promise<ProductOption[]> {
 
   return readCachedVariants();
 }
+export async function getVariantById(id: string, token?: string): Promise<ProductOption | null> {
+  const cached = readCachedVariants();
+  const fromCache = cached.find((v) => v.id === id);
+  if (fromCache) return fromCache;
+
+  try {
+    const response = await apiClient<any>({
+      endpoint: `/product-variants/${id}`,
+      method: "GET",
+      token,
+    });
+    return mapVariant(response.data || response);
+  } catch (error) {
+    console.error(`Failed to fetch variant ${id}:`, error);
+    return null;
+  }
+}
+
 
 export async function createVariant(data: VariantData, token?: string): Promise<ProductOption> {
   console.log("DEBUG: Creating variant. Payload:", JSON.stringify(data, null, 2), "Token present:", !!token);

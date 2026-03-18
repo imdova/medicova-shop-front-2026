@@ -24,7 +24,8 @@ const subCategorySchema = z.object({
   metaTitle: z.string().optional(),
   metaDescription: z.string().optional(),
   metaKeywords: z.array(z.string()).optional(),
-  headline: z.string().optional(),
+  headlineEn: z.string().optional(),
+  headlineAr: z.string().optional(),
   description: z.string().min(1, "Description is required"),
   image: z.any().optional(),
   faqs: z
@@ -76,7 +77,8 @@ const translations = {
     dragDrop: "Drag and drop an image here",
     orClick: "or click to browse",
     fileTypes: "JPEG, PNG, WebP • Max 5MB",
-    headline: "Sub Category Headline",
+    headlineEn: "Sub Category Headline (English)",
+    headlineAr: "Sub Category Headline (Arabic)",
     headlinePlaceholder: "Enter a catchy headline.",
     headlineNote: "Optional: A short, catchy headline for the subcategory.",
     description: "Description",
@@ -118,7 +120,8 @@ const translations = {
     dragDrop: "اسحب وأفلت صورة هنا",
     orClick: "أو انقر للتصفح",
     fileTypes: "JPEG, PNG, WebP • الحد الأقصى 5 ميجابايت",
-    headline: "عنوان الفئة الفرعية",
+    headlineEn: "عنوان الفئة الفرعية (الإنجليزية)",
+    headlineAr: "عنوان الفئة الفرعية (العربية)",
     headlinePlaceholder: "أدخل عنوانًا جذابًا.",
     headlineNote: "اختياري: عنوان قصير وجذاب للفئة الفرعية.",
     description: "الوصف",
@@ -657,18 +660,34 @@ export default function CreateSubCategoryPage() {
                 </div>
               </div>
 
-              {/* Sub Category Headline */}
+              {/* Sub Category Headlines */}
               <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <label className="mb-2 block text-sm font-medium">
-                  {t.headline}
-                </label>
-                <input
-                  type="text"
-                  {...form.register("headline")}
-                  placeholder={t.headlinePlaceholder}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <p className="mt-1 text-xs text-gray-500">{t.headlineNote}</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">
+                      {t.headlineEn}
+                    </label>
+                    <input
+                      type="text"
+                      {...form.register("headlineEn")}
+                      placeholder={t.headlinePlaceholder}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">
+                      {t.headlineAr}
+                    </label>
+                    <input
+                      type="text"
+                      dir="rtl"
+                      {...form.register("headlineAr")}
+                      placeholder={t.headlinePlaceholder}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">{t.headlineNote}</p>
               </div>
 
               {/* Description */}

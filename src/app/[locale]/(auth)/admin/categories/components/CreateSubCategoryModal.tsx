@@ -40,6 +40,8 @@ const CreateSubCategoryModal: React.FC<Props> = ({
   const [nameAr, setNameAr] = useState("");
   const [slugEn, setSlugEn] = useState("");
   const [slugAr, setSlugAr] = useState("");
+  const [headlineEn, setHeadlineEn] = useState("");
+  const [headlineAr, setHeadlineAr] = useState("");
   const [parentCategoryId, setParentCategoryId] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -52,6 +54,8 @@ const CreateSubCategoryModal: React.FC<Props> = ({
     setNameAr(editItem.name?.ar || "");
     setSlugEn(editItem.slug || "");
     setSlugAr(editItem.slugAr || "");
+    setHeadlineEn(editItem.headline?.en || "");
+    setHeadlineAr(editItem.headline?.ar || "");
     const parent = categories.find(
       (c) => ((c as any)._id || c.id) === (editItem.categoryId || ""),
     );
@@ -68,6 +72,8 @@ const CreateSubCategoryModal: React.FC<Props> = ({
         if (data.nameAr) setNameAr(data.nameAr);
         if (data.slug) setSlugEn(data.slug);
         if (data.slugAr) setSlugAr(data.slugAr);
+        if (data.headlineEn) setHeadlineEn(data.headlineEn);
+        if (data.headlineAr) setHeadlineAr(data.headlineAr);
         if (data.image) setImagePreview(data.image);
         const parentId =
           data.parentCategory?._id || data.parentCategory || data.category?._id;
@@ -81,6 +87,8 @@ const CreateSubCategoryModal: React.FC<Props> = ({
     setNameAr("");
     setSlugEn("");
     setSlugAr("");
+    setHeadlineEn("");
+    setHeadlineAr("");
     setParentCategoryId("");
     setImageFile(null);
     setImagePreview(null);
@@ -126,6 +134,8 @@ const CreateSubCategoryModal: React.FC<Props> = ({
           description: nameEn.trim(),
           active: true,
           parentCategory: parentCategoryId,
+          headlineEn: headlineEn.trim(),
+          headlineAr: headlineAr.trim(),
         };
         if (imageUrl) body.image = imageUrl;
         if (slugEn.trim()) body.slug = slugEn.trim();
@@ -155,6 +165,8 @@ const CreateSubCategoryModal: React.FC<Props> = ({
       nameAr,
       slugEn,
       slugAr,
+      headlineEn,
+      headlineAr,
       parentCategoryId,
       imageFile,
       imagePreview,
@@ -341,6 +353,42 @@ const CreateSubCategoryModal: React.FC<Props> = ({
               value={slugAr}
               onChange={(e) => setSlugAr(e.target.value)}
               placeholder={t("slugPlaceholder")}
+              className={inputCls}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="subcat-headline-en"
+              className="mb-1.5 block text-sm font-semibold text-gray-700"
+            >
+              {t("headlineEn") || "Headline (EN)"}
+            </label>
+            <input
+              id="subcat-headline-en"
+              type="text"
+              value={headlineEn}
+              onChange={(e) => setHeadlineEn(e.target.value)}
+              placeholder="e.g. Best deals"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="subcat-headline-ar"
+              className="mb-1.5 block text-sm font-semibold text-gray-700"
+            >
+              {t("headlineAr") || "Headline (AR)"}
+            </label>
+            <input
+              id="subcat-headline-ar"
+              type="text"
+              dir="rtl"
+              value={headlineAr}
+              onChange={(e) => setHeadlineAr(e.target.value)}
+              placeholder="مثال: أفضل العروض"
               className={inputCls}
             />
           </div>

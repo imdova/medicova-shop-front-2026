@@ -14,6 +14,7 @@ export type Category = {
   totalSales: LocalizedTitle;
   status: "active" | "inactive";
   isActive: boolean;
+  headline?: LocalizedTitle;
 };
 
 export async function fetchCategories(): Promise<Category[]> {
@@ -39,6 +40,7 @@ export async function fetchCategories(): Promise<Category[]> {
     },
     status: item.status ? "active" : "inactive",
     isActive: !!item.status,
+    headline: { en: item.headlineEn || item.headline || "", ar: item.headlineAr || item.headline || "" },
   })) as Category[];
 }
 
@@ -77,6 +79,7 @@ export type SubCategory = {
   totalSales: LocalizedTitle;
   status: "active" | "inactive";
   isActive: boolean;
+  headline?: LocalizedTitle;
 };
 
 export async function fetchSubCategories(): Promise<SubCategory[]> {
@@ -107,6 +110,7 @@ export async function fetchSubCategories(): Promise<SubCategory[]> {
       },
       status: (item.active || item.status) ? "active" : "inactive",
       isActive: !!(item.active || item.status),
+      headline: { en: item.headlineEn || item.headline || "", ar: item.headlineAr || item.headline || "" },
     };
   }) as SubCategory[];
 }
@@ -199,7 +203,7 @@ export type SubCategoryChild = {
   parentSubCategory: LocalizedTitle;
   parentSubCategoryId: string;
   description: string;
-  headline: string;
+  headline: LocalizedTitle;
   active: boolean;
   metaTitle: string;
   metaDescription: string;
@@ -236,6 +240,7 @@ export async function fetchSubCategoryChildren(): Promise<SubCategoryChild[]> {
         },
         parentSubCategoryId: parent?._id || "",
         description: item.description || "",
+        headline: { en: item.headlineEn || item.headline || "", ar: item.headlineAr || item.headline || "" },
         active: !!(item.active || item.status),
         products: item.products || 0,
         orders: item.totalOrders || item.orders || 0,

@@ -42,7 +42,7 @@ export interface CreateProductPayload {
       remaining: number;
     }>;
   };
-  variants: string[];
+  variants?: string[];
   specifications: Array<{
     keyEn?: string;
     keyAr?: string;
@@ -88,6 +88,16 @@ export interface CreateProductPayload {
   approved: boolean;
   rate: number;
   draft?: boolean;
+  selectedOptions?: {
+    options: Array<{
+      variantId: string;
+      values: string[];
+    }>;
+    distribution: Array<{
+      [key: string]: string | number;
+      stock: number;
+    }>;
+  };
 }
 
 export interface ApiProduct {
@@ -276,4 +286,68 @@ export async function updateProductApi(id: string, payload: Partial<CreateProduc
     body: payload as any,
     token,
   });
+}
+
+/**
+ * Maps ApiProduct from the backend to the Product type used in the UI components.
+ */
+export function mapApiProductToProduct(item: any): any {
+  const enName = item.nameEn || item.title?.en || "Untitled";
+  const arName = item.nameAr || item.title?.ar || enName || "بدون عنوان";
+
+  // Handle images
+  const featuredImage = item.media?.featuredImages || (Array.isArray(item.media?.galleryImages) ? item.media.galleryImages[0] : null) || "/images/placeholder.jpg";
+  const galleryImages = Array.isArray(item.media?.galleryImages) ? item.media.galleryImages : [featuredImage];
+
+  return {
+    id: item._id || item.id,
+    sku: item.sku || item.identity?.sku,
+    title: {
+      en: enName,
+      ar: arName,
+    },
+    price: item.price || item.pricing?.salePrice || item.pricing?.originalPrice || 0,
+    del_price: item.del_price || (item.pricing?.salePrice ? item.pricing?.originalPrice : undefined),
+    images: galleryImages,
+    rating: item.rate || 0,
+    reviewCount: item.reviewCount || 0,
+    isBestSaller: !!item.isBestSaller || (item.rate >= 4.5),
+    stock: item.stock || item.inventory?.stockQuantity || 0,
+    brand: typeof item.brand === "object" ? {
+      id: item.brand._id || item.brand.id,
+      name: { en: item.brand.nameEn || item.brand.name || "Brand", ar: item.brand.nameAr || item.brand.name || "براند" },
+      image: item.brand.image || "/images/placeholder.jpg"
+    } : { id: item.brand || "unknown", name: { en: "Brand", ar: "براند" }, image: "/images/placeholder.jpg" },
+    category: typeof item.category === "object" ? {
+      id: item.category._id || item.category.id,
+      slug: item.category.slug || item.category.slugEn || item.category.url?.split("/").pop(),
+      title: { en: item.category.name || item.category.title?.en || "Category", ar: item.category.nameAr || item.category.title?.ar || "قسم" }
+    } : { id: item.category || "unknown", slug: item.category, title: { en: "Category", ar: "قسم" } },
+    subcategory: item.subcategory || item.category?.subcategory ? {
+      slug: item.subcategory?.slug || item.subcategory?.slugEn || item.category?.subcategory?.url?.split("/").pop() || item.subcategory,
+      title: { 
+        en: item.subcategory?.name || item.subcategory?.title?.en || item.category?.subcategory?.title?.en || "Subcategory", 
+        ar: item.subcategory?.nameAr || item.subcategory?.title?.ar || item.category?.subcategory?.title?.ar || "قسم فرعي" 
+      }
+    } : undefined,
+    description: {
+      en: item.descriptions?.descriptionEn || "",
+      ar: item.descriptions?.descriptionAr || "",
+    },
+    nudges: item.nudges || { en: [], ar: [] },
+    features: item.features || { en: [], ar: [] },
+    highlights: item.highlights || { en: [], ar: [] },
+    overview_desc: item.overview_desc || { en: "", ar: "" },
+    weightKg: item.weightKg || 0,
+    shipping_fee: item.shipping_fee || 0,
+    shippingMethod: item.shippingMethod || { en: "standard", ar: "قياسي" },
+    sellers: item.sellers || {
+      id: item.sellerId || "unknown",
+      name: "Medicova Seller",
+      rating: 5,
+      isActive: true,
+      returnPolicy: { en: "Standard Policy", ar: "سياسة قياسية" },
+      status: { en: "Active", ar: "نشط" }
+    }
+  };
 }
