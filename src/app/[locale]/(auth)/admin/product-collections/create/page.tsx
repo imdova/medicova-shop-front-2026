@@ -122,6 +122,7 @@ export default function CreateCollectionPage() {
           model: { en: "", ar: "" },
           category: { id: "", title: { en: "", ar: "" }, image: "", slug: "" }, // Added slug
           title: { en: p.nameEn, ar: p.nameAr },
+          slug: { en: p.slugEn || "", ar: p.slugAr || "" },
           price: p.price || p.pricing?.originalPrice || 0,
           images:
             p.media?.galleryImages ||

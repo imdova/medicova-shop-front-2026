@@ -8,6 +8,8 @@ import { getEncrypted } from "@/util/encryptedCookieStorage";
 import { Product } from "@/types/product";
 import { SizeType, NumericSizeType, LiquidSizeType } from "@/types";
 import { useTranslations } from "next-intl";
+import { getSellerSelectedOptions } from "@/services/sellerSelectedOptionService";
+import { getVariantById } from "@/services/variantService";
 
 interface UseProductPageProps {
   product: Product | undefined;
@@ -29,9 +31,45 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
   const [currentNudgeIndex, setCurrentNudgeIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [isClient, setIsClient] = useState(false);
+  const [selectedOptions, setSelectedOptions] = useState<{ label: { en: string; ar: string }; values: string[] }[]>([]);
 
   const cartProduct = cartProducts.find((item) => item.id === product?.id);
   const isInCart = !!cartProduct;
+
+  // Fetch selected options
+  useEffect(() => {
+    if (product?.id) {
+      const fetchOptions = async () => {
+        try {
+          const res = await getSellerSelectedOptions(product.id);
+          const data = (res as any)?.data || res;
+          
+          if (data && data.options && Array.isArray(data.options)) {
+            const optionsWithLabels = await Promise.all(
+              data.options.map(async (opt: any) => {
+                try {
+                  const variant = await getVariantById(opt.variantId);
+                  return {
+                    label: variant?.name || { en: "Option", ar: "خيار" },
+                    values: opt.values || [],
+                  };
+                } catch (e) {
+                  return {
+                    label: { en: "Option", ar: "خيار" },
+                    values: opt.values || [],
+                  };
+                }
+              })
+            );
+            setSelectedOptions(optionsWithLabels);
+          }
+        } catch (err) {
+          console.error("Failed to fetch seller selected options", err);
+        }
+      };
+      fetchOptions();
+    }
+  }, [product?.id]);
 
   // Hydrate cart from cookies
   useEffect(() => {
@@ -100,6 +138,7 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
         addItem({
           id: product.id,
           title: product.title,
+          slug: product.slug,
           image: product.images?.[0] ?? "/images/placeholder.jpg",
           description: product.description.en,
           del_price: product.del_price,
@@ -161,6 +200,7 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
     cartProducts,
     totalPrice,
     isInCart,
+    selectedOptions,
     setSelectedSize,
     setSelectedColor,
     setQuantity,
@@ -169,5 +209,27 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
     setAlert,
     handleAddToCart,
     handleCheckout,
+  } as {
+    isClient: boolean;
+    loading: boolean;
+    selectedSize: SizeType | NumericSizeType | LiquidSizeType | undefined;
+    selectedColor: string | undefined;
+    quantity: number;
+    currentNudgeIndex: number;
+    isDrawerOpen: boolean;
+    isAuthModalOpen: boolean;
+    alert: { message: string; type: "success" | "error" | "info" } | null;
+    cartProducts: any[];
+    totalPrice: number;
+    isInCart: boolean;
+    selectedOptions: { label: { en: string; ar: string }; values: string[] }[];
+    setSelectedSize: (size: SizeType | NumericSizeType | LiquidSizeType | undefined) => void;
+    setSelectedColor: (color: string | undefined) => void;
+    setQuantity: (quantity: number) => void;
+    setIsDrawerOpen: (isOpen: boolean) => void;
+    setIsAuthModalOpen: (isOpen: boolean) => void;
+    setAlert: (alert: { message: string; type: "success" | "error" | "info" } | null) => void;
+    handleAddToCart: () => Promise<void>;
+    handleCheckout: () => void;
   };
 };

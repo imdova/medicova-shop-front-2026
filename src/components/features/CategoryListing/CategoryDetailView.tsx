@@ -7,11 +7,11 @@ import { useGetProductsByCategory } from "@/hooks/useGetProductsByCategory";
 import { products } from "@/data";
 
 // Redesigned Components
-import CategoryHero from "../components/CategoryHero";
-import BestsellerBanner from "../components/BestsellerBanner";
-import SubcategoryChips from "../components/SubcategoryChips";
-import ProductGrid from "../components/ProductGrid";
-import FAQSection from "../components/FAQSection";
+import CategoryHero from "./CategoryHero";
+import BestsellerBanner from "./BestsellerBanner";
+import SubcategoryChips from "./SubcategoryChips";
+import ProductGrid from "./ProductGrid";
+import FAQSection from "./FAQSection";
 
 interface RenderComponentProps {
   category: MultiCategory;

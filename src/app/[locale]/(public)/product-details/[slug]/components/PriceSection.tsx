@@ -9,6 +9,10 @@ interface PriceSectionProps {
   product: Product;
   locale: "en" | "ar";
   currentNudgeIndex: number;
+  selectedOptions?: { 
+    label: { en: string; ar: string }; 
+    values: { name: string; color: string }[] 
+  }[];
 }
 
 const StarRating = ({ rating }: { rating: number }) => (
@@ -70,6 +74,7 @@ const PriceSection = ({
   product,
   locale,
   currentNudgeIndex,
+  selectedOptions,
 }: PriceSectionProps) => {
   const t = useTranslations("product");
   const common = useTranslations("common");
@@ -167,6 +172,69 @@ const PriceSection = ({
           ))}
         </div>
       </div>
+
+      {/* Product Options (Variants) */}
+      {selectedOptions && selectedOptions.length > 0 && (
+        <div className="mt-8 space-y-4 border-t border-gray-100 pt-6">
+          {[...selectedOptions]
+            .sort((a, b) => {
+              const isAColor = a.label.en.toLowerCase() === "color";
+              const isBColor = b.label.en.toLowerCase() === "color";
+              if (isAColor && !isBColor) return -1;
+              if (!isAColor && isBColor) return 1;
+              return 0;
+            })
+            .map((opt, i) => {
+              const isColor = opt.label.en.toLowerCase() === "color";
+              return (
+                <div key={i} className="flex flex-col gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">
+                    {opt.label[locale]}
+                  </span>
+                  <div className="flex flex-wrap gap-3">
+                    {opt.values.map((val, j) => {
+                      if (isColor) {
+                        const isUrl = val.color.startsWith("http");
+                        return (
+                          <div
+                            key={j}
+                            className="group relative flex flex-col items-center gap-1"
+                          >
+                            <div
+                              className="relative h-8 w-8 overflow-hidden rounded-full border-2 border-gray-200 shadow-sm transition-transform hover:scale-110"
+                              style={!isUrl ? { backgroundColor: val.color } : {}}
+                              title={val.name}
+                            >
+                              {isUrl && (
+                                <Image
+                                  src={val.color}
+                                  alt={val.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              )}
+                            </div>
+                            <span className="text-[9px] font-medium text-gray-500 opacity-0 transition-opacity group-hover:opacity-100">
+                              {val.name}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <span
+                          key={j}
+                          className="rounded-xl border border-gray-200 bg-white/50 px-4 py-1.5 text-xs font-bold text-gray-700 shadow-sm backdrop-blur-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                        >
+                          {val.name}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      )}
     </section>
   );
 };

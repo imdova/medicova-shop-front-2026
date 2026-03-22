@@ -40,11 +40,13 @@ export async function updateSellerSelectedOptions(
 
 export async function getSellerSelectedOptions(
   productId: string,
-  token?: string
+  token?: string,
+  suppressErrorLog?: boolean
 ) {
   return apiClient({
     endpoint: `/seller-selected-option/by-product/${productId}`,
     method: "GET",
     token,
+    suppressErrorLog,
   });
 }

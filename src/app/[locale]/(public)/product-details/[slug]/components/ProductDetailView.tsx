@@ -12,6 +12,7 @@ import SellerCard from "./SellerCard";
 import ProductOverview from "./ProductOverview";
 import CartDrawer from "./CartDrawer";
 import ProductGallery from "./ProductGallery";
+import VariantSelectionModal from "./VariantSelectionModal";
 
 import SectionHeader from "@/components/features/headings/SectionHeader";
 import MobileCartNavbar from "@/components/layouts/Layout/NavbarMobile/MobileCartNavbar";
@@ -76,17 +77,23 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
     currentNudgeIndex,
     isDrawerOpen,
     isAuthModalOpen,
+    isVariantModalOpen,
     alert,
     cartProducts,
     totalPrice,
     isInCart,
+    selectedOptions,
+    unitSelections,
     setSelectedSize,
     setSelectedColor,
     setQuantity,
     setIsDrawerOpen,
     setIsAuthModalOpen,
+    setIsVariantModalOpen,
     setAlert,
+    onUnitSelectionChange,
     handleAddToCart,
+    confirmVariantSelection,
     handleCheckout,
   } = useProductPage({ product });
 
@@ -133,6 +140,7 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
               loading={loading}
               isInCart={isInCart}
               onAddToCart={handleAddToCart}
+              setQuantity={setQuantity}
             />
           </div>
 
@@ -172,20 +180,24 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
                 product={product}
                 locale={locale}
                 currentNudgeIndex={currentNudgeIndex}
+                selectedOptions={selectedOptions}
               />
 
-              <VariantSelector
-                colors={product.colors}
-                sizes={product.sizes}
-                selectedColor={selectedColor}
-                selectedSize={selectedSize}
-                onColorSelect={setSelectedColor}
-                onSizeSelect={setSelectedSize}
-                locale={locale}
-              />
             </div>
           </div>
         </div>
+
+        <VariantSelectionModal
+          isOpen={isVariantModalOpen}
+          onClose={() => setIsVariantModalOpen(false)}
+          product={product!}
+          quantity={quantity}
+          selectedOptions={selectedOptions}
+          unitSelections={unitSelections}
+          onUnitSelectionChange={onUnitSelectionChange}
+          onConfirm={confirmVariantSelection}
+          locale={locale}
+        />
    
 
         {/* Seller Section */}

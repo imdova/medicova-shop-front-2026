@@ -9,11 +9,46 @@ import { Product } from "@/types/product";
 import { SizeType, NumericSizeType, LiquidSizeType } from "@/types";
 import { useTranslations } from "next-intl";
 
+import { getSellerSelectedOptions } from "@/services/sellerSelectedOptionService";
+import { getVariantById } from "@/services/variantService";
+
+interface UnitSelection {
+  size?: SizeType | NumericSizeType | LiquidSizeType;
+  color?: string;
+}
+
 interface UseProductPageProps {
   product: Product | undefined;
 }
 
-export const useProductPage = ({ product }: UseProductPageProps) => {
+export const useProductPage = ({ product }: UseProductPageProps): {
+  isClient: boolean;
+  loading: boolean;
+  selectedSize: SizeType | NumericSizeType | LiquidSizeType | undefined;
+  selectedColor: string | undefined;
+  quantity: number;
+  currentNudgeIndex: number;
+  isDrawerOpen: boolean;
+  isAuthModalOpen: boolean;
+  isVariantModalOpen: boolean;
+  alert: { message: string; type: "success" | "error" | "info" } | null;
+  cartProducts: any[];
+  totalPrice: number;
+  isInCart: boolean;
+  selectedOptions: { label: { en: string; ar: string }; values: { name: string; color: string }[] }[];
+  unitSelections: UnitSelection[];
+  setSelectedSize: (size: SizeType | NumericSizeType | LiquidSizeType | undefined) => void;
+  setSelectedColor: (color: string | undefined) => void;
+  setQuantity: (quantity: number) => void;
+  setIsDrawerOpen: (isOpen: boolean) => void;
+  setIsAuthModalOpen: (isOpen: boolean) => void;
+  setIsVariantModalOpen: (isOpen: boolean) => void;
+  setAlert: (alert: { message: string; type: "success" | "error" | "info" } | null) => void;
+  onUnitSelectionChange: (index: number, selection: UnitSelection) => void;
+  handleAddToCart: () => Promise<void>;
+  confirmVariantSelection: () => void;
+  handleCheckout: () => void;
+} => {
   const t = useTranslations("product");
   const session = useSession();
   const router = useRouter();
@@ -25,13 +60,70 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
   const [loading, setLoading] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [alert, setAlert] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [currentNudgeIndex, setCurrentNudgeIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [isClient, setIsClient] = useState(false);
+  const [selectedOptions, setSelectedOptions] = useState<{ label: { en: string; ar: string }; values: { name: string; color: string }[] }[]>([]);
+  
+  const [unitSelections, setUnitSelections] = useState<UnitSelection[]>([
+    { size: undefined, color: undefined }
+  ]);
 
   const cartProduct = cartProducts.find((item) => item.id === product?.id);
   const isInCart = !!cartProduct;
+
+  // Fetch selected options
+  useEffect(() => {
+    if (product?.id) {
+      const fetchOptions = async () => {
+        try {
+          const token = (session?.data as any)?.accessToken;
+          const res = await getSellerSelectedOptions(product.id, token, true);
+          const data = (res as any)?.data || res;
+          
+          if (data && data.options && Array.isArray(data.options)) {
+            const optionsWithLabels = await Promise.all(
+              data.options.map(async (opt: any) => {
+                try {
+                  const variant = await getVariantById(opt.variantId);
+                  
+                  // Match values with variant option labels to get hex/color
+                  const enrichedValues = (opt.values || []).map((val: string) => {
+                    const match = variant?.option_values?.find(
+                      (vOpt: any) => 
+                        vOpt.label.en.toLowerCase() === val.toLowerCase() || 
+                        vOpt.label.ar === val
+                    );
+                    return {
+                      name: val,
+                      color: match?.color || val, // Fallback to name if no hex found
+                    };
+                  });
+
+                  return {
+                    label: variant?.name || { en: "Option", ar: "خيار" },
+                    values: enrichedValues,
+                  };
+                } catch (e) {
+                  return {
+                    label: { en: "Option", ar: "خيار" },
+                    values: (opt.values || []).map((v: string) => ({ name: v, color: v })),
+                  };
+                }
+              })
+            );
+            setSelectedOptions(optionsWithLabels);
+          }
+        } catch (err) {
+          // Silent catch for options fetch, as it might be unauthorized for guests
+          console.warn("Seller selected options fetch failed (likely unauthorized)", err);
+        }
+      };
+      fetchOptions();
+    }
+  }, [product?.id, session?.data]);
 
   // Hydrate cart from cookies
   useEffect(() => {
@@ -51,12 +143,15 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
 
   // Set initial selections
   useEffect(() => {
-    if (product?.sizes?.length) {
-      setSelectedSize(product.sizes[0]);
-    }
-    if (product?.colors?.en?.length) {
-      setSelectedColor(product.colors.en[0]);
-    }
+    const defaultSize = product?.sizes?.[0];
+    const defaultColor = product?.colors?.en?.[0];
+
+    if (defaultSize) setSelectedSize(defaultSize);
+    if (defaultColor) setSelectedColor(defaultColor);
+
+    setUnitSelections([
+      { size: defaultSize, color: defaultColor }
+    ]);
   }, [product?.sizes, product?.colors]);
 
   // Nudge auto-rotation
@@ -73,29 +168,61 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
 
   // Sync quantity with cart if product is already there
   useEffect(() => {
-    if (cartProduct) {
+    if (cartProduct && cartProduct.quantity !== quantity) {
       setQuantity(cartProduct.quantity);
-    } else {
-      setQuantity(1);
     }
   }, [cartProduct?.quantity]);
+
+  // Sync unitSelections with quantity
+  useEffect(() => {
+    setUnitSelections(prev => {
+      if (quantity === prev.length) return prev;
+      const next = [...prev];
+      if (quantity > next.length) {
+        for (let i = next.length; i < quantity; i++) {
+          next.push({ size: next[0]?.size, color: next[0]?.color });
+        }
+      } else {
+        return next.slice(0, quantity);
+      }
+      return next;
+    });
+  }, [quantity]);
 
   const showAlert = useCallback((message: string, type: "success" | "error" | "info") => {
     setAlert({ message, type });
     setTimeout(() => setAlert(null), 3000);
   }, []);
 
+  const onUnitSelectionChange = (index: number, selection: UnitSelection) => {
+    setUnitSelections(prev => {
+      const next = [...prev];
+      next[index] = selection;
+      // Sync first unit with top-level selection for legacy compatibility
+      if (index === 0) {
+        setSelectedSize(selection.size);
+        setSelectedColor(selection.color);
+      }
+      return next;
+    });
+  };
+
   const handleAddToCart = async () => {
     if (!product?.id) {
       showAlert(t("error"), "error");
       return;
     }
+    setIsVariantModalOpen(true);
+  };
 
-    setLoading(true);
-    // Simulate slight delay for feedback
-    await new Promise((resolve) => setTimeout(resolve, 600));
+  const confirmVariantSelection = () => {
+    if (!product?.id) return;
 
-    if (!isInCart) {
+    unitSelections.forEach((selection: any) => {
+      // Find color and size regardless of exact key casing/label (common variants)
+      const color = selection.color || selection.Color || selection.COLOR;
+      const size = selection.size || selection.Size || selection.SIZE;
+
       dispatch(
         addItem({
           id: product.id,
@@ -107,39 +234,22 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
           del_price: product.del_price,
           price: product.price ?? 0,
           shipping_fee: product.shipping_fee ?? 0,
-          quantity: Math.min(quantity, product.stock ?? 1),
+          quantity: 1,
           brand: product.brand,
           deliveryTime: product.deliveryTime,
           sellers: product.sellers,
           stock: product.stock,
-          color: selectedColor,
-          size: selectedSize,
+          color: color,
+          size: size,
           shippingMethod: product.shippingMethod,
           weightKg: product.weightKg,
         })
       );
-      showAlert(t("addedToCart"), "success");
-    } else {
-      const availableStock = product.stock ?? 0;
-      const currentQuantity = cartProduct?.quantity ?? 0;
-      const requestedTotal = currentQuantity + quantity;
+    });
 
-      if (requestedTotal > availableStock) {
-        const canAdd = Math.max(0, availableStock - currentQuantity);
-        if (canAdd > 0) {
-          dispatch(increaseQuantity({ id: product.id, amount: canAdd }));
-          showAlert(t("outOfStock"), "info"); // Simplified alert for logic
-        } else {
-          showAlert(t("outOfStock"), "error");
-        }
-      } else {
-        dispatch(increaseQuantity({ id: product.id, amount: quantity }));
-        showAlert(t("addedToCart"), "success");
-      }
-    }
-
+    setIsVariantModalOpen(false);
     setIsDrawerOpen(true);
-    setLoading(false);
+    showAlert(t("addedToCart"), "success");
   };
 
   const handleCheckout = () => {
@@ -159,17 +269,23 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
     currentNudgeIndex,
     isDrawerOpen,
     isAuthModalOpen,
+    isVariantModalOpen,
     alert,
     cartProducts,
     totalPrice,
     isInCart,
+    selectedOptions,
+    unitSelections,
     setSelectedSize,
     setSelectedColor,
     setQuantity,
     setIsDrawerOpen,
     setIsAuthModalOpen,
+    setIsVariantModalOpen,
     setAlert,
+    onUnitSelectionChange,
     handleAddToCart,
+    confirmVariantSelection,
     handleCheckout,
   };
 };

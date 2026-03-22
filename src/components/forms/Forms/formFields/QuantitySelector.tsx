@@ -12,6 +12,7 @@ type QuantitySelectorProps = {
   className?: string;
   buttonSize?: "sm" | "md" | "lg";
   showLabel?: boolean;
+  onQuantityChange?: (quantity: number) => void;
 };
 
 const QuantitySelector = ({
@@ -22,6 +23,7 @@ const QuantitySelector = ({
   className = "",
   buttonSize = "md",
   showLabel = false,
+  onQuantityChange,
 }: QuantitySelectorProps) => {
   const dispatch = useDispatch();
   const [quantity, setQuantity] = useState(initialQuantity);
@@ -51,6 +53,9 @@ const QuantitySelector = ({
     // Update local state only if the value changed
     if (validatedQuantity !== quantity) {
       setQuantity(validatedQuantity);
+      if (onQuantityChange) {
+        onQuantityChange(validatedQuantity);
+      }
     }
   };
 

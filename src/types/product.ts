@@ -208,6 +208,10 @@ export interface Product {
     firstName?: string;
     lastName?: string;
   } | string;
+  selectedOptions?: {
+    label: LocalizedTitle;
+    values: string[];
+  }[];
 }
 
 export type ProductTag = {
@@ -257,6 +261,7 @@ export type OptionValue = {
   label: LocalizedTitle;
   price: string;
   price_type: "fixed" | "percent";
+  color?: string;
 };
 
 export type ProductOption = {

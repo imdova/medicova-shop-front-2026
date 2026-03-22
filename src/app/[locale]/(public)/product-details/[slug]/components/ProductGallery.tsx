@@ -11,6 +11,7 @@ interface ProductGalleryProps {
   loading: boolean;
   isInCart: boolean;
   onAddToCart: () => void;
+  setQuantity: (quantity: number) => void;
 }
 
 const ProductGallery = ({
@@ -20,6 +21,7 @@ const ProductGallery = ({
   loading,
   isInCart,
   onAddToCart,
+  setQuantity,
 }: ProductGalleryProps) => {
   return (
     <div className="animate-in fade-in slide-in-from-left-4 sticky top-4 flex h-full flex-col justify-between rounded-3xl border border-white/40 bg-white/40 p-6 shadow-xl backdrop-blur-xl duration-1000">
@@ -53,6 +55,7 @@ const ProductGallery = ({
           loading={loading}
           isInCart={isInCart}
           onAddToCart={onAddToCart}
+          onQuantityChange={setQuantity}
           locale={locale}
         />
       </div>

@@ -10,6 +10,7 @@ interface AddToCartButtonProps {
   loading: boolean;
   isInCart: boolean;
   onAddToCart: () => void;
+  onQuantityChange: (quantity: number) => void;
   locale: "en" | "ar";
 }
 
@@ -20,6 +21,7 @@ const AddToCartButton = ({
   loading,
   isInCart,
   onAddToCart,
+  onQuantityChange,
   locale,
 }: AddToCartButtonProps) => {
   const t = useTranslations("product");
@@ -32,6 +34,7 @@ const AddToCartButton = ({
         initialQuantity={quantity}
         min={1}
         max={maxStock || 99}
+        onQuantityChange={onQuantityChange}
         buttonSize="md"
         showLabel={false}
         className="flex-1"
