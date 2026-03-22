@@ -5,6 +5,14 @@ import { getProducts, mapApiProductToProduct } from "@/services/productService";
 
 interface UseGetProductsByCategoryProps {
   categorySlug?: string;
+  searchQuery?: string;
+  brands?: string[];
+  categories?: string[];
+  minPrice?: number;
+  maxPrice?: number;
+  rating?: number;
+  availability?: string[];
+  sort?: string;
   page?: number;
   limit?: number;
 }
@@ -18,6 +26,14 @@ interface UseGetProductsByCategoryResult {
 
 export function useGetProductsByCategory({
   categorySlug,
+  searchQuery,
+  brands,
+  categories,
+  minPrice,
+  maxPrice,
+  rating,
+  availability,
+  sort,
   page = 1,
   limit = 12,
 }: UseGetProductsByCategoryProps): UseGetProductsByCategoryResult {
@@ -38,20 +54,89 @@ export function useGetProductsByCategory({
         // Map and filter products
         let filtered = allApiProducts.map(mapApiProductToProduct);
 
+        // Filter by category (from URL param)
         if (categorySlug) {
-          // Attempt to filter by category slug, ID, or subcategory slug
-          filtered = filtered.filter((p: any) => 
+          filtered = filtered.filter((p: Product) => 
             p.category?.id === categorySlug || 
             p.category?.slug === categorySlug ||
-            p.subcategory?.slug === categorySlug ||
+            p.category?.subcategory?.url?.includes(categorySlug) ||
             p.category?.title?.en?.toLowerCase() === categorySlug.toLowerCase() ||
-            p.subcategory?.title?.en?.toLowerCase() === categorySlug.toLowerCase()
+            p.category?.subcategory?.title?.en?.toLowerCase() === categorySlug.toLowerCase()
           );
+        }
+
+        // Filter by Search Query
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          filtered = filtered.filter((p: Product) => 
+            p.title.en.toLowerCase().includes(query) || 
+            p.title.ar.toLowerCase().includes(query)
+          );
+        }
+
+        // Filter by multiple Brands
+        if (brands && brands.length > 0) {
+          filtered = filtered.filter((p: Product) => 
+            brands.includes(p.brand?.id || "") || 
+            brands.includes(p.brand?.name?.en?.toLowerCase() || "")
+          );
+        }
+
+        // Filter by multiple Categories (from filter sidebar)
+        if (categories && categories.length > 0) {
+          filtered = filtered.filter((p: Product) => 
+            categories.includes(p.category?.id || "") || 
+            categories.includes(p.category?.slug || "")
+          );
+        }
+
+        // Filter by Price Range
+        if (minPrice !== undefined) {
+          filtered = filtered.filter((p: Product) => p.price >= minPrice);
+        }
+        if (maxPrice !== undefined) {
+          filtered = filtered.filter((p: Product) => p.price <= maxPrice);
+        }
+
+        // Filter by Rating
+        if (rating !== undefined) {
+          filtered = filtered.filter((p: Product) => (p.rating || 0) >= rating);
+        }
+
+        // Filter by Availability
+        if (availability && availability.length > 0) {
+          filtered = filtered.filter((p: Product) => {
+            const stock = p.stock || 0;
+            if (availability.includes("in-stock") && stock > 0) return true;
+            if (availability.includes("out-of-stock") && stock === 0) return true;
+            return false;
+          });
+        }
+
+        // Apply Sorting
+        if (sort) {
+          switch (sort) {
+            case "price-asc":
+              filtered.sort((a, b) => a.price - b.price);
+              break;
+            case "price-desc":
+              filtered.sort((a, b) => b.price - a.price);
+              break;
+            case "rating":
+              filtered.sort((a, b) => b.rating - a.rating);
+              break;
+            case "newest":
+              // Assuming ID or something represents age if date is missing
+              filtered.sort((a, b) => b.id.localeCompare(a.id));
+              break;
+            default:
+              break;
+          }
         }
 
         const count = filtered.length;
         
-        // Handle pagination locally for now as getProducts returns all (limit=1000)
+        // Handle pagination locally
         const startIndex = (page - 1) * limit;
         const paginated = filtered.slice(startIndex, startIndex + limit);
 
@@ -66,7 +151,7 @@ export function useGetProductsByCategory({
     };
 
     fetchProducts();
-  }, [categorySlug, page, limit]);
+  }, [categorySlug, searchQuery, brands, categories, minPrice, maxPrice, rating, availability, sort, page, limit]);
 
   return { productsData, totalProducts, isLoading, error };
 }

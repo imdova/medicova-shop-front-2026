@@ -3,8 +3,7 @@
 import LeftFilter from "@/components/features/filter/LeftFilter";
 import TapFilter from "@/components/features/filter/TapFilter";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import React, { useEffect, useState } from "react";
-import { products } from "@/data";
+import React, { useEffect, useState, useMemo } from "react";
 import { Product } from "@/types/product";
 import ProductCard from "@/components/features/cards/ProductCard";
 import { Drawer } from "@/components/layouts/Drawer";
@@ -13,8 +12,12 @@ import Dropdown from "@/components/shared/DropDownMenu";
 import MobileDropdown from "@/components/layouts/MobileDropdown";
 import ViewToggle from "@/components/shared/Buttons/ViewToggle";
 import ListProductCard from "@/components/features/cards/ListProductCard";
-import { leftFilters, sortOptions, tapFilters } from "@/constants/filters";
+import { sortOptions } from "@/constants/filters";
 import { useAppLocale } from "@/hooks/useAppLocale";
+import { useGetProductsByCategory } from "@/hooks/useGetProductsByCategory";
+import { getCategories } from "@/services/categoryService";
+import { getBrands } from "@/services/brandService";
+import { FilterGroup, MultiCategory, Brand } from "@/types";
 
 const Text = {
   en: {
@@ -34,6 +37,7 @@ const Text = {
     filter: "فلتر",
   },
 };
+
 export default function CategoryPage({
   params,
 }: {
@@ -45,9 +49,7 @@ export default function CategoryPage({
   const router = useRouter();
   const pathname = usePathname();
   const locale = useAppLocale();
-  const [productsData, setProductsData] = useState<Product[]>([]);
   const [view, setView] = useState<"list" | "grid">("grid");
-  const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenDropdown, setIsOpenDropdown] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
@@ -55,7 +57,112 @@ export default function CategoryPage({
     const initialPage = searchParams.get("page");
     return initialPage ? parseInt(initialPage, 10) : 1;
   });
-  const itemsPerPage = 10;
+  const itemsPerPage = 12;
+
+  const query = searchParams.get("q") || undefined;
+
+  const [dynamicCategories, setDynamicCategories] = useState<MultiCategory[]>([]);
+  const [dynamicBrands, setDynamicBrands] = useState<Brand[]>([]);
+
+  // Fetch dynamic filters
+  useEffect(() => {
+    const fetchFilters = async () => {
+      const [cats, brs] = await Promise.all([getCategories(), getBrands()]);
+      setDynamicCategories(cats);
+      setDynamicBrands(brs);
+    };
+    fetchFilters();
+  }, []);
+
+  // Extract filters from URL
+  const selectedBrands = useMemo(() => searchParams.get("brand")?.split(",") || [], [searchParams]);
+  const selectedCategories = useMemo(() => searchParams.get("category")?.split(",") || [], [searchParams]);
+  const minPrice = useMemo(() => searchParams.get("min_price") ? Number(searchParams.get("min_price")) : undefined, [searchParams]);
+  const maxPrice = useMemo(() => searchParams.get("max_price") ? Number(searchParams.get("max_price")) : undefined, [searchParams]);
+  const rating = useMemo(() => searchParams.get("rating") ? Number(searchParams.get("rating")) : undefined, [searchParams]);
+  const availability = useMemo(() => searchParams.get("availability")?.split(",") || [], [searchParams]);
+  const sort = useMemo(() => searchParams.get("sort") || undefined, [searchParams]);
+
+  // Construct dynamic Filter Groups
+  const dynamicFilterGroups: FilterGroup[] = useMemo(() => {
+    return [
+      {
+        id: "category",
+        name: { en: "Category", ar: "الفئة" },
+        options: dynamicCategories.map(cat => ({
+          id: cat.slug || cat.id,
+          name: cat.title,
+          subcategories: cat.subCategories?.map(sub => ({
+            id: sub.slug || sub.id,
+            name: sub.title,
+            subcategories: sub.subCategories?.map(child => ({
+              id: child.slug || child.id,
+              name: child.title
+            }))
+          }))
+        }))
+      },
+      {
+        id: "brand",
+        name: { en: "Brand", ar: "العلامة التجارية" },
+        options: dynamicBrands.map(brand => ({
+          id: brand.id,
+          name: brand.name,
+        }))
+      },
+      {
+        id: "price",
+        name: { en: "Price", ar: "السعر" },
+        options: [
+          {
+            id: "custom-range",
+            name: { en: "Custom Range", ar: "نطاق مخصص" },
+            isRange: true,
+          },
+        ],
+      },
+      {
+        id: "rating",
+        name: { en: "Customer Rating", ar: "تقييم العملاء" },
+        options: [
+          { id: "4.5", name: { en: "4.5 & Up", ar: "4.5 فأعلى" } },
+          { id: "4", name: { en: "4 & Up", ar: "4 فأعلى" } },
+          { id: "3.5", name: { en: "3.5 & Up", ar: "3.5 فأعلى" } },
+          { id: "3", name: { en: "3 & Up", ar: "3 فأعلى" } },
+        ],
+      },
+      {
+        id: "availability",
+        name: { en: "Availability", ar: "التوفر" },
+        options: [
+          { id: "in-stock", name: { en: "In Stock", ar: "متوفر" } },
+          { id: "out-of-stock", name: { en: "Out of Stock", ar: "غير متوفر" } },
+        ],
+      },
+    ];
+  }, [dynamicCategories, dynamicBrands]);
+
+  const {
+    productsData,
+    totalProducts,
+    isLoading: loading,
+  } = useGetProductsByCategory({
+    categorySlug: category,
+    searchQuery: query,
+    brands: selectedBrands,
+    categories: selectedCategories,
+    minPrice,
+    maxPrice,
+    rating,
+    availability,
+    sort,
+    page: currentPage,
+    limit: itemsPerPage,
+  });
+
+  useEffect(() => {
+    setTotalResults(totalProducts);
+  }, [totalProducts]);
 
   // Get current filters from URL
   const getCurrentFilters = () => {
@@ -68,7 +175,7 @@ export default function CategoryPage({
     return filters;
   };
 
-  // Toggle filter in URL - updated to handle nested subcategories
+  // Toggle filter in URL
   const toggleFilter = (
     filterKey: string,
     filterValue: string,
@@ -79,34 +186,24 @@ export default function CategoryPage({
   ) => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
 
-    // Handle category filters differently - navigate to path
     if (filterKey === "category") {
-      // Clear any existing category filters from query params
       newSearchParams.delete("category");
-
       if (isSubcategory) {
-        // Handle nested subcategories
         if (isNestedSubcategory && grandparentCategory) {
-          // Construct the path for nested subcategories
           const newPath = `/search/${grandparentCategory}/${parentCategory}/${filterValue}`;
           router.push(`${newPath}?${newSearchParams.toString()}`);
         } else if (parentCategory) {
-          // Construct the path for regular subcategories
           const newPath = `/search/${parentCategory}/${filterValue}`;
           router.push(`${newPath}?${newSearchParams.toString()}`);
         }
       } else {
-        // For main categories, navigate to /search/category
         router.push(`/search/${filterValue}?${newSearchParams.toString()}`);
       }
       return;
     }
 
-    // Handle other filters
     const currentValues = newSearchParams.get(filterKey)?.split(",") || [];
-
     if (currentValues.includes(filterValue)) {
-      // Remove the filter value
       const updatedValues = currentValues.filter((v) => v !== filterValue);
       if (updatedValues.length > 0) {
         newSearchParams.set(filterKey, updatedValues.join(","));
@@ -114,35 +211,28 @@ export default function CategoryPage({
         newSearchParams.delete(filterKey);
       }
     } else {
-      // Add the filter value
       newSearchParams.set(filterKey, [...currentValues, filterValue].join(","));
     }
 
-    // Reset to first page when filters change
     newSearchParams.delete("page");
     router.replace(`${pathname}?${newSearchParams.toString()}`);
   };
 
-  // For single-select filters (like sort)
   const toggleSingleFilter = (filterKey: string, filterValue: string) => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
-
     if (newSearchParams.get(filterKey) === filterValue) {
       newSearchParams.delete(filterKey);
     } else {
       newSearchParams.set(filterKey, filterValue);
     }
-
     newSearchParams.delete("page");
     router.replace(`${pathname}?${newSearchParams.toString()}`);
   };
 
-  // Set sort option
   const setSortOption = (sortValue: string) => {
     toggleSingleFilter("sort", sortValue);
   };
 
-  // Set page
   const setPage = (page: number) => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.set("page", page.toString());
@@ -150,7 +240,6 @@ export default function CategoryPage({
     setCurrentPage(page);
   };
 
-  // Get current sort option
   const getCurrentSort = () => {
     return searchParams.get("sort") || "recommended";
   };
@@ -163,17 +252,15 @@ export default function CategoryPage({
     if (searchParams.get("sort")) {
       newSearchParams.set("sort", searchParams.get("sort")!);
     }
-    router.push(`/search`);
+    router.push(`/search?${newSearchParams.toString()}`);
   };
 
-  // Find current category and subcategory in the filters
+  // Find current category path
   const findCategoryPath = () => {
     const currentPath: { id: string; name: string }[] = [];
-
-    // Find main category
-    const mainCategory = leftFilters
-      .find((f) => f.id === "category")
-      ?.options?.find((opt) => opt.id === category);
+    const mainCategory = dynamicFilterGroups
+      .find((f: FilterGroup) => f.id === "category")
+      ?.options?.find((opt: any) => opt.id === category);
 
     if (mainCategory) {
       currentPath.push({
@@ -181,18 +268,15 @@ export default function CategoryPage({
         name: mainCategory.name[locale],
       });
 
-      // Handle subcategories if they exist
-      if (subcategory && subcategory.length > 0) {
+      if (subcategory && Array.isArray(subcategory) && subcategory.length > 0) {
         let currentSubcategories = mainCategory.subcategories || [];
-
         for (const subId of subcategory) {
-          const foundSub = currentSubcategories.find((sub) => sub.id === subId);
+          const foundSub = currentSubcategories.find((sub: any) => sub.id === subId);
           if (foundSub) {
             currentPath.push({
               id: foundSub.id,
               name: foundSub.name[locale],
             });
-            // Update currentSubcategories to next level for next iteration
             currentSubcategories = foundSub.subcategories || [];
           } else {
             break;
@@ -200,7 +284,6 @@ export default function CategoryPage({
         }
       }
     }
-
     return currentPath;
   };
 
@@ -209,26 +292,9 @@ export default function CategoryPage({
   const displayTitle =
     currentCategoryPath.length > 0
       ? currentCategoryPath.map((item) => item.name).join(" > ")
-      : searchParams.get("q")
-        ? searchParams.get("q")
+      : query
+        ? query
         : "Products";
-
-  // Fetch products (mock implementation)
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        setProductsData(products);
-        setTotalResults(products.length);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, [category, subcategory, searchParams]);
 
   return (
     <div className="relative bg-white">
@@ -237,25 +303,9 @@ export default function CategoryPage({
           <div className="hidden lg:block">
             <LeftFilter
               locale={locale}
-              filterGroups={leftFilters}
+              filterGroups={dynamicFilterGroups}
               currentFilters={getCurrentFilters()}
-              onFilterToggle={(
-                key,
-                value,
-                isSubcategory,
-                parentCategory,
-                isNestedSubcategory,
-                grandparentCategory,
-              ) => {
-                toggleFilter(
-                  key,
-                  value,
-                  isSubcategory,
-                  parentCategory,
-                  isNestedSubcategory,
-                  grandparentCategory,
-                );
-              }}
+              onFilterToggle={toggleFilter}
               onClearFilters={clearAllFilters}
               currentCategoryPath={currentCategoryPath.map((item) => item.id)}
             />
@@ -269,25 +319,9 @@ export default function CategoryPage({
             <div className="mt-6">
               <LeftFilter
                 locale={locale}
-                filterGroups={leftFilters}
+                filterGroups={dynamicFilterGroups}
                 currentFilters={getCurrentFilters()}
-                onFilterToggle={(
-                  key,
-                  value,
-                  isSubcategory,
-                  parentCategory,
-                  isNestedSubcategory,
-                  grandparentCategory,
-                ) => {
-                  toggleFilter(
-                    key,
-                    value,
-                    isSubcategory,
-                    parentCategory,
-                    isNestedSubcategory,
-                    grandparentCategory,
-                  );
-                }}
+                onFilterToggle={toggleFilter}
                 onClearFilters={clearAllFilters}
                 currentCategoryPath={currentCategoryPath.map((item) => item.id)}
               />
@@ -313,9 +347,11 @@ export default function CategoryPage({
           <div className="flex-1">
             <div className="sticky top-0 z-20 mb-4 flex w-full items-center justify-between border-y border-gray-200 bg-white md:relative md:border-none">
               <h1 className="p-3 text-xs text-gray-900 md:text-lg">
-                {totalResults.toLocaleString()} Results for{" "}
-                <span className="text-xs font-semibold md:text-lg">
-                  &#8220;{displayTitle}&#8220;
+                {locale === "ar"
+                  ? `نتائج ${totalResults.toLocaleString()} لـ `
+                  : `${totalResults.toLocaleString()} Results for `}
+                <span className="text-xs font-semibold text-primary md:text-lg">
+                  &ldquo;{displayTitle}&rdquo;
                 </span>
               </h1>
               <div className="hidden md:block">
@@ -345,7 +381,7 @@ export default function CategoryPage({
 
             <div className="mb-4 gap-2 border-b border-gray-200">
               <TapFilter
-                filterGroups={tapFilters}
+                filterGroups={dynamicFilterGroups.filter((g: FilterGroup) => g.id === "brand")}
                 currentFilters={getCurrentFilters()}
                 onFilterToggle={toggleFilter}
                 locale={locale}
@@ -356,50 +392,42 @@ export default function CategoryPage({
               <div
                 className={
                   view === "grid"
-                    ? "grid grid-cols-1 gap-4"
+                    ? "grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4"
                     : "flex flex-col gap-4"
                 }
               >
-                {[...Array(5)].map((_, i) => (
+                {[...Array(itemsPerPage)].map((_, i) => (
                   <div
                     key={i}
-                    className="h-48 animate-pulse rounded-lg bg-white p-4 shadow-sm"
+                    className="h-64 animate-pulse rounded-lg bg-gray-50 shadow-sm"
                   ></div>
                 ))}
               </div>
             ) : view === "grid" ? (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                {productsData
-                  .slice(
-                    (currentPage - 1) * itemsPerPage,
-                    currentPage * itemsPerPage,
-                  )
-                  .map((product) => (
-                    <div key={product.id} className="w-full flex-shrink-0">
-                      <ProductCard product={product} />
-                    </div>
-                  ))}
+                {productsData.map((product) => (
+                  <div key={product.id} className="w-full flex-shrink-0">
+                    <ProductCard product={product} />
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                {productsData
-                  .slice(
-                    (currentPage - 1) * itemsPerPage,
-                    currentPage * itemsPerPage,
-                  )
-                  .map((product) => (
-                    <div key={product.id} className="w-full">
-                      <ListProductCard locale={locale} product={product} />
-                    </div>
-                  ))}
+                {productsData.map((product) => (
+                  <div key={product.id} className="w-full">
+                    <ListProductCard locale={locale} product={product} />
+                  </div>
+                ))}
               </div>
             )}
 
             {totalResults > itemsPerPage && (
-              <div className="mt-6 flex flex-col gap-2 rounded-lg bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div
-                  className={`flex justify-center sm:justify-start ${locale === "ar" ? "w-full text-right" : ""}`}
-                >
+              <div
+                className={`mt-6 flex flex-col gap-2 rounded-lg bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between ${
+                  locale === "ar" ? "rtl text-right" : ""
+                }`}
+              >
+                <div className="flex justify-center sm:justify-start">
                   <p className="text-sm text-gray-700">
                     {Text[locale].page}{" "}
                     <span className="font-medium">{currentPage}</span>{" "}
@@ -409,7 +437,8 @@ export default function CategoryPage({
                     </span>
                   </p>
                 </div>
-                <div className="flex justify-center gap-2">
+
+                <div className="flex flex-wrap justify-center gap-2">
                   <button
                     onClick={() => setPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
@@ -422,41 +451,41 @@ export default function CategoryPage({
                     {Text[locale].previous}
                   </button>
 
-                  {Array.from(
-                    {
-                      length: Math.min(
-                        5,
-                        Math.ceil(totalResults / itemsPerPage),
+                  {(() => {
+                    const totalPages = Math.ceil(totalResults / itemsPerPage);
+                    const pagesToShow = 5;
+                    const startPage = Math.max(
+                      1,
+                      Math.min(
+                        currentPage - Math.floor(pagesToShow / 2),
+                        totalPages - pagesToShow + 1,
                       ),
-                    },
-                    (_, i) => {
-                      let pageNum;
-                      const totalPages = Math.ceil(totalResults / itemsPerPage);
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
+                    );
+                    const endPage = Math.min(
+                      startPage + pagesToShow - 1,
+                      totalPages,
+                    );
 
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setPage(pageNum)}
-                          className={`rounded-md border px-4 py-2 text-sm font-medium ${
-                            currentPage === pageNum
-                              ? "border-green-600 bg-green-600 text-white"
-                              : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    },
-                  )}
+                    return Array.from(
+                      { length: endPage - startPage + 1 },
+                      (_, i) => {
+                        const pageNum = startPage + i;
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setPage(pageNum)}
+                            className={`rounded-md border px-4 py-2 text-sm font-medium ${
+                              currentPage === pageNum
+                                ? "border-green-600 bg-green-600 text-white"
+                                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      },
+                    );
+                  })()}
 
                   <button
                     onClick={() =>
