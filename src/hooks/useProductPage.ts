@@ -100,8 +100,6 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
         addItem({
           id: product.id,
           title: product.title,
-          slug: product.slug,
-          categorySlug: product.category?.slug,
           image: product.images?.[0] ?? "/images/placeholder.jpg",
           description: product.description.en,
           del_price: product.del_price,

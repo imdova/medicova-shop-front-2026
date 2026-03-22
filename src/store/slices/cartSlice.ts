@@ -22,6 +22,8 @@ const cartSlice = createSlice({
         id: string;
         image: string;
         title: LocalizedTitle;
+        slug: LocalizedTitle;
+        categorySlug?: string;
         price: number;
         del_price?: number;
         description: string;
@@ -40,6 +42,8 @@ const cartSlice = createSlice({
       const {
         id,
         title,
+        slug,
+        categorySlug,
         price,
         image,
         description,
@@ -66,6 +70,8 @@ const cartSlice = createSlice({
         state.products.push({
           id,
           title,
+          slug,
+          categorySlug,
           price,
           image,
           description,

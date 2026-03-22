@@ -1,7 +1,5 @@
 "use client";
-import { ShoppingBag, Truck } from "lucide-react";
 import { Product } from "@/types/product";
-import { getExecuteDateFormatted } from "@/util";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 
@@ -61,7 +59,7 @@ const StockBadge = ({
           className={`relative inline-flex h-2 w-2 rounded-full ${isLow ? "bg-amber-500" : "bg-emerald-500"}`}
         />
       </div>
-      {stock > 50 ? t("inStock") : t("leftInStock", { count: Number(stock) })}
+      {t("onlyStock", { count: stock })}
     </div>
   );
 };
@@ -116,53 +114,36 @@ const PriceSection = ({
           {product.stock && (
             <StockBadge stock={product.stock} locale={locale} />
           )}
+          {saving > 0 && (
+            <span className="text-xs font-semibold text-emerald-600">
+              {t("youSave")} {saving.toLocaleString()} {common("currency")}
+            </span>
+          )}
         </div>
       </div>
 
-
       {/* Payment Methods */}
-      <div className="animate-in fade-in slide-in-from-bottom-4 mt-8 duration-700">
+      <div className="mt-8 border-t border-gray-100 pt-6">
         <div className="flex flex-wrap items-center gap-4">
           {[
-            {
-              id: "visa",
-              name: "Visa",
-              url: "/icons/visa.svg",
-            },
-            {
-              id: "mastercard",
-              name: "Mastercard",
-              url: "/icons/mastercard.svg",
-            },
-            {
-              id: "fawry",
-              name: "Fawry",
-              url: "/icons/fawry-seeklogo.png",
-            },
-            {
-              id: "wallet",
-              name: "E-Wallet",
-              url: "/icons/wallet.png",
-            },
-            {
-              id: "cod",
-              name: "Cash on Delivery",
-              url: "/icons/payment-method.png",
-            },
+            { name: "Visa", src: "/icons/card-visa.svg" },
+            { name: "Mastercard", src: "/icons/card-mastercard.svg" },
+            { name: "Amex", src: "/icons/card-amex.svg" },
+            { name: "valU", src: "/icons/valu_v2.svg" },
+            { name: "COD", src: "/icons/cod-en.svg" },
+            { name: "Vodafone Cash", src: "/icons/vodafone-cash.png" },
+            { name: "Fawry", src: "/icons/fawry.png" },
           ].map((method) => (
             <div
-              key={method.id}
-              className="group relative flex h-12 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/60 bg-white/60 p-2 shadow-sm backdrop-blur-xl transition-all duration-300 hover:scale-110 hover:border-primary/40 hover:bg-white/90 hover:shadow-xl active:scale-95"
-              title={method.name}
+              key={method.name}
+              className="group relative flex h-10 w-16 items-center justify-center rounded-xl border border-gray-100 bg-white p-2 shadow-sm transition-all hover:border-primary/20 hover:scale-105"
             >
-              <div className="relative h-full w-full">
-                <Image
-                  src={method.url}
-                  alt={method.name}
-                  fill
-                  className="object-contain transition-transform duration-300 group-hover:scale-110"
-                />
-              </div>
+              <Image
+                src={method.src}
+                alt={method.name}
+                fill
+                className="object-contain p-1.5 transition-all"
+              />
             </div>
           ))}
         </div>

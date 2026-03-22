@@ -120,6 +120,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ loading, product }) => {
           addItem({
             id: product.id,
             title: product.title,
+            slug: product.slug,
+            categorySlug: product.category?.slug,
             image: product.images?.[0] ?? "/images/placeholder.jpg",
             description:
               product.description[locale as keyof LocalizedTitle] ??
@@ -237,7 +239,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ loading, product }) => {
               {/* Main Image */}
               <div className="relative overflow-hidden rounded-[16px] bg-gray-50 transition-colors group-hover:bg-gray-100/50">
                 <Link
-                  href={`/product-details/${product.id}`}
+                  href={product.category?.slug ? `/${locale}/category/${product.category.slug}/${product.slug[locale]}` : `/product-details/${product.id}`}
                   className="relative block h-48 w-full sm:h-64"
                 >
                   <FallbackImage
@@ -310,7 +312,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ loading, product }) => {
             </div>
 
             <Link
-              href={`/product-details/${product.id}`}
+              href={product.category?.slug ? `/${locale}/category/${product.category.slug}/${product.slug[locale]}` : `/product-details/${product.id}`}
               className="flex h-full flex-1 flex-col justify-between"
             >
               {/* Product Info */}

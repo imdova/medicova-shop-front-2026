@@ -295,9 +295,34 @@ export function mapApiProductToProduct(item: any): any {
   const enName = item.nameEn || item.title?.en || "Untitled";
   const arName = item.nameAr || item.title?.ar || enName || "بدون عنوان";
 
-  // Handle images
-  const featuredImage = item.media?.featuredImages || (Array.isArray(item.media?.galleryImages) ? item.media.galleryImages[0] : null) || "/images/placeholder.jpg";
-  const galleryImages = Array.isArray(item.media?.galleryImages) ? item.media.galleryImages : [featuredImage];
+  // Handle images based on the provided schema (root level featuredImages/galleryImages)
+  const apiBaseUrl = "https://shop-api.medicova.net";
+  const ensureAbsoluteUrl = (url: any) => {
+    if (!url || typeof url !== "string") return "/images/placeholder.jpg";
+    if (url.startsWith("http")) return url;
+    return `${apiBaseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
+  // The schema shows featuredImages as a string at the root, and galleryImages as an array at the root.
+  // We also check item.media for backward compatibility if some products still use it.
+  const featuredImageRaw = item.featuredImages || item.media?.featuredImages || (Array.isArray(item.galleryImages) ? item.galleryImages[0] : (Array.isArray(item.media?.galleryImages) ? item.media.galleryImages[0] : null));
+  const featuredImage = ensureAbsoluteUrl(featuredImageRaw);
+
+  const galleryImagesRaw = Array.isArray(item.galleryImages) ? item.galleryImages : (Array.isArray(item.media?.galleryImages) ? item.media.galleryImages : []);
+  const galleryImages = galleryImagesRaw.length > 0 
+    ? galleryImagesRaw.map((img: any) => ensureAbsoluteUrl(img)) 
+    : [featuredImage];
+
+  // Price mapping based on schema: originalPrice and salePrice at root
+  const price = item.salePrice || item.price || item.pricing?.salePrice || item.pricing?.originalPrice || item.sale_price || 0;
+  const delPrice = item.originalPrice || item.del_price || item.original_price || (item.pricing?.salePrice ? item.pricing?.originalPrice : undefined);
+  
+  // Calculate sale percentage if not provided
+  let saleText = item.sale;
+  if (!saleText && price > 0 && delPrice && delPrice > price) {
+    const discount = Math.round(((delPrice - price) / delPrice) * 100);
+    saleText = `${discount}% OFF`;
+  }
 
   return {
     id: item._id || item.id,
@@ -306,44 +331,73 @@ export function mapApiProductToProduct(item: any): any {
       en: enName,
       ar: arName,
     },
-    price: item.price || item.pricing?.salePrice || item.pricing?.originalPrice || 0,
-    del_price: item.del_price || (item.pricing?.salePrice ? item.pricing?.originalPrice : undefined),
+    slug: {
+      en: item.slugEn || item.slug || item._id || item.id,
+      ar: item.slugAr || item.slugAr || item._id || item.id,
+    },
+    price: price,
+    del_price: delPrice,
+    sale: saleText,
     images: galleryImages,
     rating: item.rate || 0,
     reviewCount: item.reviewCount || 0,
     isBestSaller: !!item.isBestSaller || (item.rate >= 4.5),
-    stock: item.stock || item.inventory?.stockQuantity || 0,
+    stock: (() => {
+      const rawStock = item.stockQuantity ?? 
+                      (typeof item.stock === 'number' ? item.stock : item.stock?.remaining) ?? 
+                      item.inventory?.stockQuantity ?? 
+                      0;
+      const stockStatus = item.inventory?.stockStatus || item.stockStatus;
+      
+      const n = Number(rawStock);
+      if (!isNaN(n) && n > 0) return n;
+      
+      // Fallback if numeric stock is 0 or missing but status is "in_stock"
+      if (stockStatus === "in_stock") return 99;
+      
+      return isNaN(n) ? 0 : n;
+    })(),
     brand: typeof item.brand === "object" ? {
       id: item.brand._id || item.brand.id,
       name: { en: item.brand.nameEn || item.brand.name || "Brand", ar: item.brand.nameAr || item.brand.name || "براند" },
-      image: item.brand.image || "/images/placeholder.jpg"
+      image: ensureAbsoluteUrl(item.brand.image || item.brand.logo)
     } : { id: item.brand || "unknown", name: { en: "Brand", ar: "براند" }, image: "/images/placeholder.jpg" },
     category: typeof item.category === "object" ? {
       id: item.category._id || item.category.id,
-      slug: item.category.slug || item.category.slugEn || item.category.url?.split("/").pop(),
+      slug: item.category.slug || item.category.slugEn || item.category.url?.split("/").pop() || (item.category.name?.toLowerCase().replace(/\s+/g, '-')),
       title: { en: item.category.name || item.category.title?.en || "Category", ar: item.category.nameAr || item.category.title?.ar || "قسم" }
-    } : { id: item.category || "unknown", slug: item.category, title: { en: "Category", ar: "قسم" } },
+    } : { id: item.category || "unknown", slug: item.category?.toLowerCase() || "category", title: { en: "Category", ar: "قسم" } },
     subcategory: item.subcategory || item.category?.subcategory ? {
-      slug: item.subcategory?.slug || item.subcategory?.slugEn || item.category?.subcategory?.url?.split("/").pop() || item.subcategory,
+      slug: item.subcategory?.slug || item.subcategory?.slugEn || item.category?.subcategory?.url?.split("/").pop() || item.subcategory || item.subcategory?.id,
       title: { 
         en: item.subcategory?.name || item.subcategory?.title?.en || item.category?.subcategory?.title?.en || "Subcategory", 
         ar: item.subcategory?.nameAr || item.subcategory?.title?.ar || item.category?.subcategory?.title?.ar || "قسم فرعي" 
       }
     } : undefined,
     description: {
-      en: item.descriptions?.descriptionEn || "",
-      ar: item.descriptions?.descriptionAr || "",
+      en: item.descriptions?.descriptionEn || item.descriptionEn || item.description?.en || item.description || "",
+      ar: item.descriptions?.descriptionAr || item.descriptionAr || item.description?.ar || item.descriptionAr || "",
     },
     nudges: item.nudges || { en: [], ar: [] },
     features: item.features || { en: [], ar: [] },
-    highlights: item.highlights || { en: [], ar: [] },
-    overview_desc: item.overview_desc || { en: "", ar: "" },
+    highlights: {
+      en: item.highlightsEn || item.highlights?.en || [],
+      ar: item.highlightsAr || item.highlights?.ar || [],
+    },
+    overview_desc: {
+      en: item.descriptions?.descriptionEn || item.descriptionEn || item.description?.en || item.description || "",
+      ar: item.descriptions?.descriptionAr || item.descriptionAr || item.description?.ar || item.descriptionAr || "",
+    },
+    specifications: (item.specifications || []).map((spec: any) => ({
+      label: { en: spec.keyEn || "Label", ar: spec.keyAr || "العنوان" },
+      content: { en: spec.valueEn || "-", ar: spec.valueAr || "-" }
+    })),
     weightKg: item.weightKg || 0,
     shipping_fee: item.shipping_fee || 0,
     shippingMethod: item.shippingMethod || { en: "standard", ar: "قياسي" },
     sellers: item.sellers || {
-      id: item.sellerId || "unknown",
-      name: "Medicova Seller",
+      id: typeof item.sellerId === "object" ? item.sellerId?._id : (item.sellerId || "unknown"),
+      name: typeof item.sellerId === "object" ? (item.sellerId?.brandName || `${item.sellerId?.firstName} ${item.sellerId?.lastName}`) : "Medicova Seller",
       rating: 5,
       isActive: true,
       returnPolicy: { en: "Standard Policy", ar: "سياسة قياسية" },

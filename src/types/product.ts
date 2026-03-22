@@ -150,6 +150,7 @@ export interface Product {
   model: LocalizedTitle;
   category: CategoryType;
   title: LocalizedTitle;
+  slug: LocalizedTitle;
   price: number;
   del_price?: number; // Optional
   stock?: number; // Optional

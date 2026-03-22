@@ -27,7 +27,7 @@ export default function CartItemCard({
       <div className="p-4">
         <div className="flex gap-4">
           <Link
-            href={`/product-details/${item.id}`}
+            href={item.categorySlug ? `/${locale}/category/${item.categorySlug}/${item.slug[locale]}` : `/product-details/${item.id}`}
             className="relative h-[140px] w-[120px] shrink-0 overflow-hidden rounded-xl bg-gray-50"
           >
             <FallbackImage

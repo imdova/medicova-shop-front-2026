@@ -28,13 +28,13 @@ const ProductOverview = ({ product, locale }: ProductOverviewProps) => {
 
         <div className="mt-8 flex flex-wrap items-stretch gap-8">
           {/* Highlights */}
-          {product.highlights?.[locale]?.length > 0 && (
+          {product.highlights && (
             <div className="flex min-w-[320px] flex-1 flex-col rounded-2xl border border-white/40 bg-white/40 p-6 shadow-sm backdrop-blur-md transition-all hover:shadow-md">
               <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-primary">
                 {t("highlights")}
               </h3>
               <ul className="flex-1 space-y-3">
-                {product.highlights[locale].map((highlight, index) => (
+                {product.highlights[locale]?.map((highlight, index) => (
                   <li key={index} className="flex items-start gap-3">
                     <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
                     <span className="text-sm font-medium leading-relaxed text-gray-600">
@@ -47,7 +47,7 @@ const ProductOverview = ({ product, locale }: ProductOverviewProps) => {
           )}
 
           {/* Overview Description */}
-          {product.overview_desc?.[locale] && (
+          {product.overview_desc && (
             <div className="flex min-w-[320px] flex-1 flex-col rounded-2xl border border-white/40 bg-white/40 p-6 shadow-sm backdrop-blur-md transition-all hover:shadow-md">
               <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-primary">
                 {t("description")}

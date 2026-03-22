@@ -5,13 +5,21 @@ import {
 import { MultiCategory } from "@/types";
 import { notFound } from "next/navigation";
 import RenderComponent from "./RenderComponent";
+import { getProducts, mapApiProductToProduct } from "@/services/productService";
+import { products as allProducts } from "@/data";
+import ProductPage from "@/app/[locale]/(public)/product-details/[slug]/page";
+import { Product } from "@/types/product";
 
 interface CategoryPageProps {
-  params: Promise<{ categories?: string[] }>;
+  params: Promise<{ categories?: string[]; locale: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
-  const { categories: slugs } = await params;
+export default async function CategoryPage({ 
+  params,
+  searchParams
+}: CategoryPageProps) {
+  const { categories: slugs, locale } = await params;
   const allCategories = await getCategories();
 
   if (!slugs || slugs.length === 0) {
@@ -33,13 +41,52 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
     let foundCategory = currentLevel.find(matches);
 
-    if (!foundCategory && i > 0) {
-      const parent = categoryPath[i - 1];
+    if (!foundCategory) {
+      // If not found as a category, check if it's the last segment and might be a product
+      if (i === slugs.length - 1) {
+        const productSlug = slugs[slugs.length - 1];
+        
+        // Fetch all products to find the one matching the slug
+        const apiProducts = await getProducts();
+        const mappedProducts = apiProducts.map(mapApiProductToProduct);
+        
+        let product = mappedProducts.find(
+          (p: Product) =>
+            p.slug?.en === productSlug ||
+            p.slug?.ar === productSlug ||
+            p.id === productSlug ||
+            p.sku === productSlug,
+        );
 
-      // If we are looking for level 3, use the public subcategory-child API
-      if (i === 2) {
-        const children = await getSubCategoryChildren(parent.id);
-        foundCategory = children.find(matches);
+        // Fallback to dummy data if not found in API
+        if (!product) {
+          product = allProducts.find(
+            (p: Product) =>
+              p.slug?.en === productSlug ||
+              p.slug?.ar === productSlug ||
+              p.id === productSlug ||
+              p.sku === productSlug,
+          );
+        }
+
+        if (product) {
+          // If product found, we render the ProductPage
+          // We need to pass the params in the expected format
+          const productParams = Promise.resolve({
+            slug: productSlug,
+            locale: locale as "en" | "ar",
+          });
+          return <ProductPage params={productParams} searchParams={searchParams} product={product} />;
+        }
+      }
+
+      if (i > 0) {
+        const parent = categoryPath[i - 1];
+        // If we are looking for level 3, use the public subcategory-child API
+        if (i === 2) {
+          const children = await getSubCategoryChildren(parent.id);
+          foundCategory = children.find(matches);
+        }
       }
     }
 

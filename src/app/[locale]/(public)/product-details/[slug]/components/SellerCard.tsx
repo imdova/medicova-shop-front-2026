@@ -18,6 +18,30 @@ interface SellerCardProps {
   locale: "en" | "ar";
 }
 
+const StarRating = ({ rating }: { rating: number }) => (
+  <div
+    className="flex items-center gap-0.5"
+    role="img"
+    aria-label={`${rating} out of 5 stars`}
+  >
+    {[...Array(5)].map((_, i) => {
+      const isFull = i < Math.floor(rating);
+      const isHalf = !isFull && i < rating;
+      return (
+        <svg
+          key={i}
+          className={`h-3 w-3 ${isFull || isHalf ? "text-primary" : "text-gray-200"}`}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+        >
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+      );
+    })}
+  </div>
+);
+
 const SellerCard = ({ product, locale }: SellerCardProps) => {
   const t = useTranslations("product");
   const { sellers } = product;
@@ -50,9 +74,12 @@ const SellerCard = ({ product, locale }: SellerCardProps) => {
                         {sellers.name}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                      <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-                      {sellers.positiveRatings} {t("positiveRatings")}
+                    <div className="mt-1 flex items-center gap-2">
+                      <StarRating rating={sellers.rating} />
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                        {sellers.positiveRatings} {t("positiveRatings")}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -64,40 +91,6 @@ const SellerCard = ({ product, locale }: SellerCardProps) => {
                 </div>
               </Link>
 
-              <div className="flex flex-wrap gap-4 p-5">
-                <div className="flex min-w-[120px] flex-1 flex-col gap-2">
-                  <div className="flex items-center gap-2 text-primary">
-                    <Archive size={16} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                      {t("itemAsShown")}
-                    </span>
-                  </div>
-                  <ProgressLine
-                    progress={sellers.itemShown ?? 0}
-                    height="h-2"
-                    showLabel
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2 text-primary">
-                    <Handshake size={16} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                      {t("partnerSince")}
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold text-gray-800">
-                    {sellers.partnerSince}
-                  </span>
-                </div>
-                <div className="bg-primary/5 hover:bg-primary/10 flex w-full items-center gap-3 rounded-xl p-3 transition-colors">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-primary shadow-sm">
-                    <ListRestart size={14} />
-                  </div>
-                  <span className="text-xs font-bold text-gray-700">
-                    {t("lowReturnSeller")}
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
         )}

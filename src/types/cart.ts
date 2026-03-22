@@ -15,6 +15,8 @@ export interface CartItem {
   id: string;
   image: string;
   title: LocalizedTitle;
+  slug: LocalizedTitle;
+  categorySlug?: string;
   price: number;
   del_price?: number;
   description: string;
@@ -33,7 +35,9 @@ export interface CartItem {
 export interface WishlistItem {
   id: string;
   image: string;
-  title: string;
+  title: LocalizedTitle;
+  slug: LocalizedTitle;
+  categorySlug?: string;
   price: number;
   del_price?: number;
   description: string;

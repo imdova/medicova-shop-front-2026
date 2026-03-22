@@ -33,24 +33,31 @@ const Breadcrumbs = ({ product, locale }: BreadcrumbsProps) => {
             {Chevron}
           </li>
 
-          <li className="flex items-center gap-2 text-primary">
+          <li className="flex items-center gap-2">
             <Link
-              href={`/${locale}/category/${product.category?.slug}`}
-              className="whitespace-nowrap hover:font-bold"
+              href={product.category?.slug ?? "#"}
+              className="whitespace-nowrap hover:text-primary"
             >
               {product.category?.title[locale as keyof LocalizedTitle]}
             </Link>
-            {Chevron}
+            {product.category?.subcategory && Chevron}
           </li>
 
-          <li className="flex items-center gap-1">
-            <span
-              className="line-clamp-1 max-w-[200px] whitespace-nowrap font-medium text-gray-900"
-              aria-current="page"
-            >
-              {product.title[locale as keyof LocalizedTitle]}
-            </span>
-          </li>
+          {product.category?.subcategory && (
+            <li className="flex items-center gap-1">
+              <Link
+                href={product.category.subcategory.url ?? "#"}
+                className="whitespace-nowrap font-medium text-gray-900"
+                aria-current="page"
+              >
+                {
+                  product.category.subcategory.title[
+                    locale as keyof LocalizedTitle
+                  ]
+                }
+              </Link>
+            </li>
+          )}
         </ol>
       </div>
     </nav>

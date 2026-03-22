@@ -34,9 +34,24 @@ const ProductGallery = ({
         <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-gray-900">
           {product.title[locale]}
         </h1>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[
+            { id: "1", name: { en: "Premium", ar: "ممتاز" }, slug: "premium" },
+            { id: "2", name: { en: "Medical Grade", ar: "درجة طبية" }, slug: "medical-grade" },
+            { id: "3", name: { en: "Eco-Friendly", ar: "صديق للبيئة" }, slug: "eco-friendly" },
+          ].map((tag) => (
+            <Link
+              key={tag.id}
+              href={`/search?tag=${tag.slug}`}
+              className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-[10px] font-medium text-gray-600 transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+            >
+              {tag.name[locale]}
+            </Link>
+          ))}
+        </div>
       </div>
 
-      <div className="group relative overflow-hidden rounded-2xl bg-white p-2 shadow-inner h-full ">
+      <div className="group relative overflow-hidden rounded-2xl bg-white p-2 shadow-inner h-full">
         <ProductImagesSlider
           locale={locale}
           product={product}
