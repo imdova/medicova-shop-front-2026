@@ -64,7 +64,13 @@ export const {
 } = getCategoriesData();
 
 export const getProductsData = () => {
-  return productsData as Product[];
+  return (productsData as any[]).map((p: any) => ({
+    ...p,
+    slug: {
+      en: p.slug?.en || p.id || p.sku || "product",
+      ar: p.slug?.ar || p.id || p.sku || "منتج",
+    },
+  })) as Product[];
 };
 
 export const products = getProductsData();

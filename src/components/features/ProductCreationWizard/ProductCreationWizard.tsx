@@ -2,14 +2,14 @@
 
 import { useCallback } from "react";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { Step1CoreInfo } from "./steps/Step1CoreInfo";
+import Step1CoreInfo from "./steps/Step1CoreInfo";
 import { Step3Settings } from "./steps/Step3Settings";
 import { MediaStep } from "./steps/MediaStep";
 import { Step2PricingInventory } from "./steps/Step2PricingInventory";
 import { WizardHeader } from "./WizardHeader";
 import { useProductForm, Step } from "./useProductForm";
 import DynamicButton from "@/components/shared/Buttons/DynamicButton";
-import { ChevronRight, ChevronLeft, Check, Loader2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, Check, Loader2, Save } from "lucide-react";
 
 interface ProductCreationWizardProps {
   productId?: string;
@@ -165,6 +165,18 @@ const ProductCreationWizard = ({
                 )
               }
               iconPosition={isLastStep || locale !== "ar" ? "right" : "left"}
+            />
+
+            <DynamicButton
+              variant="outline"
+              onClick={() =>
+                void validateStep({ submitMode: "draft", forceSubmit: true })
+              }
+              disabled={isSubmitting}
+              className="h-10 rounded-xl px-4 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-50 active:scale-[0.98]"
+              label={locale === "ar" ? "حفظ كمسودة" : "Save as Draft"}
+              icon={<Save size={14} />}
+              iconPosition="left"
             />
           </div>
         </div>

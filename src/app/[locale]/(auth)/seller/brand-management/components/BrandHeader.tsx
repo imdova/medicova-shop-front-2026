@@ -25,8 +25,9 @@ export const BrandHeader = ({ onCreateClick }: BrandHeaderProps) => {
           variant="primary"
           onClick={onCreateClick}
           label={t("createBrand")}
+          style={{ backgroundColor: "lab(58.4941% -47.8529 35.5714)" }}
           icon={<Plus size={18} strokeWidth={3} />}
-          className="rounded bg-gray-900 px-8 py-4 font-black uppercase tracking-widest text-white shadow-xl shadow-black/10 transition-all hover:scale-[1.02] hover:bg-black active:scale-[0.98]"
+          className="rounded-xl px-8 py-3.5 font-bold text-white shadow-lg shadow-emerald-200/50 transition-all hover:scale-[1.02] active:scale-[0.98] md:px-10"
         />
       </div>
     </header>

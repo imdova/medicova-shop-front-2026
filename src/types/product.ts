@@ -150,6 +150,7 @@ export interface Product {
   model: LocalizedTitle;
   category: CategoryType;
   title: LocalizedTitle;
+  slug: LocalizedTitle;
   price: number;
   del_price?: number; // Optional
   stock?: number; // Optional
@@ -207,6 +208,14 @@ export interface Product {
     firstName?: string;
     lastName?: string;
   } | string;
+  selectedOptions?: {
+    label: LocalizedTitle;
+    values: string[];
+  }[];
+  tags?: string[];
+  shippingCostInsideCairo?: number;
+  shippingCostRegion1?: number;
+  shippingCostRegion2?: number;
 }
 
 export type ProductTag = {
@@ -216,6 +225,7 @@ export type ProductTag = {
   createdAt: string;
   status: LocalizedTitle;
   slug: string;
+  slugAr?: string;
   description: LocalizedTitle;
   meta_title: LocalizedTitle;
   meta_description: LocalizedTitle;
@@ -256,6 +266,7 @@ export type OptionValue = {
   label: LocalizedTitle;
   price: string;
   price_type: "fixed" | "percent";
+  color?: string;
 };
 
 export type ProductOption = {

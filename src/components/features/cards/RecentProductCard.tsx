@@ -48,7 +48,7 @@ export const RecentProductCard = ({ product }: ProductCardProps) => {
         </div>
       </div>
       <Link
-        href={`/product-details/${product.id}`}
+        href={product.category?.slug ? `/${locale}/category/${product.category.slug}/${product.slug[locale]}` : `/product-details/${product.id}`}
         className="absolute left-0 top-0 flex h-full w-full items-center justify-center gap-2 bg-white/70 font-semibold text-gray-700 opacity-0 backdrop-blur-md transition-opacity duration-300 ease-linear group-hover:opacity-100"
       >
         <span className="flex items-center gap-2 rounded-md border border-gray-200 bg-white p-2 text-xs">

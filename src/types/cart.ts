@@ -11,10 +11,17 @@ export type CartFormValues = {
   saveInfo: boolean;
 };
 
+export interface UnitSelection {
+  size?: SizeType | NumericSizeType | LiquidSizeType;
+  color?: string;
+}
+
 export interface CartItem {
   id: string;
   image: string;
   title: LocalizedTitle;
+  slug: LocalizedTitle;
+  categorySlug?: string;
   price: number;
   del_price?: number;
   description: string;
@@ -29,11 +36,17 @@ export interface CartItem {
   shippingMethod: shippingMethod;
   weightKg: number;
   totalPrice: number;
+  unitSelections?: UnitSelection[];
+  shippingCostInsideCairo?: number;
+  shippingCostRegion1?: number;
+  shippingCostRegion2?: number;
 }
 export interface WishlistItem {
   id: string;
   image: string;
-  title: string;
+  title: LocalizedTitle;
+  slug: LocalizedTitle;
+  categorySlug?: string;
   price: number;
   del_price?: number;
   description: string;

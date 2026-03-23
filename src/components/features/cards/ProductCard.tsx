@@ -120,6 +120,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ loading, product }) => {
           addItem({
             id: product.id,
             title: product.title,
+            slug: product.slug,
+            categorySlug: product.category?.slug,
             image: product.images?.[0] ?? "/images/placeholder.jpg",
             description:
               product.description[locale as keyof LocalizedTitle] ??
@@ -237,7 +239,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ loading, product }) => {
               {/* Main Image */}
               <div className="relative overflow-hidden rounded-[16px] bg-gray-50 transition-colors group-hover:bg-gray-100/50">
                 <Link
-                  href={`/product-details/${product.id}`}
+                  href={product.category?.slug ? `/${locale}/category/${product.category.slug}/${product.slug[locale]}` : `/product-details/${product.id}`}
                   className="relative block h-48 w-full sm:h-64"
                 >
                   <FallbackImage
@@ -310,7 +312,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ loading, product }) => {
             </div>
 
             <Link
-              href={`/product-details/${product.id}`}
+              href={product.category?.slug ? `/${locale}/category/${product.category.slug}/${product.slug[locale]}` : `/product-details/${product.id}`}
               className="flex h-full flex-1 flex-col justify-between"
             >
               {/* Product Info */}
@@ -335,11 +337,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ loading, product }) => {
                       {product.del_price.toLocaleString()}{" "}
                       {locale === "ar" ? "جنيه" : "EGP"}
                     </del>
-                  )}
-                  {product.sale && (
-                    <span className="rounded-sm bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 ring-1 ring-inset ring-red-600/10">
-                      {product.sale}
-                    </span>
                   )}
                 </div>
 

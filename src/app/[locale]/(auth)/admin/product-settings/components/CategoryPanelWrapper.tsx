@@ -31,6 +31,8 @@ import {
   toggleSubCategoryStatus,
   toggleBrandStatus,
   toggleSubCategoryChildStatus,
+  updateCategorySortOrder,
+  updateSubCategorySortOrder,
 } from "../../categories/constants";
 
 type EntityTab = "categories" | "subCategories" | "childCategory" | "brands";
@@ -151,6 +153,79 @@ export default function CategoryPanelWrapper({
     setEditBrand(null);
   }, []);
 
+  const handleMoveCategoryOrder = useCallback(
+    async (item: Category, direction: "up" | "down") => {
+      const sorted = [...categories].sort((a, b) => a.sortOrder - b.sortOrder);
+      const idx = sorted.findIndex(c => c.id === item.id);
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= sorted.length) return;
+
+      const current = sorted[idx];
+      const adjacent = sorted[swapIdx];
+
+      // Optimistic update
+      const newSorted = [...sorted];
+      newSorted[idx] = { ...adjacent, sortOrder: current.sortOrder };
+      newSorted[swapIdx] = { ...current, sortOrder: adjacent.sortOrder };
+
+      // Ensure sortOrder values remain unique if they were identical
+      if (current.sortOrder === adjacent.sortOrder) {
+        newSorted[swapIdx].sortOrder = direction === "up" ? current.sortOrder - 1 : current.sortOrder + 1;
+      }
+
+      setCategories(newSorted);
+
+      try {
+        await Promise.all([
+          updateCategorySortOrder(current.id, newSorted[swapIdx].sortOrder, token),
+          updateCategorySortOrder(adjacent.id, newSorted[idx].sortOrder, token),
+        ]);
+        toast.success(t("savedSuccessfully"));
+        fetchData();
+      } catch (err: any) {
+        toast.error(err?.message || t("saveFailed"));
+        fetchData(); // Rollback
+      }
+    },
+    [categories, token, t, fetchData],
+  );
+
+  const handleMoveSubCategoryOrder = useCallback(
+    async (item: SubCategory, direction: "up" | "down") => {
+      const sorted = [...subCategories].sort((a, b) => a.sortOrder - b.sortOrder);
+      const idx = sorted.findIndex(c => c.id === item.id);
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= sorted.length) return;
+
+      const current = sorted[idx];
+      const adjacent = sorted[swapIdx];
+
+      // Optimistic update
+      const newSorted = [...sorted];
+      newSorted[idx] = { ...adjacent, sortOrder: current.sortOrder };
+      newSorted[swapIdx] = { ...current, sortOrder: adjacent.sortOrder };
+
+      if (current.sortOrder === adjacent.sortOrder) {
+        newSorted[swapIdx].sortOrder = direction === "up" ? current.sortOrder - 1 : current.sortOrder + 1;
+      }
+
+      setSubCategories(newSorted);
+
+      try {
+        await Promise.all([
+          updateSubCategorySortOrder(current.id, newSorted[swapIdx].sortOrder, token),
+          updateSubCategorySortOrder(adjacent.id, newSorted[idx].sortOrder, token),
+        ]);
+        toast.success(t("savedSuccessfully"));
+        fetchData();
+      } catch (err: any) {
+        toast.error(err?.message || t("saveFailed"));
+        fetchData(); // Rollback
+      }
+    },
+    [subCategories, token, t, fetchData],
+  );
+
   return (
     <>
       {activeTab === "categories" && (
@@ -170,6 +245,8 @@ export default function CategoryPanelWrapper({
             setEditCategory(null);
             setShowModal(true);
           }}
+          onMoveUp={(item) => handleMoveCategoryOrder(item, "up")}
+          onMoveDown={(item) => handleMoveCategoryOrder(item, "down")}
         />
       )}
 
@@ -190,6 +267,8 @@ export default function CategoryPanelWrapper({
             setEditSubCategory(null);
             setShowModal(true);
           }}
+          onMoveUp={(item) => handleMoveSubCategoryOrder(item, "up")}
+          onMoveDown={(item) => handleMoveSubCategoryOrder(item, "down")}
         />
       )}
 

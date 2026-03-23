@@ -146,6 +146,8 @@ export interface CategoryType {
     image: string;
     url: string;
   };
+  description?: LocalizedTitle;
+  headline?: LocalizedTitle;
 }
 // Brand type
 export interface Brand {
@@ -185,10 +187,14 @@ export interface SearchResult {
 export type ShippingOptions = {
   shippingMethod: shippingMethod;
   destination: DestinationKey; // e.g., country code
+  city?: string;
   cartTotal: number; // total cart value
   weightKg?: number; // optional weight
+  shippingCostInsideCairo?: number;
+  shippingCostRegion1?: number;
+  shippingCostRegion2?: number;
 };
-export type DestinationKey = keyof typeof destinationSurcharges;
+export type DestinationKey = keyof typeof destinationSurcharges | string;
 
 // locations type
 

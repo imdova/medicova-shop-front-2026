@@ -41,6 +41,8 @@ const CreateSubCategoryChildModal: React.FC<Props> = ({
   const [slugEn, setSlugEn] = useState("");
   const [slugAr, setSlugAr] = useState("");
   const [parentSubCategoryId, setParentSubCategoryId] = useState("");
+  const [headlineEn, setHeadlineEn] = useState("");
+  const [headlineAr, setHeadlineAr] = useState("");
   const [description, setDescription] = useState("");
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -60,6 +62,8 @@ const CreateSubCategoryChildModal: React.FC<Props> = ({
     setSlugEn(editItem.slug || "");
     setSlugAr(editItem.slugAr || "");
     setParentSubCategoryId(editItem.parentSubCategoryId || "");
+    setHeadlineEn(editItem.headline?.en || "");
+    setHeadlineAr(editItem.headline?.ar || "");
     setDescription(editItem.description || "");
     setImagePreview(editItem.image || editItem.icon || null);
 
@@ -70,9 +74,11 @@ const CreateSubCategoryChildModal: React.FC<Props> = ({
         const item = data.subCategoryChild || data.data || data;
         setNameEn(item.name || "");
         setNameAr(item.nameAr || "");
-        setSlugEn(item.slug || "");
-        setSlugAr(item.slugAr || "");
-        setDescription(item.description || "");
+        if (item.slug) setSlugEn(item.slug);
+        if (item.slugAr) setSlugAr(item.slugAr);
+        if (item.headlineEn) setHeadlineEn(item.headlineEn);
+        if (item.headlineAr) setHeadlineAr(item.headlineAr);
+        if (item.description) setDescription(item.description);
         setImagePreview(item.image || item.icon || null);
         const parentId = item.parentSubCategory?._id || item.parentSubCategory;
         if (parentId) setParentSubCategoryId(parentId);
@@ -86,6 +92,8 @@ const CreateSubCategoryChildModal: React.FC<Props> = ({
     setSlugEn("");
     setSlugAr("");
     setParentSubCategoryId("");
+    setHeadlineEn("");
+    setHeadlineAr("");
     setDescription("");
     setImageFile(null);
     setImagePreview(null);
@@ -131,6 +139,8 @@ const CreateSubCategoryChildModal: React.FC<Props> = ({
           slugAr: slugAr.trim() || undefined,
           parentSubCategory: parentSubCategoryId,
           description: description.trim(),
+          headlineEn: headlineEn.trim(),
+          headlineAr: headlineAr.trim(),
           active: true,
           image: imageUrl || undefined,
           icon: imageUrl || undefined,
@@ -157,6 +167,8 @@ const CreateSubCategoryChildModal: React.FC<Props> = ({
       slugEn,
       slugAr,
       parentSubCategoryId,
+      headlineEn,
+      headlineAr,
       description,
       imageFile,
       imagePreview,
@@ -315,6 +327,34 @@ const CreateSubCategoryChildModal: React.FC<Props> = ({
               value={slugAr}
               dir="rtl"
               onChange={(e) => setSlugAr(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+              {t("headlineEn") || "Headline (EN)"}
+            </label>
+            <input
+              type="text"
+              value={headlineEn}
+              onChange={(e) => setHeadlineEn(e.target.value)}
+              placeholder="e.g. Best deals"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+              {t("headlineAr") || "Headline (AR)"}
+            </label>
+            <input
+              type="text"
+              dir="rtl"
+              value={headlineAr}
+              onChange={(e) => setHeadlineAr(e.target.value)}
+              placeholder="مثال: أفضل العروض"
               className={inputCls}
             />
           </div>

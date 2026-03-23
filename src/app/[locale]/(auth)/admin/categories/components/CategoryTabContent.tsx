@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import Image from "next/image";
-import { PencilIcon, TrashIcon } from "lucide-react";
+import { PencilIcon, TrashIcon, ChevronUp, ChevronDown } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import DynamicTable from "@/components/features/tables/DTable";
 import StatusToggle from "@/components/shared/Buttons/StatusToggle";
@@ -17,6 +17,8 @@ interface CategoryTabContentProps {
   onEdit: (category: Category) => void;
   onDelete: (category: Category) => void;
   onCreateClick: () => void;
+  onMoveUp?: (category: Category) => void;
+  onMoveDown?: (category: Category) => void;
 }
 
 const CategoryTabContent: React.FC<CategoryTabContentProps> = ({
@@ -27,6 +29,8 @@ const CategoryTabContent: React.FC<CategoryTabContentProps> = ({
   onEdit,
   onDelete,
   onCreateClick,
+  onMoveUp,
+  onMoveDown,
 }) => {
   const locale = useLocale() as "en" | "ar";
   const t = useTranslations("admin");
@@ -113,6 +117,26 @@ const CategoryTabContent: React.FC<CategoryTabContentProps> = ({
         headerClassName="bg-gray-50/50 text-gray-400 text-[11px] font-black uppercase tracking-wider"
         rowClassName="hover:bg-gray-50/80 transition-colors duration-300 border-b border-gray-50/50"
         solidActions={[
+          ...(onMoveUp
+            ? [
+                {
+                  label: "↑",
+                  onClick: (item: any) => onMoveUp?.(item as Category),
+                  icon: <ChevronUp />,
+                  color: "#16a34a",
+                },
+              ]
+            : []),
+          ...(onMoveDown
+            ? [
+                {
+                  label: "↓",
+                  onClick: (item: any) => onMoveDown?.(item as Category),
+                  icon: <ChevronDown />,
+                  color: "#16a34a",
+                },
+              ]
+            : []),
           {
             label: t("edit"),
             onClick: (item) => onEdit(item as Category),

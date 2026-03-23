@@ -22,6 +22,7 @@ import { useTranslations } from "next-intl";
 const MobileCartNavbar: React.FC<MobileCartNavbarProps> = ({
   product,
   quantity,
+  setQuantity,
   handleAddToCart,
   loading,
 }) => {
@@ -37,6 +38,7 @@ const MobileCartNavbar: React.FC<MobileCartNavbarProps> = ({
           initialQuantity={quantity}
           min={1}
           max={product?.stock || 99}
+          onQuantityChange={setQuantity}
           buttonSize="md"
           showLabel={false}
           className="flex-1"

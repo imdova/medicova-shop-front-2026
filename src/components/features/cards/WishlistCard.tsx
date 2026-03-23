@@ -89,7 +89,7 @@ const WishlistCard: React.FC<WishlistCardProps> = ({
             <div className="relative">
               {/* Main Image */}
               <div className="relative overflow-hidden rounded-lg bg-gray-100">
-                <Link href={`/product-details/${product.id}`}>
+                <Link href={product.category?.slug ? `/${locale}/category/${product.category.slug}/${product.slug[locale]}` : `/product-details/${product.id}`}>
                   <Image
                     width={200}
                     height={200}
@@ -150,7 +150,7 @@ const WishlistCard: React.FC<WishlistCardProps> = ({
             </div>
 
             <Link
-              href={`/product-details/${product.id}`}
+              href={product.category?.slug ? `/${locale}/category/${product.category.slug}/${product.slug[locale]}` : `/product-details/${product.id}`}
               className="flex h-full flex-1 flex-col justify-between"
             >
               {/* Product Info */}

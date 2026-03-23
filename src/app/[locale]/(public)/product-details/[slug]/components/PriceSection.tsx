@@ -9,6 +9,10 @@ interface PriceSectionProps {
   product: Product;
   locale: "en" | "ar";
   currentNudgeIndex: number;
+  selectedOptions?: { 
+    label: { en: string; ar: string }; 
+    values: { name: string; color: string }[] 
+  }[];
 }
 
 const StarRating = ({ rating }: { rating: number }) => (
@@ -61,7 +65,7 @@ const StockBadge = ({
           className={`relative inline-flex h-2 w-2 rounded-full ${isLow ? "bg-amber-500" : "bg-emerald-500"}`}
         />
       </div>
-      {t("onlyStock", { count: stock })}
+      {stock > 50 ? t("inStock") : t("leftInStock", { count: Number(stock) })}
     </div>
   );
 };
@@ -70,6 +74,7 @@ const PriceSection = ({
   product,
   locale,
   currentNudgeIndex,
+  selectedOptions,
 }: PriceSectionProps) => {
   const t = useTranslations("product");
   const common = useTranslations("common");
@@ -104,11 +109,6 @@ const PriceSection = ({
               {product.del_price.toLocaleString()} {common("currency")}
             </span>
           )}
-          {saving > 0 && (
-            <span className="animate-in zoom-in-50 rounded-lg bg-primary px-3 py-1 text-sm font-bold text-white shadow-sm duration-500">
-              {Math.round((saving / product.del_price!) * 100)}% {t("off")}
-            </span>
-          )}
         </div>
 
         {/* Stock */}
@@ -116,89 +116,118 @@ const PriceSection = ({
           {product.stock && (
             <StockBadge stock={product.stock} locale={locale} />
           )}
-          {saving > 0 && (
-            <span className="text-xs font-semibold text-emerald-600">
-              {t("youSave")} {saving.toLocaleString()} {common("currency")}
-            </span>
-          )}
         </div>
       </div>
 
-      {/* Nudges */}
-      <div className="group relative mt-4 overflow-hidden rounded-xl border border-white/40 bg-white/40 p-3 shadow-inner backdrop-blur-sm">
-        <div className="relative h-5 overflow-hidden">
-          <div
-            className="cubic-bezier(0.4, 0, 0.2, 1) flex flex-col transition-all duration-700"
-            style={{ transform: `translateY(-${currentNudgeIndex * 20}px)` }}
-          >
-            {product.nudges?.[locale]?.map((nudge, index) => (
-              <div
-                key={index}
-                className="flex h-5 items-center gap-2 text-[11px] font-semibold text-gray-500"
-              >
-                <div className="bg-primary/40 h-1.5 w-1.5 rounded-full transition-transform group-hover:scale-125" />
-                {nudge}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* Delivery */}
-      <div className="animate-in fade-in zoom-in-95 mt-6 duration-700">
-        <div className="overflow-hidden rounded-2xl border border-white/40 bg-white/40 shadow-sm backdrop-blur-md">
-          <div className="flex items-center gap-4 bg-emerald-500/5 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
-              <Truck size={20} />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-                {product.shippingMethod?.[locale] ?? t("expressDelivery")}
-              </span>
-              <span className="text-sm font-bold text-gray-800">
-                {t("getItBy")}{" "}
-                <span className="text-emerald-700">
-                  {getExecuteDateFormatted(
-                    product.deliveryTime?.[locale] ?? "",
-                    "EEEE, MMM d",
-                    locale,
-                  )}
-                </span>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Installment */}
-      {product.installmentOptions && product.installmentOptions.length > 0 && (
-        <div className="mt-4 flex flex-col gap-3">
-          {product.installmentOptions.map((option, index) => (
+      {/* Payment Methods */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 mt-8 duration-700">
+        <div className="flex flex-wrap items-center gap-4">
+          {[
+            {
+              id: "visa",
+              name: "Visa",
+              url: "/icons/visa.svg",
+            },
+            {
+              id: "mastercard",
+              name: "Mastercard",
+              url: "/icons/mastercard.svg",
+            },
+            {
+              id: "fawry",
+              name: "Fawry",
+              url: "/icons/fawry-seeklogo.png",
+            },
+            {
+              id: "wallet",
+              name: "E-Wallet",
+              url: "/icons/wallet.png",
+            },
+            {
+              id: "cod",
+              name: "Cash on Delivery",
+              url: "/icons/payment-method.png",
+            },
+          ].map((method) => (
             <div
-              key={index}
-              className="group flex items-center gap-4 rounded-xl border border-white/40 bg-white/40 p-4 shadow-sm backdrop-blur-md transition-all hover:bg-white/60 hover:shadow-md"
+              key={method.id}
+              className="group relative flex h-12 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/60 bg-white/60 p-2 shadow-sm backdrop-blur-xl transition-all duration-300 hover:scale-110 hover:border-primary/40 hover:bg-white/90 hover:shadow-xl active:scale-95"
+              title={method.name}
             >
-              <div className="relative h-10 w-16 overflow-hidden rounded-lg border border-gray-100 bg-white p-1 shadow-sm">
+              <div className="relative h-full w-full">
                 <Image
-                  src={option.methodType.image}
-                  className="h-full w-full object-contain"
+                  src={method.url}
+                  alt={method.name}
                   fill
-                  alt={option.methodType.name}
+                  className="object-contain transition-transform duration-300 group-hover:scale-110"
                 />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                  {t("installmentOption")}
-                </span>
-                <span className="text-sm font-bold text-gray-800">
-                  {option.months}{" "}
-                  {t("monthlyInstallments", {
-                    amount: option.amount.toLocaleString(),
-                  })}
-                </span>
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Product Options (Variants) */}
+      {selectedOptions && selectedOptions.length > 0 && (
+        <div className="mt-8 space-y-4 border-t border-gray-100 pt-6">
+          {[...selectedOptions]
+            .sort((a, b) => {
+              const isAColor = a.label.en.toLowerCase() === "color";
+              const isBColor = b.label.en.toLowerCase() === "color";
+              if (isAColor && !isBColor) return -1;
+              if (!isAColor && isBColor) return 1;
+              return 0;
+            })
+            .map((opt, i) => {
+              const isColor = opt.label.en.toLowerCase() === "color";
+              return (
+                <div key={i} className="flex flex-col gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">
+                    {opt.label[locale]}
+                  </span>
+                  <div className="flex flex-wrap gap-3">
+                    {opt.values.map((val, j) => {
+                      if (isColor) {
+                        const isUrl = val.color.startsWith("http");
+                        return (
+                          <div
+                            key={j}
+                            className="group relative flex flex-col items-center gap-1"
+                          >
+                            <div
+                              className="relative h-8 w-8 overflow-hidden rounded-full border-2 border-gray-200 shadow-sm transition-transform hover:scale-110"
+                              style={!isUrl ? { backgroundColor: val.color } : {}}
+                              title={val.name}
+                            >
+                              {isUrl && (
+                                <Image
+                                  src={val.color}
+                                  alt={val.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              )}
+                            </div>
+                            <span className="text-[9px] font-medium text-gray-500 opacity-0 transition-opacity group-hover:opacity-100">
+                              {val.name}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <span
+                          key={j}
+                          className="rounded-xl border border-gray-200 bg-white/50 px-4 py-1.5 text-xs font-bold text-gray-700 shadow-sm backdrop-blur-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                        >
+                          {val.name}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
         </div>
       )}
     </section>

@@ -36,25 +36,51 @@ const CartDrawer = ({
     >
       <ul className="max-h-[500px] max-w-[270px] overflow-y-auto">
         {cartItems.map((item) => (
-          <li className="mb-2" key={item.id}>
-            <Link href={`/product-details/${item.id}`}>
-              <div className="flex h-[100px] gap-2">
-                <Image
-                  className="h-full w-[80px] rounded object-cover"
-                  src={item.image}
-                  width={80}
-                  height={100}
-                  alt={item.title?.[locale] || "Product image"}
-                />
+          <li className="mb-4 border-b border-gray-50 pb-4 last:border-0" key={item.id}>
+            <Link href={item.categorySlug ? `/${locale}/category/${item.categorySlug}/${item.slug[locale]}` : `/product-details/${item.id}`}>
+              <div className="flex h-auto gap-3">
+                <div className="relative h-[90px] w-[70px] flex-shrink-0">
+                  <Image
+                    className="h-full w-full rounded object-cover"
+                    src={item.image}
+                    fill
+                    sizes="70px"
+                    alt={item.title?.[locale] || "Product image"}
+                  />
+                </div>
                 <div className="flex-1">
-                  <h3 className="mb-2 line-clamp-2 text-sm font-semibold">
+                  <h3 className="mb-1 line-clamp-2 text-xs font-semibold text-gray-800">
                     {item.title[locale]}
                   </h3>
-                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                  
+                  {item.unitSelections && item.unitSelections.length > 0 && (
+                    <div className="mb-2 max-h-[100px] overflow-y-auto space-y-1 pr-1">
+                      {item.unitSelections.map((selection: any, idx) => (
+                        <div key={idx} className="flex flex-wrap gap-1 items-center">
+                          <span className="text-[9px] text-gray-400 font-bold uppercase">U{idx+1}:</span>
+                          {Object.entries(selection).map(([key, value]) => {
+                            if (!value) return null;
+                            const isColor = key.toLowerCase().includes("color") || (typeof value === "string" && value.startsWith("#"));
+                            return (
+                              <div key={key} className="flex items-center gap-1 rounded bg-gray-50 border border-gray-100 px-1 py-0.5 text-[9px] font-bold text-gray-500">
+                                {isColor && (
+                                  <span
+                                    className="h-1.5 w-1.5 rounded-full border border-gray-200"
+                                    style={{ backgroundColor: value as string }}
+                                  />
+                                )}
+                                <span>{typeof value === "object" ? (value as any).en : String(value)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1 text-[10px] font-medium text-primary">
+                    <Check size={10} strokeWidth={3} />
                     {t("addedToCart")}
-                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-white">
-                      <Check size={10} />
-                    </span>
                   </div>
                 </div>
               </div>

@@ -8,12 +8,50 @@ import { getEncrypted } from "@/util/encryptedCookieStorage";
 import { Product } from "@/types/product";
 import { SizeType, NumericSizeType, LiquidSizeType } from "@/types";
 import { useTranslations } from "next-intl";
+import { getTags } from "@/services/tagService";
+import { ProductTag } from "@/types/product";
+
+import { getSellerSelectedOptions } from "@/services/sellerSelectedOptionService";
+import { getVariantById } from "@/services/variantService";
+
+interface UnitSelection {
+  size?: SizeType | NumericSizeType | LiquidSizeType;
+  color?: string;
+}
 
 interface UseProductPageProps {
   product: Product | undefined;
 }
 
-export const useProductPage = ({ product }: UseProductPageProps) => {
+export const useProductPage = ({ product }: UseProductPageProps): {
+  isClient: boolean;
+  loading: boolean;
+  selectedSize: SizeType | NumericSizeType | LiquidSizeType | undefined;
+  selectedColor: string | undefined;
+  quantity: number;
+  currentNudgeIndex: number;
+  isDrawerOpen: boolean;
+  isAuthModalOpen: boolean;
+  isVariantModalOpen: boolean;
+  alert: { message: string; type: "success" | "error" | "info" } | null;
+  cartProducts: any[];
+  totalPrice: number;
+  isInCart: boolean;
+  selectedOptions: { label: { en: string; ar: string }; values: { name: string; color: string }[] }[];
+  unitSelections: UnitSelection[];
+  setSelectedSize: (size: SizeType | NumericSizeType | LiquidSizeType | undefined) => void;
+  setSelectedColor: (color: string | undefined) => void;
+  setQuantity: (quantity: number) => void;
+  setIsDrawerOpen: (isOpen: boolean) => void;
+  setIsAuthModalOpen: (isOpen: boolean) => void;
+  setIsVariantModalOpen: (isOpen: boolean) => void;
+  setAlert: (alert: { message: string; type: "success" | "error" | "info" } | null) => void;
+  onUnitSelectionChange: (index: number, selection: UnitSelection) => void;
+  handleAddToCart: () => Promise<void>;
+  confirmVariantSelection: () => void;
+  handleCheckout: () => void;
+  productTags: ProductTag[];
+} => {
   const t = useTranslations("product");
   const session = useSession();
   const router = useRouter();
@@ -25,13 +63,93 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
   const [loading, setLoading] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [alert, setAlert] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [currentNudgeIndex, setCurrentNudgeIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [isClient, setIsClient] = useState(false);
+  const [selectedOptions, setSelectedOptions] = useState<{ label: { en: string; ar: string }; values: { name: string; color: string }[] }[]>([]);
+  
+  const [unitSelections, setUnitSelections] = useState<UnitSelection[]>([
+    { size: undefined, color: undefined }
+  ]);
+  const [productTags, setProductTags] = useState<ProductTag[]>([]);
 
   const cartProduct = cartProducts.find((item) => item.id === product?.id);
   const isInCart = !!cartProduct;
+
+  // Fetch selected options
+  useEffect(() => {
+    if (product?.id) {
+      const fetchOptions = async () => {
+        try {
+          const token = (session?.data as any)?.accessToken;
+          const res = await getSellerSelectedOptions(product.id, token, true);
+          const data = (res as any)?.data || res;
+          
+          if (data && data.options && Array.isArray(data.options)) {
+            const optionsWithLabels = await Promise.all(
+              data.options.map(async (opt: any) => {
+                try {
+                  const variant = await getVariantById(opt.variantId);
+                  
+                  // Match values with variant option labels to get hex/color
+                  const enrichedValues = (opt.values || []).map((val: string) => {
+                    const match = variant?.option_values?.find(
+                      (vOpt: any) => 
+                        vOpt.label.en.toLowerCase() === val.toLowerCase() || 
+                        vOpt.label.ar === val
+                    );
+                    return {
+                      name: val,
+                      color: match?.color || val, // Fallback to name if no hex found
+                    };
+                  });
+
+                  return {
+                    label: variant?.name || { en: "Option", ar: "خيار" },
+                    values: enrichedValues,
+                  };
+                } catch (e) {
+                  return {
+                    label: { en: "Option", ar: "خيار" },
+                    values: (opt.values || []).map((v: string) => ({ name: v, color: v })),
+                  };
+                }
+              })
+            );
+            setSelectedOptions(optionsWithLabels);
+          }
+        } catch (err) {
+          // Silent catch for options fetch, as it might be unauthorized for guests
+          console.warn("Seller selected options fetch failed (likely unauthorized)", err);
+        }
+      };
+      fetchOptions();
+    }
+  }, [product?.id, session?.data]);
+
+  // Fetch product tags
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const allTags = await getTags();
+        if (product?.tags && product.tags.length > 0) {
+          // Robust mapping in case tags are strings or objects
+          const tagIds = product.tags.map((t: any) =>
+            typeof t === "string" ? t : (t._id || t.id)
+          );
+          const resolved = allTags.filter((t) => tagIds.includes(t.id));
+          setProductTags(resolved);
+        } else {
+          setProductTags([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch tags for product", err);
+      }
+    };
+    fetchTags();
+  }, [product?.tags]);
 
   // Hydrate cart from cookies
   useEffect(() => {
@@ -51,13 +169,29 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
 
   // Set initial selections
   useEffect(() => {
-    if (product?.sizes?.length) {
-      setSelectedSize(product.sizes[0]);
-    }
-    if (product?.colors?.en?.length) {
-      setSelectedColor(product.colors.en[0]);
-    }
-  }, [product?.sizes, product?.colors]);
+    const defaultSize = product?.sizes?.[0];
+    const defaultColor = product?.colors?.en?.[0];
+
+    if (defaultSize) setSelectedSize(defaultSize);
+    if (defaultColor) setSelectedColor(defaultColor);
+
+    const initialSelection: any = {};
+    if (defaultSize) initialSelection.size = defaultSize;
+    if (defaultColor) initialSelection.color = defaultColor;
+    
+    // Also try to match with any dynamic labels from selectedOptions if they are fetched
+    selectedOptions.forEach(opt => {
+      const key = opt.label.en.toLowerCase();
+      if (key === "size") initialSelection[key] = defaultSize;
+      if (key === "color") initialSelection[key] = defaultColor;
+      // If we have a default value in opt.values, we could use it here
+      if (!initialSelection[key] && opt.values.length > 0) {
+        initialSelection[key] = opt.values[0].name;
+      }
+    });
+
+    setUnitSelections([initialSelection]);
+  }, [product?.sizes, product?.colors, selectedOptions, setSelectedSize, setSelectedColor]);
 
   // Nudge auto-rotation
   useEffect(() => {
@@ -73,71 +207,87 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
 
   // Sync quantity with cart if product is already there
   useEffect(() => {
-    if (cartProduct) {
+    if (cartProduct && cartProduct.quantity !== quantity) {
       setQuantity(cartProduct.quantity);
-    } else {
-      setQuantity(1);
     }
   }, [cartProduct?.quantity]);
+
+  // Sync unitSelections with quantity
+  useEffect(() => {
+    setUnitSelections(prev => {
+      if (quantity === prev.length) return prev;
+      const next = [...prev];
+      if (quantity > next.length) {
+        for (let i = next.length; i < quantity; i++) {
+          next.push({ size: next[0]?.size, color: next[0]?.color });
+        }
+      } else {
+        return next.slice(0, quantity);
+      }
+      return next;
+    });
+  }, [quantity]);
 
   const showAlert = useCallback((message: string, type: "success" | "error" | "info") => {
     setAlert({ message, type });
     setTimeout(() => setAlert(null), 3000);
   }, []);
 
+  const onUnitSelectionChange = (index: number, selection: UnitSelection) => {
+    setUnitSelections(prev => {
+      const next = [...prev];
+      next[index] = selection;
+      // Sync first unit with top-level selection for legacy compatibility
+      if (index === 0) {
+        setSelectedSize(selection.size);
+        setSelectedColor(selection.color);
+      }
+      return next;
+    });
+  };
+
   const handleAddToCart = async () => {
     if (!product?.id) {
       showAlert(t("error"), "error");
       return;
     }
+    setIsVariantModalOpen(true);
+  };
 
-    setLoading(true);
-    // Simulate slight delay for feedback
-    await new Promise((resolve) => setTimeout(resolve, 600));
+  const confirmVariantSelection = () => {
+    if (!product?.id) return;
 
-    if (!isInCart) {
-      dispatch(
-        addItem({
-          id: product.id,
-          title: product.title,
-          image: product.images?.[0] ?? "/images/placeholder.jpg",
-          description: product.description.en,
-          del_price: product.del_price,
-          price: product.price ?? 0,
-          shipping_fee: product.shipping_fee ?? 0,
-          quantity: Math.min(quantity, product.stock ?? 1),
-          brand: product.brand,
-          deliveryTime: product.deliveryTime,
-          sellers: product.sellers,
-          stock: product.stock,
-          color: selectedColor,
-          size: selectedSize,
-          shippingMethod: product.shippingMethod,
-          weightKg: product.weightKg,
-        })
-      );
-      showAlert(t("addedToCart"), "success");
-    } else {
-      const availableStock = product.stock ?? 0;
-      const currentQuantity = cartProduct?.quantity ?? 0;
-      const requestedTotal = currentQuantity + quantity;
+    dispatch(
+      addItem({
+        id: product.id,
+        title: product.title,
+        slug: product.slug,
+        categorySlug: product.category?.slug,
+        image: product.images?.[0] ?? "/images/placeholder.jpg",
+        description: product.description.en,
+        del_price: product.del_price,
+        price: product.price ?? 0,
+        shipping_fee: product.shipping_fee ?? 0,
+        quantity: unitSelections.length,
+        brand: product.brand,
+        deliveryTime: product.deliveryTime,
+        sellers: product.sellers,
+        stock: product.stock,
+        color: unitSelections[0]?.color,
+        size: unitSelections[0]?.size,
+        shippingMethod: product.shippingMethod,
+        weightKg: product.weightKg,
+        unitSelections: unitSelections,
+        totalPrice: (product.price ?? 0) * unitSelections.length,
+        shippingCostInsideCairo: product.shippingCostInsideCairo,
+        shippingCostRegion1: product.shippingCostRegion1,
+        shippingCostRegion2: product.shippingCostRegion2,
+      } as any)
+    );
 
-      if (requestedTotal > availableStock) {
-        const canAdd = Math.max(0, availableStock - currentQuantity);
-        if (canAdd > 0) {
-          dispatch(increaseQuantity({ id: product.id, amount: canAdd }));
-          showAlert(t("outOfStock"), "info"); // Simplified alert for logic
-        } else {
-          showAlert(t("outOfStock"), "error");
-        }
-      } else {
-        dispatch(increaseQuantity({ id: product.id, amount: quantity }));
-        showAlert(t("addedToCart"), "success");
-      }
-    }
-
+    setIsVariantModalOpen(false);
     setIsDrawerOpen(true);
-    setLoading(false);
+    showAlert(t("addedToCart"), "success");
   };
 
   const handleCheckout = () => {
@@ -157,17 +307,24 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
     currentNudgeIndex,
     isDrawerOpen,
     isAuthModalOpen,
+    isVariantModalOpen,
     alert,
     cartProducts,
     totalPrice,
     isInCart,
+    selectedOptions,
+    unitSelections,
     setSelectedSize,
     setSelectedColor,
     setQuantity,
     setIsDrawerOpen,
     setIsAuthModalOpen,
+    setIsVariantModalOpen,
     setAlert,
+    onUnitSelectionChange,
     handleAddToCart,
+    confirmVariantSelection,
     handleCheckout,
+    productTags,
   };
 };

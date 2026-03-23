@@ -6,7 +6,6 @@ import CustomAlert from "@/components/shared/CustomAlert";
 import OrderSummary from "./components/OrderSummary";
 import EmptyCart from "./components/EmptyCart";
 import CartItemCard from "./components/CartItemCard";
-import { availableCoupons } from "@/constants/coupons";
 import LoadingAnimation from "@/components/layouts/LoadingAnimation";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -17,17 +16,22 @@ import { useTranslations } from "next-intl";
 import { Address, DestinationKey } from "@/types";
 import { useCartCalculations } from "./hooks/useCartCalculations";
 import { getEncrypted } from "@/util/encryptedCookieStorage";
+import { useSyncCart } from "@/hooks/useSyncCart";
+import { getDiscounts } from "@/services/discountService";
+import { Discount } from "@/types/product";
+import { setDiscount } from "@/store/slices/cartSlice";
 
 export default function CartPage() {
-  const [appliedCoupon, setAppliedCoupon] = useState<string>("");
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [couponError, setCouponError] = useState<string | null>(null);
+  const { syncCart } = useSyncCart();
   const dispatch = useAppDispatch();
   const session = useSession();
   const router = useRouter();
   const locale = useAppLocale();
   const t = useTranslations();
-  const { products: cartItems } = useAppSelector((state) => state.cart);
+  const { products: cartItems, appliedCoupon: reduxCoupon, discountAmount: reduxDiscount } = useAppSelector((state) => state.cart);
+  const [appliedCoupon, setAppliedCoupon] = useState<string>(reduxCoupon || "");
+  const [discountAmount, setDiscountAmount] = useState(reduxDiscount || 0);
+  const [couponError, setCouponError] = useState<string | null>(null);
   const [alert, setAlert] = useState<{
     message: string;
     type: "success" | "error";
@@ -48,6 +52,8 @@ export default function CartPage() {
         }>("cart");
         if (savedCart) {
           dispatch(setCart(savedCart));
+          // Sync with latest API data (prices, shipping, etc)
+          await syncCart(savedCart.products);
         }
         const userAddress = await getEncrypted<Address>("userAddress");
         const savedAddresses = await getEncrypted<Address[]>("savedAddresses");
@@ -72,50 +78,76 @@ export default function CartPage() {
     total,
     productsCount,
     getItemShippingFeeDisplay,
-  } = useCartCalculations(destination, paymentMethod, discountAmount);
+  } = useCartCalculations(destination, paymentMethod, discountAmount, selectedAddress?.city);
 
   const showAlert = (message: string, type: "success" | "error") => {
     setAlert({ message, type });
     setTimeout(() => setAlert(null), 3000);
   };
 
-  const applyCoupon = () => {
+  const applyCoupon = async () => {
     setCouponError(null);
-    const coupon = availableCoupons.find(
-      (c) => c.code.toUpperCase() === appliedCoupon.toUpperCase(),
-    );
-    if (!coupon) {
-      setCouponError(
-        locale === "ar" ? "رمز الكوبون غير صالح." : "Invalid coupon code.",
-      );
-      setDiscountAmount(0);
-      return;
-    }
-    if (subtotal < coupon.minPurchaseAmount) {
-      setCouponError(
-        locale === "ar"
-          ? `الحد الأدنى للشراء لاستخدام هذا الكوبون هو ${coupon.minPurchaseAmount} جنيه.`
-          : `Minimum purchase of EGP ${coupon.minPurchaseAmount} required to use this coupon.`,
-      );
-      setDiscountAmount(0);
-      return;
-    }
-    let discount = 0;
-    if (coupon.discountType === "percentage") {
-      discount = (subtotal * coupon.discountValue) / 100;
-      if (coupon.maxDiscountAmount) {
-        discount = Math.min(discount, coupon.maxDiscountAmount);
+    if (!appliedCoupon) return;
+
+    try {
+      const token = (session?.data as any)?.accessToken;
+      if (!token) {
+        setCouponError(locale === "ar" ? "يجب تسجيل الدخول لاستخدام الكوبون." : "You must be logged in to use coupons.");
+        return;
       }
-    } else if (coupon.discountType === "fixed") {
-      discount = coupon.discountValue;
+
+      const discounts = await getDiscounts(token);
+      const coupon = discounts.find(
+        (c: Discount) => c.discountCode.toUpperCase() === appliedCoupon.toUpperCase() && c.active
+      );
+
+      if (!coupon) {
+        setCouponError(
+          locale === "ar" ? "رمز الكوبون غير صالح." : "Invalid coupon code.",
+        );
+        setDiscountAmount(0);
+        dispatch(setDiscount({ coupon: "", amount: 0 }));
+        return;
+      }
+
+      // Check minimum purchase amount if applicable
+      // Note: appliesTo might contain "minimum_amount" or other logic. 
+      // For now, mapping same logic as before if available in coupon object.
+      const minAmount = (coupon as any).minPurchaseAmount || 0;
+      if (subtotal < minAmount) {
+        setCouponError(
+          locale === "ar"
+            ? `الحد الأدنى للشراء لاستخدام هذا الكوبون هو ${minAmount} جنيه.`
+            : `Minimum purchase of EGP ${minAmount} required to use this coupon.`,
+        );
+        setDiscountAmount(0);
+        dispatch(setDiscount({ coupon: "", amount: 0 }));
+        return;
+      }
+
+      let discount = 0;
+      if (coupon.discountType === "percentage") {
+        discount = (subtotal * coupon.discountValue) / 100;
+        const maxDiscount = (coupon as any).maxDiscountAmount;
+        if (maxDiscount) {
+          discount = Math.min(discount, maxDiscount);
+        }
+      } else if (coupon.discountType === "fixed") {
+        discount = coupon.discountValue;
+      }
+
+      setDiscountAmount(discount);
+      dispatch(setDiscount({ coupon: coupon.discountCode, amount: discount }));
+      showAlert(
+        locale === "ar"
+          ? `تم تطبيق الكوبون ${coupon.discountCode}! لقد وفّرت ${discount.toFixed(2)} جنيه.`
+          : `Coupon ${coupon.discountCode} applied! You saved EGP ${discount.toFixed(2)}.`,
+        "success",
+      );
+    } catch (error) {
+      console.error("Failed to apply coupon:", error);
+      setCouponError(locale === "ar" ? "حدث خطأ أثناء تطبيق الكوبون." : "Error applying coupon.");
     }
-    setDiscountAmount(discount);
-    showAlert(
-      locale === "ar"
-        ? `تم تطبيق الكوبون ${coupon.code}! لقد وفّرت ${discount.toFixed(2)} جنيه.`
-        : `Coupon ${coupon.code} applied! You saved EGP ${discount.toFixed(2)}.`,
-      "success",
-    );
   };
 
   const handleRemove = (id: string) => {

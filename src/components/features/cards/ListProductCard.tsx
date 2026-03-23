@@ -84,7 +84,9 @@ const ListProductCard: React.FC<ListCardProps> = ({ loading, product }) => {
         dispatch(
           addItem({
             id: product.id,
-            title: product.title ?? "",
+            title: product.title,
+            slug: product.slug,
+            categorySlug: product.category?.slug,
             image: product.images?.[0] ?? "/images/placeholder.jpg",
             description:
               product.description[locale as keyof LocalizedTitle] ??
@@ -158,7 +160,7 @@ const ListProductCard: React.FC<ListCardProps> = ({ loading, product }) => {
         ) : (
           <>
             <div className="group relative h-fit flex-shrink-0 overflow-hidden rounded-lg">
-              <Link href={`/product-details/${product.id}`}>
+              <Link href={product.category?.slug ? `/${locale}/category/${product.category.slug}/${product.slug[locale]}` : `/product-details/${product.id}`}>
                 <div className="block bg-gray-100">
                   <Image
                     width={160}
@@ -208,7 +210,7 @@ const ListProductCard: React.FC<ListCardProps> = ({ loading, product }) => {
             </div>
 
             <div className="ml-4 flex flex-grow flex-col">
-              <Link href={`/product-details/${product.id}`}>
+              <Link href={product.category?.slug ? `/${locale}/category/${product.category.slug}/${product.slug[locale]}` : `/product-details/${product.id}`}>
                 <div className="block">
                   <h3 className="text-sm font-semibold text-gray-800">
                     {product.title[locale as keyof LocalizedTitle]}

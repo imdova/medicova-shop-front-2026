@@ -5,17 +5,13 @@ import { useTranslations } from "next-intl";
 
 interface BrandFiltersProps {
   search: string;
-  status: string;
   onSearchChange: (value: string) => void;
-  onStatusChange: (value: string) => void;
   locale: string;
 }
 
 export const BrandFilters = ({
   search,
-  status,
   onSearchChange,
-  onStatusChange,
   locale,
 }: BrandFiltersProps) => {
   const t = useTranslations("seller_brand_management");
@@ -32,17 +28,6 @@ export const BrandFilters = ({
           className="focus:ring-primary/10 w-full rounded-2xl border border-gray-100 bg-white p-3 pl-12 pr-4 font-bold shadow-sm outline-none transition-all focus:border-primary focus:ring-4"
         />
       </div>
-
-      <select
-        value={status}
-        onChange={(e) => onStatusChange(e.target.value)}
-        className="focus:ring-primary/10 rounded-2xl border border-gray-100 bg-white py-3 pl-4 pr-10 text-sm font-black uppercase tracking-wider text-gray-700 shadow-sm focus:border-primary focus:outline-none focus:ring-4"
-      >
-        <option value="all">{t("filters.status.all")}</option>
-        <option value="pending">{t("filters.status.pending")}</option>
-        <option value="approved">{t("filters.status.approved")}</option>
-        <option value="rejected">{t("filters.status.rejected")}</option>
-      </select>
     </div>
   );
 };

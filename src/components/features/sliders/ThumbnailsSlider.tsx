@@ -80,9 +80,9 @@ const ThumbnailsSlider = ({
   }, [currentImageIndex]);
 
   return (
-    <div className="relative mt-4 hidden md:block">
+    <div className="relative ">
       {/* Horizontal Slider */}
-      <div className="relative">
+      <div className="relative h-full ">
         {/* Left Scroll Button */}
         {showScrollArrows.left && (
           <button
@@ -97,7 +97,7 @@ const ThumbnailsSlider = ({
         <div
           ref={containerRef}
           onScroll={checkScrollPosition}
-          className="no-scrollbar flex gap-3 overflow-x-auto py-2"
+          className="no-scrollbar flex gap-3 overflow-x-auto px-2 flex-col h-full"
         >
           {images.map((img, index) => (
             <motion.button

@@ -144,8 +144,8 @@ const ProductImagesSlider = ({ images = [], product }: ImagesSliderProps) => {
   };
 
   return (
-    <div>
-      {/* Global Alert Display */}
+    <div className="flex flex-row-reverse h-full ">
+    
       {alert && (
         <CustomAlert
           message={alert.message}
@@ -156,7 +156,7 @@ const ProductImagesSlider = ({ images = [], product }: ImagesSliderProps) => {
       {/* Main Image Slider */}
       <div
         {...swipeHandlers}
-        className="relative h-[450px] touch-pan-y select-none overflow-hidden rounded-lg"
+        className="relative h-full touch-pan-y select-none overflow-hidden rounded-lg"
         style={{ touchAction: "pan-y" }}
         ref={imageRef}
         onMouseEnter={() => !isMobile && setIsHovering(true)}

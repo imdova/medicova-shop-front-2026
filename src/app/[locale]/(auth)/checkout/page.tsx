@@ -23,6 +23,8 @@ export default function CheckoutPage() {
     shippingFee,
     paymentFee,
     total,
+    discountAmount,
+    appliedCoupon,
     productShippingFees,
     setShowAddressModal,
     setShowCreditCardModal,
@@ -85,6 +87,8 @@ export default function CheckoutPage() {
                 subtotal={subtotal}
                 shippingFee={shippingFee}
                 paymentFee={paymentFee}
+                discountAmount={discountAmount}
+                appliedCoupon={appliedCoupon}
                 total={total}
                 disabled={!selectedAddress || productData.length === 0}
                 locale={locale}

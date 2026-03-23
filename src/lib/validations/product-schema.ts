@@ -90,6 +90,7 @@ export const productSchema = z.object({
     .array(
       z.object({
         id: z.string().optional(),
+        templateVariantId: z.string().optional(),
         nameEn: z.string(),
         nameAr: z.string(),
         type: z.string(),
@@ -148,6 +149,17 @@ export const productSchema = z.object({
     .array(z.union([z.string(), z.instanceof(File)]))
     .max(10, "Maximum 10 images allowed")
     .default([]),
+  selectedOptions: z
+    .object({
+      options: z.array(
+        z.object({
+          variantId: z.string(),
+          values: z.array(z.string()),
+        })
+      ).optional(),
+      distribution: z.array(z.any()),
+    })
+    .optional(),
 });
 
 export const step1CoreSchema = z.object({

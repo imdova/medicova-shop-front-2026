@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { ProductFormData } from "@/lib/validations/product-schema";
 import {
   step1CoreSchema,
@@ -14,7 +15,13 @@ import {
   CreateProductPayload,
 } from "@/services/productService";
 import { uploadImage } from "@/lib/uploadService";
-import { createVariant } from "@/services/variantService";
+import { createVariant, getVariantById } from "@/services/variantService";
+import { 
+  createOrUpdateSellerSelectedOptions, 
+  getSellerSelectedOptions, 
+  updateSellerSelectedOptions 
+} from "@/services/sellerSelectedOptionService";
+import { extractSessionToken } from "@/lib/auth/sessionToken";
 import toast from "react-hot-toast";
 
 export type Step =
@@ -23,9 +30,46 @@ export type Step =
   | "step3_media"
   | "step4_settings";
 
+type SubmitMode = "publish" | "draft";
+type ValidateStepOptions = {
+  submitMode?: SubmitMode;
+  forceSubmit?: boolean;
+};
+
+const normalizeText = (value: unknown): string =>
+  String(value || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const normalizeKey = (value: unknown): string =>
+  normalizeText(value).toLowerCase();
+
+const normalizeCanonicalVariantKey = (value: unknown): string => {
+  const key = normalizeKey(value);
+  if (
+    key === "color" ||
+    key === "colors" ||
+    key === "اللون" ||
+    key === "الألوان"
+  ) {
+    return "color";
+  }
+  if (
+    key === "size" ||
+    key === "sizes" ||
+    key === "المقاس" ||
+    key === "المقاسات"
+  ) {
+    return "size";
+  }
+  return key;
+};
+
 export const useProductForm = (productId?: string) => {
+  const router = useRouter();
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const token = extractSessionToken(session);
   const user = (session as any)?.user;
   const isEditMode = !!productId;
 
@@ -105,7 +149,7 @@ export const useProductForm = (productId?: string) => {
     if (!productId || !token) return;
     setIsLoading(true);
     getProductById(productId, token)
-      .then((data: any) => {
+      .then(async (data: any) => {
         if (data) {
           console.log("DEBUG: Full product data for edit:", JSON.stringify(data, null, 2));
           const d = data;
@@ -213,7 +257,14 @@ export const useProductForm = (productId?: string) => {
               productVideo: d.media?.productVideo || d.productVideo,
             },
             approved: d.approved ?? false,
-            store: d.store?._id || d.store || (typeof d.seller === "string" ? d.seller : d.seller?._id || ""),
+            store: (() => {
+              const storeId = d.store?._id || (typeof d.store === "string" ? d.store : null)
+                || d.sellerId?._id || (typeof d.sellerId === "string" ? d.sellerId : null)
+                || (typeof d.seller === "string" ? d.seller : d.seller?._id || d.seller?.id)
+                || "";
+              console.log("DEBUG: Resolved store ID:", storeId, "from store:", d.store, "sellerId:", d.sellerId, "seller:", d.seller);
+              return storeId;
+            })(),
             createdBy: d.createdBy || "seller",
             rate: d.rate || 0,
             productVariants: productVariants.map((v: any) =>
@@ -221,12 +272,168 @@ export const useProductForm = (productId?: string) => {
             ),
             tags: (d.tags || []).map((t: any) => (typeof t === "string" ? t : t._id || t.id)),
           }));
+
+          // 2. Fetch Selected Options and Distribution
+          try {
+            const selectedRes = await getSellerSelectedOptions(productId, token);
+            const selectedDataWrapper = (selectedRes as any)?.data || selectedRes;
+            
+            // The API might return an array if using the /by-product endpoint
+            const selectedData = Array.isArray(selectedDataWrapper) 
+              ? (selectedDataWrapper.length > 0 ? selectedDataWrapper[0] : null)
+              : (selectedDataWrapper?.products ? selectedDataWrapper.products[0] : selectedDataWrapper);
+
+            if (selectedData && (selectedData.options || selectedData.distribution)) {
+              console.log("DEBUG: Fetched seller selected options for edit:", selectedData);
+              
+              // Populate store/seller from selectedData if not already set
+              const sellerIdFromOptions = selectedData.sellerId?._id || (typeof selectedData.sellerId === "string" ? selectedData.sellerId : null);
+              if (sellerIdFromOptions) {
+                setProduct(prev => {
+                  if (!prev.store) {
+                    console.log("DEBUG: Setting store from seller selected options sellerId:", sellerIdFromOptions);
+                    return { ...prev, store: sellerIdFromOptions };
+                  }
+                  return prev;
+                });
+              }
+              
+              // We need to fetch full variant details to know their display names
+              const variantPromises = (selectedData.options || []).map((opt: any) => 
+                getVariantById(opt.variantId, token)
+              );
+              const fullVariants = (await Promise.all(variantPromises)).filter(Boolean);
+              
+              const canonicalToDisplayName = new Map<string, string>();
+              fullVariants.forEach((v: any) => {
+                const displayName = v.name?.en || v.nameEn || "";
+                const canonical = normalizeCanonicalVariantKey(displayName);
+                canonicalToDisplayName.set(canonical, displayName);
+              });
+              // Ensure color is mapped correctly
+              canonicalToDisplayName.set("color", "Colors");
+
+              // Map distribution to "Variant Stock" specification
+              const distribution = selectedData.distribution || [];
+              if (distribution.length > 0) {
+                const variantStockEntries = distribution.map((dist: any) => {
+                  const { stock, _id, __v, ...options } = dist;
+                  const mappedOptions: Record<string, string> = {};
+                  Object.entries(options).forEach(([k, v]) => {
+                    const canonical = normalizeCanonicalVariantKey(k);
+                    const displayName = canonicalToDisplayName.get(canonical) || canonicalToDisplayName.get(k) || k;
+                    mappedOptions[displayName] = String(v);
+                  });
+                  return { options: mappedOptions, stock: stock || 0 };
+                });
+                
+                setProduct(prev => {
+                  const filteredSpecs = (prev.specifications || []).filter(
+                    s => (s?.keyEn || "").toLowerCase() !== "variant stock"
+                  );
+                  return {
+                    ...prev,
+                    specifications: [
+                      ...filteredSpecs,
+                      {
+                        keyEn: "Variant Stock",
+                        keyAr: "مخزون المتغيرات",
+                        valueEn: JSON.stringify(variantStockEntries),
+                        valueAr: JSON.stringify(variantStockEntries)
+                      }
+                    ]
+                  };
+                });
+              }
+
+              // Map options to productVariants for UI checkboxes
+              if (fullVariants.length > 0) {
+                setProduct(prev => {
+                  const nextProductVariants = fullVariants.map((v: any) => {
+                    const originalOpt = (selectedData.options || []).find(
+                      (opt: any) => opt.variantId === v.id
+                    );
+                    if (!originalOpt) return null;
+                    
+                    const selectedOptions = (v.option_values || []).filter((opt: any) => 
+                      (originalOpt.values || []).includes(opt.label.en) || 
+                      (originalOpt.values || []).includes(opt.label.ar)
+                    );
+                    
+                    return {
+                      id: v.id,
+                      templateVariantId: v.id,
+                      nameEn: v.name.en,
+                      nameAr: v.name.ar,
+                      type: v.option_type,
+                      optionsEn: selectedOptions.map((opt: any) => ({
+                        optionName: opt.label.en,
+                        price: parseFloat(opt.price || "0"),
+                        stock: opt.stock || 0,
+                      })),
+                      optionsAr: selectedOptions.map((opt: any) => ({
+                        optionName: opt.label.ar,
+                        price: parseFloat(opt.price || "0"),
+                        stock: opt.stock || 0,
+                      }))
+                    };
+                  }).filter((v): v is NonNullable<typeof v> => v !== null);
+
+                  let nextSpecs = [...(prev.specifications || [])];
+                  const colorsIndex = nextSpecs.findIndex(s => (s?.keyEn || "").toLowerCase() === "colors");
+                  const existingColorsSpec = colorsIndex !== -1 ? nextSpecs[colorsIndex] : null;
+                  const colorVariant = fullVariants.find(v => normalizeCanonicalVariantKey(v.name.en) === "color");
+                  const selectedColorOpt = (selectedData.options || []).find((opt: any) => opt.variantId === colorVariant?.id);
+                  
+                  if ((!existingColorsSpec || !existingColorsSpec.valueEn) && selectedColorOpt && colorVariant) {
+         
+                    const knownColorHex: Record<string, string> = {
+                      red: "#ef4444", blue: "#3b82f6", green: "#22c55e", black: "#000000",
+                      white: "#ffffff", yellow: "#f59e0b", purple: "#8b5cf6", pink: "#ec4899",
+                      orange: "#f97316", gray: "#6b7280", grey: "#6b7280", brown: "#92400e",
+                      navy: "#1e3a5f", teal: "#14b8a6", cyan: "#06b6d4", maroon: "#7f1d1d",
+                      أحمر: "#ef4444", أزرق: "#3b82f6", أخضر: "#22c55e", أسود: "#000000",
+                      أبيض: "#ffffff", أصفر: "#f59e0b", بنفسجي: "#8b5cf6", وردي: "#ec4899",
+                      برتقالي: "#f97316", رمادي: "#6b7280",
+                    };
+                    const colorValues = (selectedColorOpt.values || []).map((val: string) => {
+                      const optDetails = colorVariant.option_values.find((o: any) => o.label.en === val || o.label.ar === val);
+                      const hex = optDetails?.color || optDetails?.hex || knownColorHex[val.trim().toLowerCase()] || "#9ca3af";
+                      return `${val}|${hex}`;
+                    }).join("; ");
+                    
+                    if (colorValues) {
+                      const newSpec = {
+                        keyEn: "Colors",
+                        keyAr: "الألوان",
+                        valueEn: colorValues,
+                        valueAr: colorValues
+                      };
+                      if (colorsIndex !== -1) nextSpecs[colorsIndex] = newSpec;
+                      else nextSpecs.push(newSpec);
+                    }
+                  }
+
+                  return {
+                    ...prev,
+                    productVariants: nextProductVariants,
+                    specifications: nextSpecs
+                  };
+                });
+              }
+            }
+          } catch (err) {
+            console.error("Failed to fetch selected options for edit:", err);
+          }
         }
       })
       .finally(() => setIsLoading(false));
   }, [productId, token]);
 
-  const validateStep = useCallback(async (): Promise<boolean> => {
+  const validateStep = useCallback(
+    async (options: ValidateStepOptions = {}): Promise<boolean> => {
+      const submitMode = options.submitMode || "publish";
+      const forceSubmit = options.forceSubmit === true;
     const steps: Step[] = [
       "step1_core",
       "step2_pricing",
@@ -234,6 +441,7 @@ export const useProductForm = (productId?: string) => {
       "step4_settings",
     ];
     const currentIndex = steps.indexOf(currentStep);
+    const shouldSubmit = forceSubmit || currentStep === "step4_settings";
 
     let schema;
     if (currentStep === "step1_core") schema = step1CoreSchema;
@@ -241,7 +449,7 @@ export const useProductForm = (productId?: string) => {
     else if (currentStep === "step3_media") schema = step2MediaSchema; // Inventory & Shipping
     else if (currentStep === "step4_settings") schema = step4SettingsSchema;
 
-    if (schema) {
+    if (schema && submitMode === "publish" && !forceSubmit) {
       const result = schema.safeParse(product);
       if (!result.success) {
         const newErrors: Record<string, string> = {};
@@ -254,7 +462,7 @@ export const useProductForm = (productId?: string) => {
     }
 
     setErrors({});
-    if (currentStep === "step4_settings") {
+    if (shouldSubmit) {
       setIsSubmitting(true);
       try {
         // 1. Upload any File objects to get URLs
@@ -275,9 +483,8 @@ export const useProductForm = (productId?: string) => {
 
         // 2. Map form state to API payload
         const cleanedSpecifications: any[] = [];
-        const apiVariants: any[] = [];
+        const variantsToEnsure: Array<any> = [];
 
-        // Extract Sizes and Colors to variants if they exist
         const sizesSpec = (product.specifications || []).find(
           (s: any) => (s?.keyEn || "").toLowerCase() === "sizes",
         );
@@ -288,20 +495,67 @@ export const useProductForm = (productId?: string) => {
           (s: any) => (s?.keyEn || "").toLowerCase() === "variant stock",
         );
 
-        let sizeStockMap: Record<string, number> = {};
-        let colorStockMap: Record<string, number> = {};
+
+        type ParsedVariantStockEntry = {
+          options: Record<string, string>;
+          stock: number;
+        };
+        const parsedVariantStockEntries: ParsedVariantStockEntry[] = [];
+        const optionStockByVariant = new Map<string, Map<string, number>>();
+        const addOptionStock = (
+          variantKey: unknown,
+          optionName: unknown,
+          stockAmount: number,
+        ) => {
+          const canonicalVariantKey = normalizeCanonicalVariantKey(variantKey);
+          const optionKey = normalizeKey(optionName);
+          if (!canonicalVariantKey || !optionKey || !stockAmount) return;
+
+          if (!optionStockByVariant.has(canonicalVariantKey)) {
+            optionStockByVariant.set(canonicalVariantKey, new Map());
+          }
+          const optionMap = optionStockByVariant.get(canonicalVariantKey)!;
+          optionMap.set(optionKey, (optionMap.get(optionKey) || 0) + stockAmount);
+        };
+
         if (variantStockSpec) {
           try {
             const entries = JSON.parse(variantStockSpec.valueEn || "[]");
             if (Array.isArray(entries)) {
-              entries.forEach((e: any) => {
-                if (e.size) {
-                  sizeStockMap[e.size] =
-                    (sizeStockMap[e.size] || 0) + (e.stock || 0);
+              entries.forEach((entry: any) => {
+                const stock = Number(entry?.stock);
+                const safeStock = Number.isFinite(stock)
+                  ? Math.max(0, Math.floor(stock))
+                  : 0;
+                const options: Record<string, string> = {};
+                const rawOptions =
+                  entry?.options && typeof entry.options === "object"
+                    ? entry.options
+                    : {};
+
+                Object.entries(rawOptions).forEach(([rawKey, rawValue]) => {
+                  const parsedValue = normalizeText(rawValue);
+                  if (!parsedValue) return;
+                  options[String(rawKey)] = parsedValue;
+                  addOptionStock(rawKey, parsedValue, safeStock);
+                });
+
+                if (typeof entry?.size === "string" && entry.size.trim()) {
+                  const size = entry.size.trim();
+                  options.Size = size;
+                  addOptionStock("size", size, safeStock);
                 }
-                if (e.color) {
-                  colorStockMap[e.color] =
-                    (colorStockMap[e.color] || 0) + (e.stock || 0);
+                if (typeof entry?.color === "string" && entry.color.trim()) {
+                  const color = entry.color.trim();
+                  options.Color = color;
+                  addOptionStock("color", color, safeStock);
+                }
+
+                if (Object.keys(options).length) {
+                  parsedVariantStockEntries.push({
+                    options,
+                    stock: safeStock,
+                  });
                 }
               });
             }
@@ -310,66 +564,174 @@ export const useProductForm = (productId?: string) => {
           }
         }
 
-        if (sizesSpec) {
+        const getOptionStock = (
+          variantNames: Array<unknown>,
+          optionName: unknown,
+          fallbackStock: unknown,
+        ): number => {
+          const optionKey = normalizeKey(optionName);
+          if (!optionKey) {
+            const fallback = Number(fallbackStock);
+            return Number.isFinite(fallback) ? Math.max(0, fallback) : 0;
+          }
+
+          for (const variantName of variantNames) {
+            const canonicalVariantKey = normalizeCanonicalVariantKey(variantName);
+            const optionMap = optionStockByVariant.get(canonicalVariantKey);
+            if (!optionMap) continue;
+            const matched = optionMap.get(optionKey);
+            if (Number.isFinite(matched)) return Number(matched);
+          }
+
+          const fallback = Number(fallbackStock);
+          return Number.isFinite(fallback) ? Math.max(0, fallback) : 0;
+        };
+
+        const hasVariantByCanonicalName = (name: string): boolean => {
+          const canonical = normalizeCanonicalVariantKey(name);
+          return (variantsToEnsure || []).some(
+            (variant) =>
+              normalizeCanonicalVariantKey(variant?.nameEn) === canonical ||
+              normalizeCanonicalVariantKey(variant?.nameAr) === canonical,
+          );
+        };
+
+        const draftProductVariants = (product.productVariants || []).filter(
+          (variant: any) =>
+            normalizeText(variant?.nameEn) &&
+            Array.isArray(variant?.optionsEn) &&
+            variant.optionsEn.length > 0,
+        );
+
+        draftProductVariants.forEach((variant: any) => {
+          const safeOptionsEn = (variant.optionsEn || [])
+            .map((option: any) => ({
+              optionName: normalizeText(option?.optionName),
+              price: Number.isFinite(Number(option?.price))
+                ? Number(option.price)
+                : 0,
+              stock: Number.isFinite(Number(option?.stock))
+                ? Number(option.stock)
+                : 0,
+            }))
+            .filter((option: any) => option.optionName);
+          if (!safeOptionsEn.length) return;
+
+          const safeOptionsArSource = Array.isArray(variant?.optionsAr)
+            ? variant.optionsAr
+            : [];
+          const safeOptionsAr = safeOptionsArSource
+            .map((option: any) => ({
+              optionName: normalizeText(option?.optionName),
+              price: Number.isFinite(Number(option?.price))
+                ? Number(option.price)
+                : 0,
+              stock: Number.isFinite(Number(option?.stock))
+                ? Number(option.stock)
+                : 0,
+            }))
+            .filter((option: any) => option.optionName);
+
+          const optionsEnWithStock = safeOptionsEn.map((option: any) => {
+            const stock = getOptionStock(
+              [variant?.nameEn, variant?.nameAr],
+              option.optionName,
+              option.stock,
+            );
+            return { ...option, stock };
+          });
+
+          const optionsArWithStock = optionsEnWithStock.map(
+            (enOption: any, index: number) => {
+              const arOption = safeOptionsAr[index];
+              return {
+                optionName: arOption?.optionName || enOption.optionName,
+                price:
+                  arOption && Number.isFinite(Number(arOption.price))
+                    ? Number(arOption.price)
+                    : enOption.price,
+                stock: enOption.stock,
+              };
+            },
+          );
+
+          variantsToEnsure.push({
+            id: normalizeText(variant?.id) || undefined,
+            nameEn: normalizeText(variant?.nameEn),
+            nameAr: normalizeText(variant?.nameAr) || normalizeText(variant?.nameEn),
+            type: normalizeText(variant?.type) || "dropdown",
+            optionsEn: optionsEnWithStock,
+            optionsAr: optionsArWithStock,
+          });
+        });
+
+        if (sizesSpec && !hasVariantByCanonicalName("size")) {
           const sizes = (sizesSpec.valueEn || "")
             .split(",")
-            .map((s) => s.trim())
+            .map((value: string) => value.trim())
             .filter(Boolean);
           if (sizes.length) {
-            apiVariants.push({
+            variantsToEnsure.push({
               nameEn: "Size",
               nameAr: "المقاس",
               type: "dropdown",
-              optionsEn: sizes.map((s) => ({
-                optionName: s,
+              optionsEn: sizes.map((size: string) => ({
+                optionName: size,
                 price: 0,
-                stock: sizeStockMap[s] || 0,
+                stock: getOptionStock(["size", "sizes"], size, 0),
               })),
-              optionsAr: sizes.map((s) => ({
-                optionName: s,
+              optionsAr: sizes.map((size: string) => ({
+                optionName: size,
                 price: 0,
-                stock: sizeStockMap[s] || 0,
+                stock: getOptionStock(["size", "sizes", "المقاس", "المقاسات"], size, 0),
               })),
             });
           }
         }
 
-        if (colorsSpec) {
+        if (colorsSpec && !hasVariantByCanonicalName("color")) {
           const colors = (colorsSpec.valueEn || "")
             .split(";")
-            .map((part) => part.trim())
+            .map((part: string) => part.trim())
             .filter(Boolean)
-            .map((token) => {
-              const [name, hex] = token.split("|").map((x) => x.trim());
+            .map((token: string) => {
+              const [name, hex] = token.split("|").map((x: string) => x.trim());
               return { name, hex };
-            });
+            })
+            .filter((item: any) => item.name);
           if (colors.length) {
-            apiVariants.push({
+            variantsToEnsure.push({
               nameEn: "Color",
               nameAr: "اللون",
               type: "color",
-              optionsEn: colors.map((c) => ({
-                optionName: c.name,
+              optionsEn: colors.map((item: any) => ({
+                optionName: item.name,
                 price: 0,
-                stock: colorStockMap[c.name] || 0,
+                stock: getOptionStock(["color", "colors"], item.name, 0),
               })),
-              optionsAr: colors.map((c) => ({
-                optionName: c.name,
+              optionsAr: colors.map((item: any) => ({
+                optionName: item.name,
                 price: 0,
-                stock: colorStockMap[c.name] || 0,
+                stock: getOptionStock(
+                  ["color", "colors", "اللون", "الألوان"],
+                  item.name,
+                  0,
+                ),
               })),
             });
           }
         }
 
-        // Add Variant Stock as a spec or transform if needed? 
-        // User said "Sizes Colors الخ" (and others) should be in variants. 
-        // For now, I'll keep Variant Stock in specs if it's JSON, 
-        // but Sizes and Colors are now in variants.
-
         (product.specifications || []).forEach((s: any) => {
           const key = (s?.keyEn || "").toLowerCase();
-          if (key !== "sizes" && key !== "colors" && key !== "shipping required" && key !== "shipping fees" && key !== "shipping packages") {
+          if (
+            key !== "sizes" &&
+            key !== "colors" &&
+            key !== "variant stock" &&
+            key !== "shipping required" &&
+            key !== "shipping fees" &&
+            key !== "shipping packages"
+          ) {
             // Resolve "Color Images" index to URL
             if (key === "color images") {
               try {
@@ -401,74 +763,135 @@ export const useProductForm = (productId?: string) => {
         // Create variants on the fly if needed
         const finalVariantIds: string[] = [];
 
-        if (apiVariants.length) {
-          console.log("DEBUG: Automating variant creation...");
-          const targetIsAdmin = user?.role === "admin";
-          const targetStoreId = product.store || (user as any)?.storeId || "";
-          const targetCreatedBy = targetIsAdmin ? "admin" : "seller";
-
-          for (const vData of apiVariants) {
-            try {
-              const v = await createVariant({
-                ...vData,
-                createdBy: targetCreatedBy,
-                storeId: targetStoreId,
-              }, token);
-              if (v.id) finalVariantIds.push(v.id);
-            } catch (vErr) {
-              console.error("Variant creation failed:", vErr);
-            }
-          }
-        }
-
-        const randomSuffix = Math.random().toString(36).substring(2, 7);
         const nameEn = product.title.en || "product";
         const nameAr = product.title.ar || "منتج";
 
         const slugEnBase = product.slugEn || nameEn.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
         const slugArBase = product.slugAr || nameAr.trim().replace(/\s+/g, "-");
 
-        const finalSlugEn = isEditMode ? slugEnBase : `${slugEnBase}-${randomSuffix}`;
-        const finalSlugAr = isEditMode ? slugArBase : `${slugArBase}-${randomSuffix}`;
+        const finalSlugEn = slugEnBase;
+        const finalSlugAr = slugArBase;
 
-          const finalStoreId = product.store || (user as any)?.storeId || "";
-          const finalCreatedBy = (user?.role === "admin") ? "admin" : "seller";
+        const finalCreatedBy = user?.role === "admin" ? "admin" : "seller";
+        const userStoreId =
+          (user as any)?.storeId || (user as any)?.id || (user as any)?._id;
+        const finalStoreId =
+          finalCreatedBy === "admin"
+            ? product.store || userStoreId || ""
+            : userStoreId || product.store || "";
 
-          const payload: CreateProductPayload = {
-            nameEn: product.title.en,
-            nameAr: product.title.ar,
-            slugEn: finalSlugEn,
-            slugAr: finalSlugAr,
-            highlightsEn: product.highlightsEn,
-            highlightsAr: product.highlightsAr,
-            identity: {
-              sku: product.identity.sku || "",
-              skuMode: product.identity.skuMode,
+        if (variantsToEnsure.length) {
+          console.log("DEBUG: Automating variant creation...");
+          for (const variant of variantsToEnsure) {
+            const existingId = normalizeText(variant?.id);
+            if (existingId) {
+              finalVariantIds.push(existingId);
+              continue;
+            }
+
+            try {
+              const createdVariant = await createVariant(
+                {
+                  nameEn: normalizeText(variant?.nameEn),
+                  nameAr:
+                    normalizeText(variant?.nameAr) ||
+                    normalizeText(variant?.nameEn),
+                  type: normalizeText(variant?.type) || "dropdown",
+                  optionsEn: Array.isArray(variant?.optionsEn)
+                    ? variant.optionsEn
+                    : [],
+                  optionsAr: Array.isArray(variant?.optionsAr)
+                    ? variant.optionsAr
+                    : [],
+                  createdBy: finalCreatedBy,
+                  storeId: finalStoreId,
+                } as any,
+                token,
+              );
+              if (createdVariant.id) finalVariantIds.push(createdVariant.id);
+            } catch (vErr) {
+              console.error("Variant creation failed:", vErr);
+            }
+          }
+        }
+
+        const existingVariantIdsFromProduct = (product.productVariants || [])
+          .map((variant: any) => normalizeText(variant?.id))
+          .filter(Boolean);
+        const dedupedVariantIds = Array.from(
+          new Set([
+            ...existingVariantIdsFromProduct,
+            ...finalVariantIds.filter(Boolean),
+          ]),
+        );
+
+        const distributionTotal = parsedVariantStockEntries.reduce(
+          (sum, entry) =>
+            sum + (Number.isFinite(entry.stock) ? Number(entry.stock) : 0),
+          0,
+        );
+        const normalizedStockQuantity = distributionTotal
+          ? distributionTotal
+          : Math.max(0, Number(product.inventory.stockQuantity || 0));
+
+        const inventoryPayload: any = {
+          ...product.inventory,
+          stockQuantity: normalizedStockQuantity,
+          stock: {
+            total: normalizedStockQuantity,
+            remaining: normalizedStockQuantity,
+          },
+        };
+
+        if (parsedVariantStockEntries.length) {
+          inventoryPayload.variantsStock = parsedVariantStockEntries.map(
+            (entry, index) => {
+              const label = Object.entries(entry.options || {})
+                .map(([key, value]) => `${key}: ${value}`)
+                .join(" / ");
+              const stock = Number.isFinite(entry.stock)
+                ? Number(entry.stock)
+                : 0;
+              return {
+                name: label || `Variant ${index + 1}`,
+                total: stock,
+                remaining: stock,
+              };
             },
-            classification: {
-              category: product.classification.category || "",
-              subcategory: product.classification.subcategory || "",
-              childCategory: product.classification.childCategory || "",
-              brand: product.classification.brand || "",
-              productType: product.classification.productType,
-            },
-            descriptions: product.descriptions,
-            pricing: {
-              originalPrice: product.pricing.originalPrice,
-              salePrice: product.pricing.salePrice,
-              startDate: product.pricing.startDate || null,
-              endDate: product.pricing.endDate || null,
-            },
-            inventory: product.inventory,
-            variants: finalVariantIds.length
-              ? finalVariantIds
-              : (product.productVariants
-                  .map((v) => v.id)
-                  .filter(Boolean) as string[]),
-            specifications: cleanedSpecifications,
-            store: finalStoreId,
-            sellerId: product.store || null,
-            createdBy: finalCreatedBy as "admin" | "seller",
+          );
+        }
+
+        const payload: CreateProductPayload = {
+          nameEn: product.title.en,
+          nameAr: product.title.ar,
+          slugEn: finalSlugEn,
+          slugAr: finalSlugAr,
+          highlightsEn: product.highlightsEn,
+          highlightsAr: product.highlightsAr,
+          identity: {
+            sku: product.identity.sku || "",
+            skuMode: product.identity.skuMode,
+          },
+          classification: {
+            category: product.classification.category || "",
+            subcategory: product.classification.subcategory || "",
+            childCategory: product.classification.childCategory || "",
+            brand: product.classification.brand || "",
+            productType: product.classification.productType,
+          },
+          descriptions: product.descriptions,
+          pricing: {
+            originalPrice: product.pricing.originalPrice,
+            salePrice: product.pricing.salePrice,
+            startDate: product.pricing.startDate || null,
+            endDate: product.pricing.endDate || null,
+          },
+          inventory: inventoryPayload,
+          // variants: dedupedVariantIds, // Removed as per user request to use selectedOptions instead
+          specifications: cleanedSpecifications,
+          store: finalStoreId,
+          sellerId: finalStoreId || null,
+          createdBy: finalCreatedBy as "admin" | "seller",
           media: {
             featuredImages: imageUrls[0] || "",
             galleryImages: imageUrls,
@@ -477,7 +900,9 @@ export const useProductForm = (productId?: string) => {
               : undefined,
           },
           approved: product.approved ?? true,
-          rate: product.rate || 4,
+          rate: product.rate ?? 0,
+          tags: (product.tags || []).filter(Boolean),
+          draft: submitMode === "draft",
           shipping: {
             isPhysicalProduct: product.shipping?.isPhysicalProduct ?? true,
             shippingCostInsideCairo: product.shipping?.shippingCostInsideCairo ?? 0,
@@ -488,26 +913,110 @@ export const useProductForm = (productId?: string) => {
               return rest;
             }),
           },
+          selectedOptions: {
+            options: variantsToEnsure.map((v, idx) => ({
+              variantId: finalVariantIds[idx] || (v as any).id,
+              values: v.optionsEn.map((o: any) => o.optionName),
+            })),
+            distribution: parsedVariantStockEntries.map((entry) => {
+              const distEntry: any = { stock: entry.stock };
+              
+              Object.entries(entry.options).forEach(([k, v]) => {
+                const canonical = normalizeCanonicalVariantKey(k);
+                distEntry[canonical] = v;
+              });
+              
+              return distEntry;
+            }),
+          },
         };
 
         console.log("DEBUG: Final Product Payload:", JSON.stringify(payload, null, 2));
+
+        const nextProductsPath =
+          user?.role === "admin" ? "/admin/products" : "/seller/products";
 
         let response;
         if (isEditMode && productId) {
           response = await updateProductApi(productId, payload, token);
           console.log("Product Updated Successfully:", response);
-          toast.success("Product Updated Successfully!");
+          toast.success(
+            submitMode === "draft"
+              ? "Draft updated successfully!"
+              : "Product Updated Successfully!",
+          );
         } else {
           response = await createProduct(payload, token);
           console.log("Product Created Successfully:", response);
-          toast.success("Product Created Successfully!");
+          toast.success(
+            submitMode === "draft"
+              ? "Draft saved successfully!"
+              : "Product Created Successfully!",
+          );
         }
+
+        // Call seller-selected-option API if product creation/update was successful
+        if (response && payload.selectedOptions) {
+          const res = response as any;
+          // Extract product ID from nested response structure
+          const products = res.data?.products || (Array.isArray(res.data) ? res.data : null);
+          const firstProduct = Array.isArray(products) ? products[0] : (res.data?._id ? res.data : null);
+          const newProductId = firstProduct?._id || firstProduct?.id || res._id || res.id || productId;
+
+          console.log("DEBUG: Extracted newProductId:", newProductId);
+
+          if (newProductId) {
+            try {
+              // Check if options already exist for this product
+              const existing = await getSellerSelectedOptions(newProductId, token);
+              const existingData = (existing as any)?.data || (existing as any)?.items || existing;
+              const existingArray = Array.isArray(existingData) ? existingData : 
+                                   (existingData?.products ? existingData.products : 
+                                   (existingData ? [existingData] : []));
+              
+              const existingItem = existingArray.find((item: any) => {
+                const itemProdId = item.productId?._id || item.productId;
+                return itemProdId === newProductId;
+              });
+
+              const selectedOptionPayload = {
+                sellerId: finalStoreId,
+                productId: newProductId,
+                options: payload.selectedOptions.options,
+                distribution: payload.selectedOptions.distribution,
+              };
+
+              if (existingItem?._id || existingItem?.id) {
+                console.log("DEBUG: Updating existing seller selected options", existingItem._id || existingItem.id);
+                await updateSellerSelectedOptions(
+                  existingItem._id || existingItem.id, 
+                  selectedOptionPayload, 
+                  token
+                );
+              } else {
+                console.log("DEBUG: Creating new seller selected options");
+                await createOrUpdateSellerSelectedOptions(selectedOptionPayload, token);
+              }
+              console.log("Seller selected options saved successfully");
+            } catch (optErr) {
+              console.error("Failed to save seller selected options:", optErr);
+            }
+          } else {
+            console.warn("DEBUG: Could not find product ID in response, skipping seller-selected-option update", res);
+          }
+        }
+
+        router.push(nextProductsPath);
         setIsSubmitting(false);
         return true;
       } catch (e) {
         console.error("Failed to create product", e);
+        const message =
+          typeof (e as any)?.message === "string" && (e as any).message.trim()
+            ? (e as any).message
+            : "Failed to create product. Please check all fields.";
         setErrors({
-          submit: "Failed to create product. Please check all fields.",
+          submit: message,
         });
         setIsSubmitting(false);
         return false;
@@ -518,7 +1027,7 @@ export const useProductForm = (productId?: string) => {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return true;
     }
-  }, [currentStep, product, token, user]);
+  }, [currentStep, product, token, user, router]);
 
   const goToStep = useCallback((step: Step) => {
     setCurrentStep(step);

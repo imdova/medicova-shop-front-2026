@@ -27,7 +27,7 @@ const AccountLayout: React.FC<AccountLayoutProps> = ({ children }) => {
         </div>
 
         <main className="flex-1 lg:px-8">
-          <div className="mx-auto max-w-7xl">{children}</div>
+          <div className="mx-auto max-w-[60rem]">{children}</div>
         </main>
       </div>
     </div>
