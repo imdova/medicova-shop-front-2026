@@ -6,6 +6,7 @@ import { getTags } from "@/services/tagService";
 
 interface UseGetProductsByCategoryProps {
   categorySlug?: string;
+  subcategorySlug?: string;
   searchQuery?: string;
   brands?: string[];
   categories?: string[];
@@ -28,6 +29,7 @@ interface UseGetProductsByCategoryResult {
 
 export function useGetProductsByCategory({
   categorySlug,
+  subcategorySlug,
   searchQuery,
   brands,
   categories,
@@ -66,6 +68,31 @@ export function useGetProductsByCategory({
             p.category?.title?.en?.toLowerCase() === categorySlug.toLowerCase() ||
             p.category?.subcategory?.title?.en?.toLowerCase() === categorySlug.toLowerCase()
           );
+        }
+
+        // Filter by subcategory (from query param)
+        if (subcategorySlug) {
+          const lowerSub = subcategorySlug.toLowerCase();
+          const safeToLower = (val: any) => (typeof val === "string" ? val.toLowerCase() : "");
+
+          filtered = filtered.filter((p: any) => {
+            // Check root-level subcategory (from mapApiProductToProduct)
+            const subSlug = safeToLower(p.subcategory?.slug);
+            const subTitleEn = safeToLower(p.subcategory?.title?.en)?.replace(/\s+/g, '-');
+            const subTitleAr = safeToLower(p.subcategory?.title?.ar);
+            
+            // Check nested category.subcategory
+            const catSubUrl = safeToLower(p.category?.subcategory?.url);
+            const catSubTitleEn = safeToLower(p.category?.subcategory?.title?.en)?.replace(/\s+/g, '-');
+            
+            return (
+              subSlug === lowerSub ||
+              subTitleEn === lowerSub ||
+              subTitleAr === lowerSub ||
+              catSubUrl?.includes(lowerSub) ||
+              catSubTitleEn === lowerSub
+            );
+          });
         }
 
         // Filter by Search Query
@@ -177,7 +204,7 @@ export function useGetProductsByCategory({
     };
 
     fetchProducts();
-  }, [categorySlug, searchQuery, brands, categories, minPrice, maxPrice, rating, availability, sort, page, limit, tag]);
+  }, [categorySlug, subcategorySlug, searchQuery, brands, categories, minPrice, maxPrice, rating, availability, sort, page, limit, tag]);
 
   return { productsData, totalProducts, isLoading, error };
 }

@@ -1,8 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { MultiCategory } from "@/types";
-import { useSearchParams } from "next/navigation";
 import { useGetProductsByCategory } from "@/hooks/useGetProductsByCategory";
 import { products } from "@/data";
 
@@ -22,21 +22,17 @@ export default function RenderComponent({
   category,
   fullPath,
 }: RenderComponentProps) {
-  const searchParams = useSearchParams();
   const locale = useAppLocale();
   const isArabic = locale === "ar";
 
-  // Pagination & Filtering Logic
-  const pageParam = searchParams.get("page");
-  const currentPage = pageParam ? Number(pageParam) : 1;
+  // Subcategory managed via local state — URL stays unchanged
+  const [activeSlug, setActiveSlug] = useState<string | undefined>(undefined);
+  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
-  const categorySlugParam = searchParams.get("categorySlug");
-  const subcategoryParam = searchParams.get("subcategory");
-  const activeSlug = subcategoryParam ?? categorySlugParam ?? undefined;
-
   const { productsData, totalProducts, isLoading } = useGetProductsByCategory({
-    categorySlug: activeSlug || category.id,
+    categorySlug: category.id,
+    subcategorySlug: activeSlug,
     page: currentPage,
     limit: itemsPerPage,
   });
@@ -99,8 +95,11 @@ export default function RenderComponent({
         {category.subCategories && (
           <SubcategoryChips 
             subcategories={category.subCategories} 
-            currentPath={fullPath || ""} 
             activeSlug={activeSlug}
+            onSelect={(slug) => {
+              setActiveSlug(slug);
+              setCurrentPage(1);
+            }}
           />
         )}
 

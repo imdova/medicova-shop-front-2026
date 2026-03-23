@@ -369,7 +369,15 @@ export function mapApiProductToProduct(item: any): any {
       title: { en: item.category.name || item.category.title?.en || "Category", ar: item.category.nameAr || item.category.title?.ar || "قسم" }
     } : { id: item.category || "unknown", slug: item.category?.toLowerCase() || "category", title: { en: "Category", ar: "قسم" } },
     subcategory: item.subcategory || item.category?.subcategory ? {
-      slug: item.subcategory?.slug || item.subcategory?.slugEn || item.category?.subcategory?.url?.split("/").pop() || item.subcategory || item.subcategory?.id,
+      slug: (() => {
+        const raw = item.subcategory?.slug || item.subcategory?.slugEn || item.category?.subcategory?.url?.split("/").pop();
+        if (typeof raw === "string") return raw;
+        if (typeof item.subcategory === "string") return item.subcategory;
+        if (typeof item.subcategory === "object" && item.subcategory !== null) {
+          return item.subcategory._id || item.subcategory.id || "subcategory";
+        }
+        return "subcategory";
+      })(),
       title: { 
         en: item.subcategory?.name || item.subcategory?.title?.en || item.category?.subcategory?.title?.en || "Subcategory", 
         ar: item.subcategory?.nameAr || item.subcategory?.title?.ar || item.category?.subcategory?.title?.ar || "قسم فرعي" 
