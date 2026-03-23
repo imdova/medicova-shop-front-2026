@@ -30,7 +30,7 @@ const ProductGallery = ({
       {/* Mobile-only brand and title */}
       <div className="mb-6 block md:hidden">
         <Link
-          href={product.brand?.url ?? "#"}
+          href={`/search?brand=${encodeURIComponent(product.brand?.name.en.toLowerCase())}`}
           className="mb-2 inline-block text-xs font-bold uppercase tracking-[0.2em] text-primary transition-colors hover:text-secondary"
         >
           {product.brand?.name[locale]}

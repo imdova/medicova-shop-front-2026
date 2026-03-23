@@ -152,7 +152,7 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
             <div className="w-full">
               <header className="hidden md:block">
                 <Link
-                  href={product.brand?.url ?? "#"}
+                  href={`/search?brand=${encodeURIComponent(product.brand?.name.en.toLowerCase())}`}
                   className="mb-1 text-lg font-semibold text-secondary transition-colors hover:text-primary"
                 >
                   {product.brand?.name[locale]}
