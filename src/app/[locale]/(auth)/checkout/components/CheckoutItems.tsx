@@ -46,7 +46,7 @@ export default function CheckoutItems({
 
           return (
             <div
-              key={item.id}
+              key={`${item.id}-${item.size}-${item.color}-${index}`}
               className="group overflow-hidden rounded-2xl border border-gray-100 bg-white/70 p-5 shadow-sm backdrop-blur-md transition-all hover:shadow-md"
             >
               <div className="mb-4 flex items-center justify-between border-b border-gray-50 pb-4">
@@ -80,6 +80,36 @@ export default function CheckoutItems({
                   <h3 className="truncate pr-4 text-sm font-bold text-gray-800 md:text-base">
                     {item.title[locale]}
                   </h3>
+                  
+                  {item.unitSelections && item.unitSelections.length > 0 && (
+                    <div className="mt-2 space-y-1.5 border-t border-gray-50 pt-2">
+                      {item.unitSelections.map((selection: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase">
+                            {isAr ? `الوحدة ${idx + 1}:` : `Unit ${idx + 1}:`}
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {Object.entries(selection).map(([key, value]) => {
+                              if (!value) return null;
+                              const isColor = key.toLowerCase().includes("color") || (typeof value === "string" && value.startsWith("#"));
+                              return (
+                                <div key={key} className="flex items-center gap-1 rounded-md bg-gray-50 border border-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-gray-600">
+                                  {isColor && (
+                                    <span
+                                      className="h-1.5 w-1.5 rounded-full border border-gray-200"
+                                      style={{ backgroundColor: value as string }}
+                                    />
+                                  )}
+                                  <span className="opacity-60">{key}:</span>
+                                  <span>{typeof value === "object" ? (value as any).en : String(value)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
                     <p className="text-sm font-black text-primary">

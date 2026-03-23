@@ -11,6 +11,11 @@ export type CartFormValues = {
   saveInfo: boolean;
 };
 
+export interface UnitSelection {
+  size?: SizeType | NumericSizeType | LiquidSizeType;
+  color?: string;
+}
+
 export interface CartItem {
   id: string;
   image: string;
@@ -31,6 +36,7 @@ export interface CartItem {
   shippingMethod: shippingMethod;
   weightKg: number;
   totalPrice: number;
+  unitSelections?: UnitSelection[];
 }
 export interface WishlistItem {
   id: string;

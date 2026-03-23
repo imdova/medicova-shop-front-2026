@@ -18,75 +18,22 @@ const cartSlice = createSlice({
   reducers: {
     addItem: (
       state,
-      action: PayloadAction<{
-        id: string;
-        image: string;
-        title: LocalizedTitle;
-        slug: LocalizedTitle;
-        categorySlug?: string;
-        price: number;
-        del_price?: number;
-        description: string;
-        deliveryTime?: LocalizedTitle;
-        sellers?: Seller;
-        shipping_fee: number;
-        size?: SizeType | NumericSizeType | LiquidSizeType;
-        color?: string;
-        quantity: number;
-        brand?: Brand;
-        stock?: number;
-        shippingMethod: shippingMethod;
-        weightKg: number;
-      }>,
+      action: PayloadAction<CartItem>,
     ) => {
-      const {
-        id,
-        title,
-        slug,
-        categorySlug,
-        price,
-        image,
-        description,
-        del_price,
-        shipping_fee,
-        size,
-        color,
-        quantity = 1,
-        deliveryTime,
-        brand,
-        sellers,
-        stock,
-        shippingMethod,
-        weightKg,
-      } = action.payload;
-      const existingItem = state.products.find(
-        (item) => item.id === id && item.size === size && item.color === color,
-      );
+      const { id, price, quantity = 1, unitSelections = [] } = action.payload;
+      const existingItem = state.products.find((item) => item.id === id);
 
       if (existingItem) {
         existingItem.quantity += quantity;
+        if (unitSelections.length > 0) {
+          if (!existingItem.unitSelections) existingItem.unitSelections = [];
+          existingItem.unitSelections.push(...unitSelections);
+        }
         existingItem.totalPrice = existingItem.quantity * existingItem.price;
       } else {
         state.products.push({
-          id,
-          title,
-          slug,
-          categorySlug,
-          price,
-          image,
-          description,
-          quantity,
+          ...action.payload,
           totalPrice: price * quantity,
-          shipping_fee,
-          del_price,
-          size,
-          color,
-          deliveryTime,
-          brand,
-          sellers,
-          stock,
-          shippingMethod,
-          weightKg,
         });
       }
 
@@ -105,6 +52,17 @@ const cartSlice = createSlice({
 
       if (existingItem) {
         existingItem.quantity += amount;
+        
+        // If we have unit selections, we should probably duplicate the last one
+        // or just keep it as is if we don't know what to add. 
+        // For simplicity, if unitSelections exists, we'll repeat the first selection for the new units.
+        if (existingItem.unitSelections && existingItem.unitSelections.length > 0) {
+          const firstSelection = existingItem.unitSelections[0];
+          for (let i = 0; i < amount; i++) {
+            existingItem.unitSelections.push({ ...firstSelection });
+          }
+        }
+
         existingItem.totalPrice = existingItem.quantity * existingItem.price;
         state.totalPrice += existingItem.price * amount;
       }
@@ -120,6 +78,12 @@ const cartSlice = createSlice({
       if (existingItem) {
         if (existingItem.quantity > amount) {
           existingItem.quantity -= amount;
+          
+          // Remove from unit selections if they exist
+          if (existingItem.unitSelections) {
+            existingItem.unitSelections = existingItem.unitSelections.slice(0, existingItem.quantity);
+          }
+
           existingItem.totalPrice = existingItem.quantity * existingItem.price;
           state.totalPrice -= existingItem.price * amount;
         } else {

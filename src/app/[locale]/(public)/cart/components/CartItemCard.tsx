@@ -21,6 +21,7 @@ export default function CartItemCard({
 }: CartItemCardProps) {
   const locale = useAppLocale();
   const t = useTranslations();
+  const isAr = locale === "ar";
 
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
@@ -101,6 +102,42 @@ export default function CartItemCard({
                 {item.sellers?.name}
               </span>
             </p>
+
+            {item.unitSelections && item.unitSelections.length > 0 && (
+              <div className="mt-3 space-y-2 border-t border-gray-50 pt-2">
+                {item.unitSelections.map((selection: any, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">
+                      {isAr ? `الوحدة ${idx + 1}:` : `Unit ${idx + 1}:`}
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(selection).map(([key, value]) => {
+                        if (!value) return null;
+                        
+                        // Check if it's a color (either key is 'color' or value starts with #)
+                        const isColor = key.toLowerCase().includes("color") || (typeof value === "string" && value.startsWith("#"));
+                        
+                        return (
+                          <div 
+                            key={key} 
+                            className="flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-0.5 text-[10px] font-bold text-gray-600 border border-gray-100"
+                          >
+                            {isColor && (
+                              <span
+                                className="h-2 w-2 rounded-full border border-gray-200"
+                                style={{ backgroundColor: value as string }}
+                              />
+                            )}
+                            <span className="opacity-60">{key}:</span>
+                            <span>{typeof value === "object" ? (value as any).en : String(value)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

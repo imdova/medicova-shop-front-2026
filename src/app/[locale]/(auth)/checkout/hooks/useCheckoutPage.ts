@@ -43,7 +43,7 @@ export function useCheckoutPage() {
       }
     };
     loadCart();
-  }, [dispatch, productData]);
+  }, [dispatch]);
 
   useEffect(() => {
     if (!selectedAddress) {

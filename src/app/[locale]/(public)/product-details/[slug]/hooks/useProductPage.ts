@@ -175,10 +175,23 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     if (defaultSize) setSelectedSize(defaultSize);
     if (defaultColor) setSelectedColor(defaultColor);
 
-    setUnitSelections([
-      { size: defaultSize, color: defaultColor }
-    ]);
-  }, [product?.sizes, product?.colors]);
+    const initialSelection: any = {};
+    if (defaultSize) initialSelection.size = defaultSize;
+    if (defaultColor) initialSelection.color = defaultColor;
+    
+    // Also try to match with any dynamic labels from selectedOptions if they are fetched
+    selectedOptions.forEach(opt => {
+      const key = opt.label.en.toLowerCase();
+      if (key === "size") initialSelection[key] = defaultSize;
+      if (key === "color") initialSelection[key] = defaultColor;
+      // If we have a default value in opt.values, we could use it here
+      if (!initialSelection[key] && opt.values.length > 0) {
+        initialSelection[key] = opt.values[0].name;
+      }
+    });
+
+    setUnitSelections([initialSelection]);
+  }, [product?.sizes, product?.colors, selectedOptions, setSelectedSize, setSelectedColor]);
 
   // Nudge auto-rotation
   useEffect(() => {
@@ -244,34 +257,30 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   const confirmVariantSelection = () => {
     if (!product?.id) return;
 
-    unitSelections.forEach((selection: any) => {
-      // Find color and size regardless of exact key casing/label (common variants)
-      const color = selection.color || selection.Color || selection.COLOR;
-      const size = selection.size || selection.Size || selection.SIZE;
-
-      dispatch(
-        addItem({
-          id: product.id,
-          title: product.title,
-          slug: product.slug,
-          categorySlug: product.category?.slug,
-          image: product.images?.[0] ?? "/images/placeholder.jpg",
-          description: product.description.en,
-          del_price: product.del_price,
-          price: product.price ?? 0,
-          shipping_fee: product.shipping_fee ?? 0,
-          quantity: 1,
-          brand: product.brand,
-          deliveryTime: product.deliveryTime,
-          sellers: product.sellers,
-          stock: product.stock,
-          color: color,
-          size: size,
-          shippingMethod: product.shippingMethod,
-          weightKg: product.weightKg,
-        })
-      );
-    });
+    dispatch(
+      addItem({
+        id: product.id,
+        title: product.title,
+        slug: product.slug,
+        categorySlug: product.category?.slug,
+        image: product.images?.[0] ?? "/images/placeholder.jpg",
+        description: product.description.en,
+        del_price: product.del_price,
+        price: product.price ?? 0,
+        shipping_fee: product.shipping_fee ?? 0,
+        quantity: unitSelections.length,
+        brand: product.brand,
+        deliveryTime: product.deliveryTime,
+        sellers: product.sellers,
+        stock: product.stock,
+        color: unitSelections[0]?.color,
+        size: unitSelections[0]?.size,
+        shippingMethod: product.shippingMethod,
+        weightKg: product.weightKg,
+        unitSelections: unitSelections,
+        totalPrice: (product.price ?? 0) * unitSelections.length,
+      } as any)
+    );
 
     setIsVariantModalOpen(false);
     setIsDrawerOpen(true);
