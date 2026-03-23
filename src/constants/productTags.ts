@@ -7,6 +7,7 @@ export const ProductTags: ProductTag[] = [
     createdAt: "2024-01-15T10:30:00Z",
     status: { en: "published", ar: "منشور" },
     slug: "summer-collection",
+    slugAr: "مجموعة-الصيف",
     description: { en: "Our summer collection", ar: "مجموعة الصيف لدينا" },
     meta_title: { en: "Summer Collection", ar: "مجموعة الصيف" },
     meta_description: {
@@ -21,6 +22,7 @@ export const ProductTags: ProductTag[] = [
     createdAt: "2024-01-10T14:20:00Z",
     status: { en: "published", ar: "منشور" },
     slug: "winter-sale",
+    slugAr: "تخفيضات-الشتاء",
     description: {
       en: "Exclusive winter discounts",
       ar: "تخفيضات حصرية لفصل الشتاء",
@@ -38,6 +40,7 @@ export const ProductTags: ProductTag[] = [
     createdAt: "2024-01-08T09:15:00Z",
     status: { en: "published", ar: "منشور" },
     slug: "new-arrivals",
+    slugAr: "وصل-حديثاً",
     description: {
       en: "Check out new arrivals",
       ar: "اطلع على المنتجات الجديدة",
@@ -55,6 +58,7 @@ export const ProductTags: ProductTag[] = [
     createdAt: "2024-01-05T16:45:00Z",
     status: { en: "draft", ar: "مسودة" },
     slug: "clearance",
+    slugAr: "تصفية",
     description: { en: "Last chance clearance", ar: "فرصة أخيرة للتصفية" },
     meta_title: { en: "Clearance", ar: "تصفية" },
     meta_description: { en: "Biggest discounts", ar: "أكبر الخصومات" },
@@ -66,6 +70,7 @@ export const ProductTags: ProductTag[] = [
     createdAt: "2024-01-03T11:20:00Z",
     status: { en: "published", ar: "منشور" },
     slug: "featured-products",
+    slugAr: "منتجات-مميزة",
     description: { en: "Top featured products", ar: "أفضل المنتجات المميزة" },
     meta_title: { en: "Featured Products", ar: "منتجات مميزة" },
     meta_description: { en: "Handpicked just for you", ar: "منتقاة خصيصًا لك" },
@@ -77,6 +82,7 @@ export const ProductTags: ProductTag[] = [
     createdAt: "2024-01-01T08:00:00Z",
     status: { en: "published", ar: "منشور" },
     slug: "limited-edition",
+    slugAr: "إصدار-محدود",
     description: {
       en: "Rare limited edition items",
       ar: "عناصر نادرة بإصدار محدود",

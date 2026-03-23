@@ -84,12 +84,27 @@ export async function getSubCategoryChildren(parentSubCategoryId: string, token?
 export async function getSubCategories(categoryId?: string, token?: string): Promise<MultiCategory[]> {
   try {
     const res = await apiClient<any>({
-      endpoint: categoryId ? `/subcategory?category=${categoryId}` : "/subcategory",
+      endpoint: "/subcategory",
       method: "GET",
       token,
     });
 
-    const items = res.data?.subCategories || [];
+    const items = res.data?.subCategories || res.data?.subcategories || [];
+    console.log("DEBUG: getSubCategories raw items count:", items.length, "filtering by categoryId:", categoryId);
+    if (items.length > 0) {
+      console.log("DEBUG: First subcategory sample:", JSON.stringify(items[0], null, 2));
+    }
+
+    if (categoryId) {
+      // Filter client-side by parent category
+      const filtered = items.filter((item: any) => {
+        const parentId = item.category?._id || item.category || item.parentCategory?._id || item.parentCategory || "";
+        return parentId === categoryId;
+      });
+      console.log("DEBUG: Filtered subcategories for category", categoryId, ":", filtered.length);
+      return filtered.map(mapCategory);
+    }
+
     return items.map(mapCategory);
   } catch (error) {
     console.error("Error fetching subcategories:", error);

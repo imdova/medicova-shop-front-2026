@@ -39,6 +39,7 @@ function mapTag(item: any): ProductTag {
       ar: item.nameAr || item.name?.ar || item.name || "بدون عنوان",
     },
     slug: item.slugEn || item.slug || "",
+    slugAr: item.slugAr || "",
     categoryId: catId,
     createdAt: item.createdAt || new Date().toISOString(),
     status: {

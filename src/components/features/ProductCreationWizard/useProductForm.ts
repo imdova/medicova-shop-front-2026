@@ -257,7 +257,14 @@ export const useProductForm = (productId?: string) => {
               productVideo: d.media?.productVideo || d.productVideo,
             },
             approved: d.approved ?? false,
-            store: d.store?._id || d.store || (typeof d.seller === "string" ? d.seller : d.seller?._id || ""),
+            store: (() => {
+              const storeId = d.store?._id || (typeof d.store === "string" ? d.store : null)
+                || d.sellerId?._id || (typeof d.sellerId === "string" ? d.sellerId : null)
+                || (typeof d.seller === "string" ? d.seller : d.seller?._id || d.seller?.id)
+                || "";
+              console.log("DEBUG: Resolved store ID:", storeId, "from store:", d.store, "sellerId:", d.sellerId, "seller:", d.seller);
+              return storeId;
+            })(),
             createdBy: d.createdBy || "seller",
             rate: d.rate || 0,
             productVariants: productVariants.map((v: any) =>
@@ -279,6 +286,18 @@ export const useProductForm = (productId?: string) => {
             if (selectedData && (selectedData.options || selectedData.distribution)) {
               console.log("DEBUG: Fetched seller selected options for edit:", selectedData);
               
+              // Populate store/seller from selectedData if not already set
+              const sellerIdFromOptions = selectedData.sellerId?._id || (typeof selectedData.sellerId === "string" ? selectedData.sellerId : null);
+              if (sellerIdFromOptions) {
+                setProduct(prev => {
+                  if (!prev.store) {
+                    console.log("DEBUG: Setting store from seller selected options sellerId:", sellerIdFromOptions);
+                    return { ...prev, store: sellerIdFromOptions };
+                  }
+                  return prev;
+                });
+              }
+              
               // We need to fetch full variant details to know their display names
               const variantPromises = (selectedData.options || []).map((opt: any) => 
                 getVariantById(opt.variantId, token)
@@ -287,8 +306,9 @@ export const useProductForm = (productId?: string) => {
               
               const canonicalToDisplayName = new Map<string, string>();
               fullVariants.forEach((v: any) => {
-                const canonical = normalizeCanonicalVariantKey(v.nameEn);
-                canonicalToDisplayName.set(canonical, v.nameEn);
+                const displayName = v.name?.en || v.nameEn || "";
+                const canonical = normalizeCanonicalVariantKey(displayName);
+                canonicalToDisplayName.set(canonical, displayName);
               });
               // Ensure color is mapped correctly
               canonicalToDisplayName.set("color", "Colors");
@@ -297,10 +317,11 @@ export const useProductForm = (productId?: string) => {
               const distribution = selectedData.distribution || [];
               if (distribution.length > 0) {
                 const variantStockEntries = distribution.map((dist: any) => {
-                  const { stock, ...options } = dist;
+                  const { stock, _id, __v, ...options } = dist;
                   const mappedOptions: Record<string, string> = {};
                   Object.entries(options).forEach(([k, v]) => {
-                    const displayName = canonicalToDisplayName.get(k) || k;
+                    const canonical = normalizeCanonicalVariantKey(k);
+                    const displayName = canonicalToDisplayName.get(canonical) || canonicalToDisplayName.get(k) || k;
                     mappedOptions[displayName] = String(v);
                   });
                   return { options: mappedOptions, stock: stock || 0 };
@@ -365,9 +386,19 @@ export const useProductForm = (productId?: string) => {
                   const selectedColorOpt = (selectedData.options || []).find((opt: any) => opt.variantId === colorVariant?.id);
                   
                   if ((!existingColorsSpec || !existingColorsSpec.valueEn) && selectedColorOpt && colorVariant) {
+         
+                    const knownColorHex: Record<string, string> = {
+                      red: "#ef4444", blue: "#3b82f6", green: "#22c55e", black: "#000000",
+                      white: "#ffffff", yellow: "#f59e0b", purple: "#8b5cf6", pink: "#ec4899",
+                      orange: "#f97316", gray: "#6b7280", grey: "#6b7280", brown: "#92400e",
+                      navy: "#1e3a5f", teal: "#14b8a6", cyan: "#06b6d4", maroon: "#7f1d1d",
+                      أحمر: "#ef4444", أزرق: "#3b82f6", أخضر: "#22c55e", أسود: "#000000",
+                      أبيض: "#ffffff", أصفر: "#f59e0b", بنفسجي: "#8b5cf6", وردي: "#ec4899",
+                      برتقالي: "#f97316", رمادي: "#6b7280",
+                    };
                     const colorValues = (selectedColorOpt.values || []).map((val: string) => {
                       const optDetails = colorVariant.option_values.find((o: any) => o.label.en === val || o.label.ar === val);
-                      const hex = optDetails?.color || optDetails?.hex || "#000000";
+                      const hex = optDetails?.color || optDetails?.hex || knownColorHex[val.trim().toLowerCase()] || "#9ca3af";
                       return `${val}|${hex}`;
                     }).join("; ");
                     
@@ -869,7 +900,8 @@ export const useProductForm = (productId?: string) => {
               : undefined,
           },
           approved: product.approved ?? true,
-          rate: product.rate || 4,
+          rate: product.rate ?? 0,
+          tags: (product.tags || []).filter(Boolean),
           draft: submitMode === "draft",
           shipping: {
             isPhysicalProduct: product.shipping?.isPhysicalProduct ?? true,

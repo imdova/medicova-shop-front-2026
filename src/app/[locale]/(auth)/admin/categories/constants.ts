@@ -15,6 +15,7 @@ export type Category = {
   status: "active" | "inactive";
   isActive: boolean;
   headline?: LocalizedTitle;
+  sortOrder: number;
 };
 
 export async function fetchCategories(): Promise<Category[]> {
@@ -41,7 +42,8 @@ export async function fetchCategories(): Promise<Category[]> {
     status: item.status ? "active" : "inactive",
     isActive: !!item.status,
     headline: { en: item.headlineEn || item.headline || "", ar: item.headlineAr || item.headline || "" },
-  })) as Category[];
+    sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : 999,
+  })).sort((a: Category, b: Category) => a.sortOrder - b.sortOrder) as Category[];
 }
 
 export async function createCategory(body: Record<string, unknown>, token?: string) {
@@ -65,6 +67,10 @@ export async function deleteCategory(id: string, token?: string) {
   return apiClient({ endpoint: `/category/${id}`, method: "DELETE", token });
 }
 
+export async function updateCategorySortOrder(id: string, sortOrder: number, token?: string) {
+  return apiClient({ endpoint: `/category/${id}`, method: "PUT", body: { sortOrder }, token });
+}
+
 export type SubCategory = {
   id: string;
   image: string;
@@ -80,6 +86,7 @@ export type SubCategory = {
   status: "active" | "inactive";
   isActive: boolean;
   headline?: LocalizedTitle;
+  sortOrder: number;
 };
 
 export async function fetchSubCategories(): Promise<SubCategory[]> {
@@ -111,8 +118,9 @@ export async function fetchSubCategories(): Promise<SubCategory[]> {
       status: (item.active || item.status) ? "active" : "inactive",
       isActive: !!(item.active || item.status),
       headline: { en: item.headlineEn || item.headline || "", ar: item.headlineAr || item.headline || "" },
+      sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : 999,
     };
-  }) as SubCategory[];
+  }).sort((a: SubCategory, b: SubCategory) => a.sortOrder - b.sortOrder) as SubCategory[];
 }
 
 export async function createSubCategory(body: Record<string, unknown>, token?: string) {
@@ -134,6 +142,23 @@ export async function toggleSubCategoryStatus(id: string, active: boolean, token
 
 export async function deleteSubCategory(id: string, token?: string) {
   return apiClient({ endpoint: `/subcategory/${id}`, method: "DELETE", token });
+}
+
+export async function updateSubCategorySortOrder(id: string, sortOrder: number, token?: string) {
+  // We must fetch the full subcategory first because the PUT endpoint requires mandatory fields like name, slug, etc.
+  const sub = await fetchSubCategoryById(id, token);
+  if (!sub) throw new Error("Subcategory not found");
+
+  const { _id, createdAt, updatedAt, __v, ...rest } = sub;
+
+  const body = {
+    ...rest,
+    sortOrder,
+    // Ensure parentCategory is sent as an ID if it's currently an object
+    parentCategory: typeof sub.parentCategory === "object" ? sub.parentCategory._id : sub.parentCategory,
+  };
+
+  return apiClient({ endpoint: `/subcategory/${id}`, method: "PUT", body, token });
 }
 
 export type Brand = {

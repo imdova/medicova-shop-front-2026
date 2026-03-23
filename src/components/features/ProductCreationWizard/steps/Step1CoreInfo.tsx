@@ -462,27 +462,25 @@ export const Step1CoreInfo = ({
                 ]);
               }
             })
-            .catch(() => {});
+      .catch(() => {});
         }
       }
     };
     init();
-  }, [token, userRole, product.store]); // added product.store to re-check if it exists in list
-
-  // Hydrate subcategories and children when edit mode pre-fills classification IDs
+  }, [token, userRole, product.store]);   // Hydrate subcategories and children when edit mode pre-fills classification IDs
   useEffect(() => {
     const hydrate = async () => {
-      // If we have a category ID but no subcategories, or the category just loaded
       if (product.classification.category && categories.length > 0) {
-        // Only fetch if subcategories are empty or belong to a different category
-        const subId = product.classification.subcategory;
         const catId = product.classification.category;
+        const subId = product.classification.subcategory;
 
         const subs = await getSubCategories(catId, token);
+        console.log("DEBUG: Hydrating subcategories for category:", catId, "=>", subs.length, subs.map(s => s.title?.en));
         setSubCategories(subs);
 
         if (subId) {
           const children = await getSubCategoryChildren(subId, token);
+          console.log("DEBUG: Hydrated children for subcategory:", subId, "=>", children.length);
           setSubCategoryChildren(children);
         }
       }
@@ -496,6 +494,7 @@ export const Step1CoreInfo = ({
   ]);
 
   const handleCategoryChange = async (catId: string) => {
+    console.log("DEBUG: Category changed to:", catId);
     onUpdate({
       classification: {
         ...product.classification,
@@ -504,12 +503,17 @@ export const Step1CoreInfo = ({
         childCategory: "",
       },
     });
-    const subs = await getSubCategories(catId, token);
-    setSubCategories(subs);
+    // Clear old options immediately
+    setSubCategories([]);
     setSubCategoryChildren([]);
+
+    const subs = await getSubCategories(catId, token);
+    console.log("DEBUG: Fetched subcategories for category:", catId, "=>", subs.length, subs.map(s => s.title?.en));
+    setSubCategories(subs);
   };
 
   const handleSubCategoryChange = async (subId: string) => {
+    console.log("DEBUG: Subcategory changed to:", subId);
     onUpdate({
       classification: {
         ...product.classification,
@@ -517,7 +521,10 @@ export const Step1CoreInfo = ({
         childCategory: "",
       },
     });
+    // Clear old children immediately
+    setSubCategoryChildren([]);
     const children = await getSubCategoryChildren(subId, token);
+    console.log("DEBUG: Fetched children for subcategory:", subId, "=>", children.length, children.map(c => c.title?.en));
     setSubCategoryChildren(children);
   };
 
@@ -1418,6 +1425,10 @@ export const Step1CoreInfo = ({
                     <div className="max-h-48 overflow-y-auto p-1.5">
                       {availableTags
                         .filter((t) => {
+                          // Filter by selected category
+                          const selectedCat = product.classification.category;
+                          if (!selectedCat || t.categoryId !== selectedCat) return false;
+
                           const label =
                             t.name?.[locale as "en" | "ar"] || t.name?.en || "";
                           const q = tagQuery.trim().toLowerCase();
@@ -1449,6 +1460,10 @@ export const Step1CoreInfo = ({
                         })}
 
                       {availableTags
+                        .filter((t) => {
+                          const selectedCat = product.classification.category;
+                          return !selectedCat || t.categoryId === selectedCat;
+                        })
                         .filter((t) => !selectedTagIds.includes(t.id))
                         .filter((t) => {
                           const label =
@@ -1457,7 +1472,11 @@ export const Step1CoreInfo = ({
                           return q ? label.toLowerCase().includes(q) : true;
                         }).length === 0 ? (
                         <div className="px-3 py-3 text-center text-xs text-gray-400">
-                          {locale === "ar" ? "لا توجد نتائج" : "No results"}
+                          {!product.classification.category ? (
+                            locale === "ar" ? "يرجى اختيار قسم أولاً" : "Please select a category first"
+                          ) : (
+                            locale === "ar" ? "لا توجد نتائج" : "No results"
+                          )}
                         </div>
                       ) : null}
                     </div>

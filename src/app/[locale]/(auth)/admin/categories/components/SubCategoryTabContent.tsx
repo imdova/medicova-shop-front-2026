@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { PencilIcon, TrashIcon } from "lucide-react";
+import { PencilIcon, TrashIcon, ChevronUp, ChevronDown } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import DynamicTable from "@/components/features/tables/DTable";
 import StatusToggle from "@/components/shared/Buttons/StatusToggle";
@@ -16,6 +16,8 @@ interface SubCategoryTabContentProps {
   onEdit: (subCategory: SubCategory) => void;
   onDelete: (subCategory: SubCategory) => void;
   onCreateClick: () => void;
+  onMoveUp?: (subCategory: SubCategory) => void;
+  onMoveDown?: (subCategory: SubCategory) => void;
 }
 
 const SubCategoryTabContent: React.FC<SubCategoryTabContentProps> = ({
@@ -26,6 +28,8 @@ const SubCategoryTabContent: React.FC<SubCategoryTabContentProps> = ({
   onEdit,
   onDelete,
   onCreateClick,
+  onMoveUp,
+  onMoveDown,
 }) => {
   const locale = useLocale() as "en" | "ar";
   const t = useTranslations("admin");
@@ -107,6 +111,26 @@ const SubCategoryTabContent: React.FC<SubCategoryTabContentProps> = ({
         headerClassName="bg-gray-50/50 text-gray-400 text-[11px] font-black uppercase tracking-wider"
         rowClassName="hover:bg-gray-50/80 transition-colors duration-300 border-b border-gray-50/50"
         solidActions={[
+          ...(onMoveUp
+            ? [
+                {
+                  label: "↑",
+                  onClick: (item: any) => onMoveUp?.(item as SubCategory),
+                  icon: <ChevronUp />,
+                  color: "#16a34a",
+                },
+              ]
+            : []),
+          ...(onMoveDown
+            ? [
+                {
+                  label: "↓",
+                  onClick: (item: any) => onMoveDown?.(item as SubCategory),
+                  icon: <ChevronDown />,
+                  color: "#16a34a",
+                },
+              ]
+            : []),
           {
             label: t("edit"),
             onClick: (item) => onEdit(item as SubCategory),

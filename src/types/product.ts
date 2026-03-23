@@ -221,6 +221,7 @@ export type ProductTag = {
   createdAt: string;
   status: LocalizedTitle;
   slug: string;
+  slugAr?: string;
   description: LocalizedTitle;
   meta_title: LocalizedTitle;
   meta_description: LocalizedTitle;
