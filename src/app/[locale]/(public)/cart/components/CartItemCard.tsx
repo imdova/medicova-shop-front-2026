@@ -60,11 +60,6 @@ export default function CartItemCard({
                     <span>{item.del_price?.toLocaleString()}</span>
                     {t("common.currency")}{" "}
                   </span>
-                  <span className="flex items-center gap-2 text-xs font-semibold text-primary">
-                    {item.del_price
-                      ? `${((item.price / item.del_price) * 100).toFixed(0)}% OFF`
-                      : ""}
-                  </span>
                 </div>
               </div>
             </div>

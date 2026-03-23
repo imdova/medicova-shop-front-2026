@@ -338,11 +338,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ loading, product }) => {
                       {locale === "ar" ? "جنيه" : "EGP"}
                     </del>
                   )}
-                  {product.sale && (
-                    <span className="rounded-sm bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 ring-1 ring-inset ring-red-600/10">
-                      {product.sale}
-                    </span>
-                  )}
                 </div>
 
                 {/* Nudges Slider */}

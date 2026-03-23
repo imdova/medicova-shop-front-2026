@@ -9,6 +9,8 @@ interface CheckoutSummaryProps {
   shippingFee: number;
   paymentFee: number;
   total: number;
+  discountAmount?: number;
+  appliedCoupon?: string;
   disabled: boolean;
   locale: LanguageType;
 }
@@ -19,6 +21,8 @@ export default function CheckoutSummary({
   shippingFee,
   paymentFee,
   total,
+  discountAmount = 0,
+  appliedCoupon = "",
   disabled,
   locale,
 }: CheckoutSummaryProps) {
@@ -57,6 +61,17 @@ export default function CheckoutSummary({
               </span>
             )}
           </div>
+
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="font-medium text-gray-500">
+                {isAr ? `خصم (${appliedCoupon})` : `Discount (${appliedCoupon})`}
+              </span>
+              <span className="font-bold text-primary">
+                -{discountAmount.toFixed(2)} {isAr ? "جنيه" : "EGP"}
+              </span>
+            </div>
+          )}
 
           {paymentFee > 0 && (
             <div className="flex justify-between text-sm">

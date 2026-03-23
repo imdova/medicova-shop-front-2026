@@ -37,6 +37,9 @@ export interface CartItem {
   weightKg: number;
   totalPrice: number;
   unitSelections?: UnitSelection[];
+  shippingCostInsideCairo?: number;
+  shippingCostRegion1?: number;
+  shippingCostRegion2?: number;
 }
 export interface WishlistItem {
   id: string;

@@ -147,15 +147,6 @@ const OrderSummary = ({
         {couponError && (
           <p className="mb-2 text-sm text-red-500">{couponError}</p>
         )}
-
-        <Link
-          href="#offers"
-          className="hover:bg-primary/5 flex cursor-pointer items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 p-3 text-sm font-medium text-primary transition-colors"
-          aria-label={t("cart.viewOffers")}
-        >
-          <span>{t("cart.viewAvailableOffers")}</span>
-          {isArabic ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
-        </Link>
       </div>
 
       {/* Order breakdown */}
@@ -181,25 +172,13 @@ const OrderSummary = ({
         )}
 
         {/* Shipping fees section */}
-        {Object.values(shippingGroups).length > 0 && (
+        {totalShipping > 0 && (
           <div className="mb-2">
-            {Object.values(shippingGroups).map((group, i) => (
-              <div key={i} className="flex justify-between">
-                <span className="text-sm text-gray-500">
-                  {shippingMethodTranslations[group.method["en"]]}
-                  {group.count > 1 && ` (${group.count} ${t("cart.items")})`}
-                </span>
-                <span className="text-sm font-medium">
-                  {group.fee.toFixed(2)} {t("common.currency")}
-                </span>
-              </div>
-            ))}
-
-            <div className="mt-2 flex justify-between">
-              <span className="text-sm font-bold text-gray-600">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">
                 {t("cart.totalShipping")}
               </span>
-              <span className="text-sm font-bold">
+              <span className="text-sm font-medium text-gray-700">
                 {totalShipping.toFixed(2)} {t("common.currency")}
               </span>
             </div>

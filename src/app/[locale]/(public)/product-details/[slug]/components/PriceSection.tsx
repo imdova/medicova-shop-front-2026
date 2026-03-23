@@ -109,11 +109,6 @@ const PriceSection = ({
               {product.del_price.toLocaleString()} {common("currency")}
             </span>
           )}
-          {saving > 0 && (
-            <span className="animate-in zoom-in-50 rounded-lg bg-primary px-3 py-1 text-sm font-bold text-white shadow-sm duration-500">
-              {Math.round((saving / product.del_price!) * 100)}% {t("off")}
-            </span>
-          )}
         </div>
 
         {/* Stock */}

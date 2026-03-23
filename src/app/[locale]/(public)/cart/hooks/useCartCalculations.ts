@@ -25,6 +25,7 @@ export function useCartCalculations(
   destinationCountry: DestinationKey = "EG",
   paymentMethod: string = "standard",
   discountAmount: number = 0,
+  city?: string,
 ): CartCalculations {
   const { products: cartItems } = useAppSelector((state) => state.cart);
 
@@ -38,8 +39,12 @@ export function useCartCalculations(
       const feeInput = {
         shippingMethod,
         destination: destinationCountry,
+        city,
         cartTotal: itemPrice * quantity,
         weightKg: itemWeight * quantity,
+        shippingCostInsideCairo: item.shippingCostInsideCairo,
+        shippingCostRegion1: item.shippingCostRegion1,
+        shippingCostRegion2: item.shippingCostRegion2,
       };
 
       return {
@@ -49,7 +54,7 @@ export function useCartCalculations(
         quantity,
       };
     });
-  }, [cartItems, destinationCountry]);
+  }, [cartItems, destinationCountry, city]);
 
   const totalShippingFee = useMemo(
     () => productFees.reduce((total, item) => total + item.fee, 0),

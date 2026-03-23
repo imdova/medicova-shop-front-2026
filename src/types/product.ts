@@ -213,6 +213,9 @@ export interface Product {
     values: string[];
   }[];
   tags?: string[];
+  shippingCostInsideCairo?: number;
+  shippingCostRegion1?: number;
+  shippingCostRegion2?: number;
 }
 
 export type ProductTag = {

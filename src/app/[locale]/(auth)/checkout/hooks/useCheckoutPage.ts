@@ -8,6 +8,7 @@ import { calculateShippingFee } from "@/util";
 import { Address, DestinationKey } from "@/types";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { getEncrypted } from "@/util/encryptedCookieStorage";
+import { useSyncCart } from "@/hooks/useSyncCart";
 
 export type CheckoutFormData = {
   shippingAddress: string;
@@ -15,12 +16,18 @@ export type CheckoutFormData = {
 };
 
 export function useCheckoutPage() {
+  const { syncCart } = useSyncCart();
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showCreditCardModal, setShowCreditCardModal] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "cod">("card");
   const { handleSubmit, setValue } = useForm<CheckoutFormData>();
-  const { products: productData, totalPrice } = useAppSelector(
+  const { 
+    products: productData, 
+    totalPrice, 
+    discountAmount: reduxDiscount, 
+    appliedCoupon: reduxCoupon 
+  } = useAppSelector(
     (state) => state.cart,
   );
   const dispatch = useAppDispatch();
@@ -37,6 +44,7 @@ export function useCheckoutPage() {
         }>("cart");
         if (savedCart) {
           dispatch(setCart(savedCart));
+          await syncCart(savedCart.products);
         }
       } catch (e) {
         console.error("Failed to load cart from cookies", e);
@@ -82,8 +90,12 @@ export function useCheckoutPage() {
       const feeInput = {
         shippingMethod,
         destination,
+        city: selectedAddress?.city,
         cartTotal: itemPrice * item.quantity,
         weightKg: itemWeight * item.quantity,
+        shippingCostInsideCairo: (item as any).shippingCostInsideCairo,
+        shippingCostRegion1: (item as any).shippingCostRegion1,
+        shippingCostRegion2: (item as any).shippingCostRegion2,
       };
 
       return {
@@ -103,7 +115,8 @@ export function useCheckoutPage() {
   const subtotal = totalPrice;
   const shippingFee = totalShippingFee;
   const paymentFee = paymentMethod === "cod" ? 9.0 : 0;
-  const total = subtotal + shippingFee + paymentFee;
+  const discountAmount = reduxDiscount || 0;
+  const total = subtotal + shippingFee + paymentFee - discountAmount;
 
   return {
     isClient,
@@ -116,6 +129,8 @@ export function useCheckoutPage() {
     subtotal,
     shippingFee,
     paymentFee,
+    discountAmount,
+    appliedCoupon: reduxCoupon,
     total,
     productShippingFees,
     setShowAddressModal,

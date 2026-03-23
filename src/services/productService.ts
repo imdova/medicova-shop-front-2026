@@ -413,5 +413,8 @@ export function mapApiProductToProduct(item: any): any {
       status: { en: "Active", ar: "نشط" }
     },
     tags: item.tags || item.classification?.tags || [],
+    shippingCostInsideCairo: item.shippingCostInsideCairo,
+    shippingCostRegion1: item.shippingCostRegion1,
+    shippingCostRegion2: item.shippingCostRegion2,
   };
 }

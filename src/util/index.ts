@@ -121,7 +121,14 @@ function getDateFormatOptions(format: string): Intl.DateTimeFormatOptions {
 
 // calculate Shipping Fee
 export function calculateShippingFee(options: ShippingOptions): number {
-  const { shippingMethod, destination, weightKg = 1 } = options;
+  const { 
+    shippingMethod, 
+    city, 
+    weightKg = 1,
+    shippingCostInsideCairo,
+    shippingCostRegion1,
+    shippingCostRegion2
+  } = options;
 
   // Normalize the shipping method to English
   const methodEn = shippingMethod?.en?.toLowerCase() || "";
@@ -132,21 +139,40 @@ export function calculateShippingFee(options: ShippingOptions): number {
     return 0;
   }
 
-  // Base fees by normalized method
+  // If specific costs are provided, use region-based logic
+  const normalizedCity = city?.trim().toLowerCase() || "";
+  
+  if (shippingCostInsideCairo !== undefined && shippingCostRegion1 !== undefined && shippingCostRegion2 !== undefined) {
+    // 1. Cairo (Inside Cairo)
+    if (normalizedCity === "cairo" || normalizedCity === "القاهرة" || normalizedCity === "القاهره") {
+      return shippingCostInsideCairo || 0;
+    }
+    
+    // 2. Region 1: Giza, Qalyubia (Greater Cairo except Cairo)
+    const isRegion1 = [
+      "giza", "جيزة", "الجيزة",
+      "qalyubia", "قليوبية", "القليوبية"
+    ].includes(normalizedCity);
+    
+    if (isRegion1) {
+      return shippingCostRegion1 || 0;
+    }
+    
+    // 3. Region 2: Everywhere else
+    return shippingCostRegion2 || 0;
+  }
+
+  // Fallback to legacy logic
   const baseFees: Record<string, number> = {
     standard: 5,
     express: 15,
   };
 
-  // Determine the base fee using English value
   let fee = baseFees[methodEn] ?? 0;
+  fee += (destinationSurcharges as any)[options.destination] ?? 10;
 
-  // Add destination-based surcharge
-  fee += destinationSurcharges[destination] ?? 10;
-
-  // Weight handling
-  const MAX_FREE_WEIGHT = 1; // kg
-  const WEIGHT_SURCHARGE = 2; // per kg over max
+  const MAX_FREE_WEIGHT = 1; 
+  const WEIGHT_SURCHARGE = 2; 
 
   if (weightKg > MAX_FREE_WEIGHT) {
     fee += (weightKg - MAX_FREE_WEIGHT) * WEIGHT_SURCHARGE;

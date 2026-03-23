@@ -7,10 +7,12 @@ import { LocalizedTitle } from "@/types/language";
 interface CartState {
   products: CartItem[];
   totalPrice: number;
+  appliedCoupon?: string;
+  discountAmount?: number;
 }
 
 
-const initialState: CartState = { products: [], totalPrice: 0 };
+const initialState: CartState = { products: [], totalPrice: 0, appliedCoupon: "", discountAmount: 0 };
 
 const cartSlice = createSlice({
   name: "cart",
@@ -109,9 +111,16 @@ const cartSlice = createSlice({
     },
 
   
+    setDiscount: (state, action: PayloadAction<{ coupon: string; amount: number }>) => {
+      state.appliedCoupon = action.payload.coupon;
+      state.discountAmount = action.payload.amount;
+    },
+
     setCart: (state, action: PayloadAction<CartState>) => {
       state.products = action.payload.products;
       state.totalPrice = action.payload.totalPrice;
+      state.appliedCoupon = action.payload.appliedCoupon || "";
+      state.discountAmount = action.payload.discountAmount || 0;
     },
   },
 });
@@ -123,5 +132,6 @@ export const {
   decreaseQuantity,
   clearCart,
   setCart,
+  setDiscount,
 } = cartSlice.actions;
 export default cartSlice.reducer;

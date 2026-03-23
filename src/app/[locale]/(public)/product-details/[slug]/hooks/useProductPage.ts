@@ -279,6 +279,9 @@ export const useProductPage = ({ product }: UseProductPageProps): {
         weightKg: product.weightKg,
         unitSelections: unitSelections,
         totalPrice: (product.price ?? 0) * unitSelections.length,
+        shippingCostInsideCairo: product.shippingCostInsideCairo,
+        shippingCostRegion1: product.shippingCostRegion1,
+        shippingCostRegion2: product.shippingCostRegion2,
       } as any)
     );
 
