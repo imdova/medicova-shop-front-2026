@@ -50,7 +50,7 @@ import { products as allProducts } from "@/data";
 import { reviews as allReviews } from "@/constants/reviews";
 
 // Types
-import { Product } from "@/types/product";
+import { Product, ProductTag } from "@/types/product";
 
 interface ProductDetailViewProps {
   product: Product | undefined;
@@ -95,6 +95,7 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
     handleAddToCart,
     confirmVariantSelection,
     handleCheckout,
+    productTags,
   } = useProductPage({ product });
 
   if (!isClient) return <LoadingAnimation />;
@@ -141,6 +142,7 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
               isInCart={isInCart}
               onAddToCart={handleAddToCart}
               setQuantity={setQuantity}
+              productTags={productTags}
             />
           </div>
 
@@ -159,20 +161,19 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
                   {product.title[locale]}
                 </h1>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {[
-                    { en: "Best Seller", ar: "الأكثر مبيعاً", color: "bg-orange-50 text-orange-700 border-orange-200" },
-                    { en: "Free Shipping", ar: "شحن مجاني", color: "bg-blue-50 text-blue-700 border-blue-200" },
-                    { en: "Original", ar: "أصلي", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-                  ].map((tag, i) => (
-                    <Link
-                      key={i}
-                      href={`/search?q=${tag.en.toLowerCase().replace(/\s+/g, "-")}`}
-                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-all hover:scale-105 hover:shadow-md active:scale-95 ${tag.color}`}
-                    >
-                      <span className="mr-1 h-1.5 w-1.5 rounded-full bg-current opacity-40" />
-                      {locale === "ar" ? tag.ar : tag.en}
-                    </Link>
-                  ))}
+                  {productTags.map((tag, i) => {
+                    const label = tag.name[locale];
+                    return (
+                      <Link
+                        key={tag.id}
+                        href={`/search?tag=${tag.slug}`}
+                        className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 shadow-sm backdrop-blur-sm transition-all hover:scale-105 hover:shadow-md active:scale-95"
+                      >
+                        <span className="mr-1 h-1.5 w-1.5 rounded-full bg-current opacity-40" />
+                        {label}
+                      </Link>
+                    );
+                  })}
                 </div>
               </header>
 

@@ -212,6 +212,7 @@ export interface Product {
     label: LocalizedTitle;
     values: string[];
   }[];
+  tags?: string[];
 }
 
 export type ProductTag = {

@@ -8,6 +8,8 @@ import { getEncrypted } from "@/util/encryptedCookieStorage";
 import { Product } from "@/types/product";
 import { SizeType, NumericSizeType, LiquidSizeType } from "@/types";
 import { useTranslations } from "next-intl";
+import { getTags } from "@/services/tagService";
+import { ProductTag } from "@/types/product";
 
 import { getSellerSelectedOptions } from "@/services/sellerSelectedOptionService";
 import { getVariantById } from "@/services/variantService";
@@ -48,6 +50,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   handleAddToCart: () => Promise<void>;
   confirmVariantSelection: () => void;
   handleCheckout: () => void;
+  productTags: ProductTag[];
 } => {
   const t = useTranslations("product");
   const session = useSession();
@@ -70,6 +73,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   const [unitSelections, setUnitSelections] = useState<UnitSelection[]>([
     { size: undefined, color: undefined }
   ]);
+  const [productTags, setProductTags] = useState<ProductTag[]>([]);
 
   const cartProduct = cartProducts.find((item) => item.id === product?.id);
   const isInCart = !!cartProduct;
@@ -124,6 +128,28 @@ export const useProductPage = ({ product }: UseProductPageProps): {
       fetchOptions();
     }
   }, [product?.id, session?.data]);
+
+  // Fetch product tags
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const allTags = await getTags();
+        if (product?.tags && product.tags.length > 0) {
+          // Robust mapping in case tags are strings or objects
+          const tagIds = product.tags.map((t: any) =>
+            typeof t === "string" ? t : (t._id || t.id)
+          );
+          const resolved = allTags.filter((t) => tagIds.includes(t.id));
+          setProductTags(resolved);
+        } else {
+          setProductTags([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch tags for product", err);
+      }
+    };
+    fetchTags();
+  }, [product?.tags]);
 
   // Hydrate cart from cookies
   useEffect(() => {
@@ -287,5 +313,6 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     handleAddToCart,
     confirmVariantSelection,
     handleCheckout,
+    productTags,
   };
 };

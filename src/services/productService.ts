@@ -160,6 +160,7 @@ export interface ApiProduct {
   createdAt?: string;
   sellerId?: string | null;
   draft?: boolean;
+  tags?: string[];
   seller?: {
     _id?: string;
     name?: string;
@@ -333,7 +334,7 @@ export function mapApiProductToProduct(item: any): any {
     },
     slug: {
       en: item.slugEn || item.slug || item._id || item.id,
-      ar: item.slugAr || item.slugAr || item._id || item.id,
+      ar: item.slugAr || item.slug || item._id || item.id,
     },
     price: price,
     del_price: delPrice,
@@ -402,6 +403,7 @@ export function mapApiProductToProduct(item: any): any {
       isActive: true,
       returnPolicy: { en: "Standard Policy", ar: "سياسة قياسية" },
       status: { en: "Active", ar: "نشط" }
-    }
+    },
+    tags: item.tags || item.classification?.tags || [],
   };
 }

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Product } from "@/types/product";
 import { getProducts, mapApiProductToProduct } from "@/services/productService";
+import { getTags } from "@/services/tagService";
 
 interface UseGetProductsByCategoryProps {
   categorySlug?: string;
@@ -15,6 +16,7 @@ interface UseGetProductsByCategoryProps {
   sort?: string;
   page?: number;
   limit?: number;
+  tag?: string;
 }
 
 interface UseGetProductsByCategoryResult {
@@ -36,6 +38,7 @@ export function useGetProductsByCategory({
   sort,
   page = 1,
   limit = 12,
+  tag,
 }: UseGetProductsByCategoryProps): UseGetProductsByCategoryResult {
   const [productsData, setProductsData] = useState<Product[]>([]);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -113,6 +116,29 @@ export function useGetProductsByCategory({
           });
         }
 
+        // Filter by Tag (Slug)
+        if (tag) {
+          try {
+            const allTags = await getTags();
+            const targetTag = allTags.find(
+              (t) =>
+                t.slug?.toLowerCase() === tag.toLowerCase() ||
+                t.slugAr?.toLowerCase() === tag.toLowerCase() ||
+                t.id === tag,
+            );
+            if (targetTag) {
+              filtered = filtered.filter((p: Product) =>
+                p.tags?.includes(targetTag.id),
+              );
+            } else {
+              // If tag not found, return empty list for this tag search
+              filtered = [];
+            }
+          } catch (tagErr) {
+            console.error("Error resolving tag for search:", tagErr);
+          }
+        }
+
         // Apply Sorting
         if (sort) {
           switch (sort) {
@@ -151,7 +177,7 @@ export function useGetProductsByCategory({
     };
 
     fetchProducts();
-  }, [categorySlug, searchQuery, brands, categories, minPrice, maxPrice, rating, availability, sort, page, limit]);
+  }, [categorySlug, searchQuery, brands, categories, minPrice, maxPrice, rating, availability, sort, page, limit, tag]);
 
   return { productsData, totalProducts, isLoading, error };
 }

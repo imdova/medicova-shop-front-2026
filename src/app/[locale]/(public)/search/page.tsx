@@ -55,6 +55,7 @@ export default function CategoryPage({
   const itemsPerPage = 12;
   const locale = useAppLocale();
   const query = searchParams.get("q") || undefined;
+  const tag = searchParams.get("tag") || undefined;
   
   const [dynamicCategories, setDynamicCategories] = useState<MultiCategory[]>([]);
   const [dynamicBrands, setDynamicBrands] = useState<Brand[]>([]);
@@ -153,6 +154,7 @@ export default function CategoryPage({
     sort,
     page: currentPage,
     limit: itemsPerPage,
+    tag,
   });
 
   useEffect(() => {
