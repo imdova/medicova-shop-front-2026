@@ -12,7 +12,6 @@ import {
   Seller,
   deleteSeller,
 } from "@/services/sellerService";
-import { getCategories } from "@/services/categoryService";
 import { MultiCategory } from "@/types";
 import { toast } from "react-hot-toast";
 import { getProducts, ApiProduct } from "@/services/productService";
@@ -53,9 +52,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
     | "suspended";
   const page = Number(searchParams.get("page") || "1") || 1;
   const [q, setQ] = useState(searchParams.get("q") || "");
-  const categoryId = searchParams.get("categoryId") || "";
   const [sellers, setSellers] = useState<Seller[]>([]);
-  const [categories, setCategories] = useState<MultiCategory[]>([]);
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const { data: session } = useSession();
@@ -65,14 +62,12 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
     if (!token) return;
     setLoading(true);
     try {
-      const [sellersData, productsData, catsData] = await Promise.all([
+      const [sellersData, productsData] = await Promise.all([
         getAdminSellers(token),
         getProducts(token),
-        getCategories(token),
       ]);
       setSellers(sellersData);
       setProducts(productsData);
-      setCategories(catsData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     } finally {
@@ -167,12 +162,6 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
     const query = q.trim().toLowerCase();
     return derived.filter((s) => {
       if (status !== "" && s.derivedStatus !== status) return false;
-      if (
-        categoryId !== "" &&
-        s.category !== categoryId &&
-        s.category?._id !== categoryId
-      )
-        return false;
       if (!query) return true;
       return (
         s.name.toLowerCase().includes(query) ||
@@ -269,19 +258,6 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={categoryId}
-              onChange={(e) => setParam("categoryId", e.target.value)}
-              className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition hover:bg-slate-50"
-            >
-              <option value="">{isAr ? "كل الفئات" : "All Categories"}</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {isAr ? c.title.ar : c.title.en}
-                </option>
-              ))}
-            </select>
-
             <div className="flex items-center rounded-2xl bg-slate-50 p-1 ring-1 ring-slate-200">
               {[
                 {
@@ -349,8 +325,11 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                 <th className="whitespace-nowrap px-5 py-3">
                   {isAr ? "الموقع" : "Location"}
                 </th>
-                <th className="whitespace-nowrap px-5 py-3">
-                  {isAr ? "الأداء" : "Performance"}
+                <th className="whitespace-nowrap px-5 py-3 text-center">
+                  {isAr ? "إجمالي المنتجات" : "Total Products"}
+                </th>
+                <th className="whitespace-nowrap px-5 py-3 text-center">
+                  {isAr ? "المبيعات" : "Sales"}
                 </th>
                 <th className="whitespace-nowrap px-5 py-3">
                   {isAr ? "الحالة" : "Status"}
@@ -456,33 +435,27 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                           </span>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-5 py-4">
-                        <div className="space-y-1">
-                          <Link
-                            href={`/${locale}/admin/products?sellerId=${s.id}`}
-                            className="text-sm font-extrabold text-slate-900 hover:text-emerald-700 hover:underline"
-                          >
-                            {formatNumber(s.productsCount ?? 0, locale)}{" "}
-                            {isAr ? "منتجات" : "products"}
-                          </Link>
-                          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                            {formatNumber(s.totalSales ?? 0, locale)}{" "}
-                            {isAr ? "جنيه" : "EGP"} {isAr ? "مبيعات" : "sales"}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="text-[10px] font-bold text-emerald-600">
-                              {formatCurrency(s.commission || 0, locale)}{" "}
-                              {isAr ? "عمولة" : "comm."}
+                      <td className="whitespace-nowrap px-5 py-4 text-center">
+                        <Link
+                          href={`/${locale}/admin/products?sellerId=${s.id}`}
+                          className="text-sm font-extrabold text-slate-900 transition-colors hover:text-emerald-700 hover:underline"
+                        >
+                          {formatNumber(s.productsCount ?? 0, locale)}
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-sm font-extrabold text-slate-900">
+                            {formatNumber(s.totalSales ?? 0, locale)} {isAr ? "جنيه" : "EGP"}
+                          </span>
+                          {s.rating > 0 && (
+                            <div className="flex items-center gap-0.5 text-amber-500">
+                              <Star className="h-2.5 w-2.5 fill-current" />
+                              <span className="text-[10px] font-bold">
+                                {s.rating}
+                              </span>
                             </div>
-                            {s.rating > 0 && (
-                              <div className="flex items-center gap-0.5 text-amber-500">
-                                <Star className="h-2.5 w-2.5 fill-current" />
-                                <span className="text-[10px] font-bold">
-                                  {s.rating}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                          )}
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-5 py-4">

@@ -297,25 +297,5 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
         },
       ],
     },
-    {
-      title: { en: "Settings", ar: "الإعدادات" },
-      items: [
-        {
-          title: { en: "Testimonials", ar: "الشهادات" },
-          href: "/admin/testimonials",
-          icon: Star,
-        },
-        {
-          title: { en: "Notifications", ar: "الإشعارات" },
-          href: "/admin/notifications",
-          icon: Bell,
-        },
-        {
-          title: { en: "Site Settings", ar: "إعدادات الموقع" },
-          href: "/admin/security",
-          icon: ShieldUser,
-        },
-      ],
-    },
   ],
 };

@@ -52,11 +52,23 @@ function stripLocale(pathname: string): string {
 export default auth((req: NextRequest & { auth: any }) => {
   const pathname = req.nextUrl.pathname;
   const barePath = stripLocale(pathname);
+  const isLoggedIn = !!req.auth;
+
+  // If user is already logged in and tries to access signin/signup, redirect to dashboard
+  if (isLoggedIn && (barePath === "/signin" || barePath === "/signup")) {
+    const userType = (req.auth?.user as any)?.role || "user";
+    let targetPath = "/";
+    if (userType === "admin") targetPath = "/admin";
+    else if (userType === "seller" || userType === "vendor")
+      targetPath = "/seller";
+
+    const localeMatch = pathname.match(/^\/([^\/]+)/);
+    const locale = localeMatch ? localeMatch[1] : routing.defaultLocale;
+    return NextResponse.redirect(new URL(`/${locale}${targetPath}`, req.url));
+  }
 
   // For protected routes, check auth first
   if (isProtectedRoute(barePath)) {
-    const isLoggedIn = !!req.auth;
-
     if (!isLoggedIn) {
       // Redirect to sign-in
       const signInUrl = new URL("/signin", req.url);
