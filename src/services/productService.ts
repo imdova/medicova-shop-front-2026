@@ -358,12 +358,12 @@ export function mapApiProductToProduct(item: any): any {
       
       return isNaN(n) ? 0 : n;
     })(),
-    brand: typeof item.brand === "object" ? {
+    brand: (typeof item.brand === "object" && item.brand !== null) ? {
       id: item.brand._id || item.brand.id,
       name: { en: item.brand.nameEn || item.brand.name || "Brand", ar: item.brand.nameAr || item.brand.name || "براند" },
       image: ensureAbsoluteUrl(item.brand.image || item.brand.logo)
     } : { id: item.brand || "unknown", name: { en: "Brand", ar: "براند" }, image: "/images/placeholder.jpg" },
-    category: typeof item.category === "object" ? {
+    category: (typeof item.category === "object" && item.category !== null) ? {
       id: item.category._id || item.category.id,
       slug: item.category.slug || item.category.slugEn || item.category.url?.split("/").pop() || (item.category.name?.toLowerCase().replace(/\s+/g, '-')),
       title: { en: item.category.name || item.category.title?.en || "Category", ar: item.category.nameAr || item.category.title?.ar || "قسم" }
