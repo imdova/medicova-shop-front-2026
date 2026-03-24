@@ -101,6 +101,7 @@ const ListProductCard: React.FC<ListCardProps> = ({ loading, product }) => {
             stock: product.stock,
             shippingMethod: product.shippingMethod,
             weightKg: product.weightKg,
+            totalPrice: (product.price ?? 0) * Math.min(quantity, product.stock ?? 1),
           }),
         );
         showAlert(t("addedToCart"), "success");

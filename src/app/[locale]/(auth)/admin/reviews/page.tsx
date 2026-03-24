@@ -78,7 +78,7 @@ export default function ReviewsPage() {
   const handleApprove = async (id: string) => {
     if (!token) return;
     try {
-      await updateReview(id, { status: "published" }, token);
+      await updateReview(id, { approved: true }, token);
       toast.success(isArabic ? "تم قبول التقييم" : "Review approved");
       fetchReviews();
     } catch (err) {
@@ -89,7 +89,7 @@ export default function ReviewsPage() {
   const handleReject = async (id: string) => {
     if (!token) return;
     try {
-      await updateReview(id, { status: "rejected" }, token);
+      await updateReview(id, { approved: false }, token);
       toast.success(isArabic ? "تم رفض التقييم" : "Review rejected");
       fetchReviews();
     } catch (err) {

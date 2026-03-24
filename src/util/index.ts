@@ -139,6 +139,11 @@ export function calculateShippingFee(options: ShippingOptions): number {
     return 0;
   }
 
+  // If city is not provided, return 0 shipping fee (User request)
+  if (!city || city.trim() === "") {
+    return 0;
+  }
+
   // If specific costs are provided, use region-based logic
   const normalizedCity = city?.trim().toLowerCase() || "";
   

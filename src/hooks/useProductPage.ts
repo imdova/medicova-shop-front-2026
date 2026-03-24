@@ -5,11 +5,14 @@ import { useSession } from "next-auth/react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { addItem, increaseQuantity, setCart } from "@/store/slices/cartSlice";
 import { getEncrypted } from "@/util/encryptedCookieStorage";
-import { Product } from "@/types/product";
+import { Product, ProductTag } from "@/types/product";
 import { SizeType, NumericSizeType, LiquidSizeType } from "@/types";
 import { useTranslations } from "next-intl";
 import { getSellerSelectedOptions } from "@/services/sellerSelectedOptionService";
 import { getVariantById } from "@/services/variantService";
+import { getAllReviews } from "@/services/reviewService";
+import { format } from "date-fns";
+import { ProductTags } from "@/constants/productTags";
 
 interface UseProductPageProps {
   product: Product | undefined;
@@ -32,9 +35,14 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
   const [quantity, setQuantity] = useState(1);
   const [isClient, setIsClient] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<{ label: { en: string; ar: string }; values: string[] }[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   const cartProduct = cartProducts.find((item) => item.id === product?.id);
   const isInCart = !!cartProduct;
+
+  const productTags = ProductTags.filter((tag) =>
+    product?.tags?.includes(tag.id),
+  );
 
   // Fetch selected options
   useEffect(() => {
@@ -70,6 +78,36 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
       fetchOptions();
     }
   }, [product?.id]);
+
+  // Fetch reviews
+  useEffect(() => {
+    if (product?.id) {
+      const fetchReviews = async () => {
+        try {
+          const accessToken = (session.data as any)?.accessToken || "";
+          const apiReviews = await getAllReviews(accessToken, product.id);
+          
+          // Map to format expected by ProductReviews component
+          const mappedReviews = apiReviews.map((r: any) => ({
+            id: r.id,
+            rating: r.rating,
+            content: r.comment,
+            author: {
+              id: r.user.id,
+              name: `${r.user.firstName} ${r.user.lastName}`.trim() || "Customer",
+              imgUrl: r.user.avatar || "",
+            },
+            date: r.createdAt ? format(new Date(r.createdAt), "dd MMM yyyy") : "",
+          }));
+          
+          setReviews(mappedReviews);
+        } catch (err) {
+          console.error("Failed to fetch reviews", err);
+        }
+      };
+      fetchReviews();
+    }
+  }, [product?.id, session.data]);
 
   // Hydrate cart from cookies
   useEffect(() => {
@@ -153,6 +191,7 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
           size: selectedSize,
           shippingMethod: product.shippingMethod,
           weightKg: product.weightKg,
+          totalPrice: (product.price ?? 0) * Math.min(quantity, product.stock ?? 1),
         })
       );
       showAlert(t("addedToCart"), "success");
@@ -209,6 +248,8 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
     setAlert,
     handleAddToCart,
     handleCheckout,
+    reviews,
+    productTags,
   } as {
     isClient: boolean;
     loading: boolean;
@@ -231,5 +272,7 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
     setAlert: (alert: { message: string; type: "success" | "error" | "info" } | null) => void;
     handleAddToCart: () => Promise<void>;
     handleCheckout: () => void;
+    reviews: any[];
+    productTags: ProductTag[];
   };
 };

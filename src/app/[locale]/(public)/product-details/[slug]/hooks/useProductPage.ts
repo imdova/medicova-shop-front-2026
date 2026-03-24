@@ -13,6 +13,8 @@ import { ProductTag } from "@/types/product";
 
 import { getSellerSelectedOptions } from "@/services/sellerSelectedOptionService";
 import { getVariantById } from "@/services/variantService";
+import { getAllReviews } from "@/services/reviewService";
+import { format } from "date-fns";
 
 interface UnitSelection {
   size?: SizeType | NumericSizeType | LiquidSizeType;
@@ -50,6 +52,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   handleAddToCart: () => Promise<void>;
   confirmVariantSelection: () => void;
   handleCheckout: () => void;
+  reviews: any[];
   productTags: ProductTag[];
 } => {
   const t = useTranslations("product");
@@ -73,6 +76,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   const [unitSelections, setUnitSelections] = useState<UnitSelection[]>([
     { size: undefined, color: undefined }
   ]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [productTags, setProductTags] = useState<ProductTag[]>([]);
 
   const cartProduct = cartProducts.find((item) => item.id === product?.id);
@@ -128,6 +132,38 @@ export const useProductPage = ({ product }: UseProductPageProps): {
       fetchOptions();
     }
   }, [product?.id, session?.data]);
+
+  // Fetch reviews
+  useEffect(() => {
+    if (product?.id) {
+      const fetchReviews = async () => {
+        try {
+          const accessToken = (session.data as any)?.accessToken || "";
+          const apiReviews = await getAllReviews(accessToken, product.id);
+          
+          // Map to format expected by ProductReviews component
+          const mappedReviews = apiReviews
+            .filter((r: any) => r.approved === true)
+            .map((r: any) => ({
+            id: r.id,
+            rating: r.rating,
+            content: r.comment,
+            author: {
+              id: r.user.id,
+              name: `${r.user.firstName} ${r.user.lastName}`.trim() || "Customer",
+              imgUrl: r.user.avatar || "",
+            },
+            date: r.createdAt ? format(new Date(r.createdAt), "dd MMM yyyy") : "",
+          }));
+          
+          setReviews(mappedReviews);
+        } catch (err) {
+          console.error("Failed to fetch reviews", err);
+        }
+      };
+      fetchReviews();
+    }
+  }, [product?.id, session.data]);
 
   // Fetch product tags
   useEffect(() => {
@@ -325,6 +361,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     handleAddToCart,
     confirmVariantSelection,
     handleCheckout,
+    reviews,
     productTags,
   };
 };

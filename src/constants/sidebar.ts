@@ -22,7 +22,6 @@ import {
   ShieldUser,
   Star,
   Table2,
-  Truck,
   Undo2,
   UserRoundPen,
   Users2,
@@ -225,14 +224,6 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
           icon: Zap,
         },
     
-        {
-          title: {
-            en: "Shipments",
-            ar: "الشحنات",
-          },
-          href: "/admin/shipments",
-          icon: Truck,
-        },
         {
           title: {
             en: "Reviews",

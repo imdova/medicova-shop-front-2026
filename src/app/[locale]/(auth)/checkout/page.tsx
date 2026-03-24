@@ -17,8 +17,9 @@ export default function CheckoutPage() {
     productData,
     selectedAddress,
     paymentMethod,
-    showAddressModal,
     showCreditCardModal,
+    isLocating,
+    locationError,
     subtotal,
     shippingFee,
     paymentFee,
@@ -26,14 +27,23 @@ export default function CheckoutPage() {
     discountAmount,
     appliedCoupon,
     productShippingFees,
-    setShowAddressModal,
     setShowCreditCardModal,
-    handleAddressSelect,
     handleSelectMethod,
+    handleLocateMe,
     handleSubmit,
+    register,
+    watch,
+    setValue,
+    errors,
   } = useCheckoutPage();
 
   const isAr = locale === "ar";
+  
+  const fullName = watch("fullName");
+  const phoneNumber = watch("phoneNumber");
+  const shippingAddress = watch("shippingAddress");
+  
+  const isFormValid = !!fullName && !!phoneNumber && phoneNumber.length === 13 && !!shippingAddress;
 
   const onSubmit = (data: any) => {
     console.log("Checkout submitted:", {
@@ -63,8 +73,13 @@ export default function CheckoutPage() {
             <div className="flex-1 lg:max-w-[750px]">
               <AddressSection
                 selectedAddress={selectedAddress}
-                onShowModal={() => setShowAddressModal(true)}
+                onLocateMe={handleLocateMe}
+                isLocating={isLocating}
+                locationError={locationError}
                 locale={locale}
+                register={register}
+                watch={watch}
+                errors={errors}
               />
 
               <CheckoutItems
@@ -90,7 +105,7 @@ export default function CheckoutPage() {
                 discountAmount={discountAmount}
                 appliedCoupon={appliedCoupon}
                 total={total}
-                disabled={!selectedAddress || productData.length === 0}
+                disabled={!isFormValid || productData.length === 0}
                 locale={locale}
               />
             </div>
@@ -98,14 +113,6 @@ export default function CheckoutPage() {
         </form>
 
         {/* Modals */}
-        <DeliverToModal
-          isOpen={showAddressModal}
-          onClose={() => setShowAddressModal(false)}
-          onAddressSelect={handleAddressSelect}
-          currentAddress={selectedAddress || undefined}
-          locale={locale}
-        />
-
         <CreditCardModal
           locale={locale}
           isOpen={showCreditCardModal}
