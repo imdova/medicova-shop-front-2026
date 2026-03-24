@@ -2,14 +2,12 @@
 
 import { Plus, Store } from "lucide-react";
 import SellersListPanel from "./panels/SellersListPanel";
-import { useState } from "react";
-import AddSellerModal from "../components/AddSellerModal";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 
 export default function SellersPage() {
   const t = useTranslations("admin");
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const locale = useAppLocale();
   const isArabic = locale === "ar";
 
@@ -35,8 +33,8 @@ export default function SellersPage() {
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
+          <Link
+            href="/admin/sellers/add"
             className="inline-flex h-11 items-center gap-2 rounded-2xl bg-[#2F6B3A] px-5 text-sm font-black text-white shadow-xl shadow-emerald-900/10 transition-all duration-300 hover:brightness-110 active:scale-95"
           >
             <Plus
@@ -44,16 +42,10 @@ export default function SellersPage() {
               className="transition-transform duration-300 group-hover:rotate-90"
             />
             <span>{isArabic ? "إضافة بائع" : "Onboard New Seller"}</span>
-          </button>
+          </Link>
         </div>
 
         <SellersListPanel locale={locale} />
-
-        <AddSellerModal
-          isModalOpen={isModalOpen}
-          setIsModalOpen={setIsModalOpen}
-          locale={locale}
-        />
       </div>
     </div>
   );

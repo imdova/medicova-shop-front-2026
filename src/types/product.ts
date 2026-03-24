@@ -18,6 +18,7 @@ export type Seller = {
   returnPolicy: LocalizedTitle;
   itemShown: number;
   status: LocalizedTitle;
+  commission?: number;
 };
 
 // Types
