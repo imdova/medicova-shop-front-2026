@@ -257,8 +257,9 @@ export default function DeliverToModal({
       const position = await new Promise<GeolocationPosition>(
         (resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
+            enableHighAccuracy: false,
             timeout: 10000,
+            maximumAge: 60000,
           });
         },
       );
@@ -281,11 +282,26 @@ export default function DeliverToModal({
         country: addressDetails.country || "egypt",
         country_code: addressDetails.country_code || "EG",
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Location error:", error);
-      setLocationError(
-        locale === "ar" ? "تعذر الحصول على الموقع" : "Could not get location",
-      );
+      
+      let message = locale === "ar" ? "تعذر الحصول على الموقع" : "Could not get location";
+      
+      if (error.code === 1) { // PERMISSION_DENIED
+        message = locale === "ar" 
+          ? "تم رفض الإذن للوصول للموقع. يرجى تفعيل الإذن من إعدادات المتصفح." 
+          : "Permission denied. Please enable location access in browser settings.";
+      } else if (error.code === 2) { // POSITION_UNAVAILABLE
+        message = locale === "ar"
+          ? "موقعك غير متاح حالياً. يرجى اختيار موقعك يدوياً على الخريطة."
+          : "Location information is unavailable. Please select your location manually on the map.";
+      } else if (error.code === 3) { // TIMEOUT
+        message = locale === "ar"
+          ? "انتهت مهلة البحث عن الموقع. يرجى المحاولة مرة أخرى أو استخدام الخريطة."
+          : "Location request timed out. Please try again or use the map.";
+      }
+
+      setLocationError(message);
     } finally {
       setIsLocating(false);
     }
@@ -390,66 +406,70 @@ export default function DeliverToModal({
   return (
     <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black bg-opacity-50 p-4">
       <div className="max-h-[90vh] w-full max-w-md overflow-hidden rounded-lg bg-white">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b bg-gray-100 p-4">
-          <h2 className="text-lg font-semibold">
-            {locale === "ar" ? "التوصيل إلى" : "Deliver To"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-            aria-label={locale === "ar" ? "إغلاق" : "Close"}
-          >
-            <X size={20} />
-          </button>
-        </div>
+        {/* Header - Hidden in Map View */}
+        {!mapView && (
+          <div className="flex items-center justify-between border-b bg-gray-100 p-4">
+            <h2 className="text-lg font-semibold">
+              {locale === "ar" ? "التوصيل إلى" : "Deliver To"}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700"
+              aria-label={locale === "ar" ? "إغلاق" : "Close"}
+            >
+              <X size={20} />
+            </button>
+          </div>
+        )}
 
-        {/* Search */}
-        <div className="border-b p-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder={locale === "ar" ? "ابحث عن موقع" : "Search location"}
-              className="w-full rounded-lg border p-3 pl-10 pr-10 focus:outline-none"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                handleSearchLocation();
-              }}
-            />
-            <MapPin
-              className="absolute left-3 top-3.5 text-gray-400"
-              size={18}
-            />
-            {searchQuery && (
-              <button
-                onClick={handdelCloseSearch}
-                className="absolute right-2 top-3.5 text-gray-400"
-              >
-                <X size={18} />
-              </button>
+        {/* Search - Hidden in Map View */}
+        {!mapView && (
+          <div className="border-b p-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={locale === "ar" ? "ابحث عن موقع" : "Search location"}
+                className="w-full rounded-lg border p-3 pl-10 pr-10 focus:outline-none"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  handleSearchLocation();
+                }}
+              />
+              <MapPin
+                className="absolute left-3 top-3.5 text-gray-400"
+                size={18}
+              />
+              {searchQuery && (
+                <button
+                  onClick={handdelCloseSearch}
+                  className="absolute right-2 top-3.5 text-gray-400"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+
+            {/* Search results */}
+            {searchResults.length > 0 && searchQuery.length > 0 && (
+              <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border">
+                {searchResults.map((result) => (
+                  <div
+                    key={`${result.lat}-${result.lng}`}
+                    className="cursor-pointer p-2 hover:bg-gray-100"
+                    onClick={() => handleSelectSearchResult(result)}
+                  >
+                    <p className="text-sm">{result.city}</p>
+                    <p className="text-xs text-gray-500">
+                      {result.admin_name ? `${result.admin_name}, ` : ""}
+                      {result.country}
+                    </p>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-
-          {/* Search results */}
-          {searchResults.length > 0 && searchQuery.length > 0 && (
-            <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border">
-              {searchResults.map((result) => (
-                <div
-                  key={`${result.lat}-${result.lng}`}
-                  className="cursor-pointer p-2 hover:bg-gray-100"
-                  onClick={() => handleSelectSearchResult(result)}
-                >
-                  <p className="text-sm">{result.city}</p>
-                  <p className="text-xs text-gray-500">
-                    {result.admin_name ? `${result.admin_name}, ` : ""}
-                    {result.country}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Content */}
         <div className="max-h-[60vh] overflow-y-auto">

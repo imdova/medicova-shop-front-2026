@@ -428,6 +428,7 @@ export interface ReviewType {
   comment: string;
   images: string[];
   status: { en: string; ar: string };
+  approved: boolean;
   createdAt: string;
   reviewType?: "manual" | "system";
   replies?: {

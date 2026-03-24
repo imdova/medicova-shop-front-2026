@@ -121,9 +121,11 @@ export default function CheckoutItems({
                         <Truck className="h-3 w-3" />
                         {isAr ? "الشحن:" : "Shipping:"}{" "}
                         {shippingInfo.fee === 0
-                          ? isAr
-                            ? "مجاني"
-                            : "Free"
+                          ? (
+                            <span className="text-[9px] italic text-gray-400">
+                              {isAr ? "يحدد بعد العنوان" : "Calculated after address"}
+                            </span>
+                          )
                           : `${shippingInfo.fee.toFixed(2)} ${isAr ? "جنيه" : "EGP"}`}
                       </div>
                     )}

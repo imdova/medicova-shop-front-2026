@@ -21,7 +21,7 @@ type ProductReviewsProps = {
   locale?: LanguageType;
 };
 
-const ProductReviews: React.FC<ProductReviewsProps> = ({ reviews }) => {
+const ProductReviews: React.FC<ProductReviewsProps> = ({ reviews = [] }) => {
   const t = useTranslations("product");
   const [showAllReviews, setShowAllReviews] = useState(false);
   const initialReviewsToShow = 3; // Number of reviews to show initially

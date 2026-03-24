@@ -71,6 +71,7 @@ export const dummyReviews: ReviewType[] = [
       "Excellent sound quality and comfortable to wear for long periods. Battery life is amazing!",
     images: [],
     status: { en: "Published", ar: "منشور" },
+    approved: true,
     createdAt: "2024-01-15T10:30:00Z",
   },
   {
@@ -82,6 +83,7 @@ export const dummyReviews: ReviewType[] = [
       "Good features but the battery could be better. Love the health tracking functions.",
     images: [],
     status: { en: "Pending", ar: "قيد الانتظار" },
+    approved: false,
     createdAt: "2024-01-14T14:20:00Z",
   },
   {
@@ -93,6 +95,7 @@ export const dummyReviews: ReviewType[] = [
       "Average quality. Zipper broke after 2 months of use. Not very durable.",
     images: [],
     status: { en: "Published", ar: "منشور" },
+    approved: true,
     createdAt: "2024-01-13T09:15:00Z",
   },
   {
@@ -104,6 +107,7 @@ export const dummyReviews: ReviewType[] = [
       "أحببتها كثيرًا! أفضل عملية شراء قمت بها هذا العام. إلغاء الضوضاء مثالي.",
     images: [],
     status: { en: "Published", ar: "منشور" },
+    approved: true,
     createdAt: "2024-01-12T16:45:00Z",
   },
   {
@@ -114,6 +118,7 @@ export const dummyReviews: ReviewType[] = [
     comment: "توقف عن العمل بعد 3 أسابيع. محبط جدًا من الجودة.",
     images: [],
     status: { en: "Rejected", ar: "مرفوض" },
+    approved: false,
     createdAt: "2024-01-11T11:20:00Z",
   },
   {
@@ -125,6 +130,7 @@ export const dummyReviews: ReviewType[] = [
       "Perfect for fitness tracking! The sleep analysis feature is very accurate.",
     images: [],
     status: { en: "Published", ar: "منشور" },
+    approved: true,
     createdAt: "2024-01-10T13:10:00Z",
   },
   {
@@ -136,6 +142,7 @@ export const dummyReviews: ReviewType[] = [
       "Good value for money. Adjustable brightness is useful for different tasks.",
     images: [],
     status: { en: "Pending", ar: "قيد الانتظار" },
+    approved: false,
     createdAt: "2024-01-09T08:30:00Z",
   },
   {
@@ -147,6 +154,7 @@ export const dummyReviews: ReviewType[] = [
       "واسع جدًا ومريح. مثالي لرحلتي اليومية مع الكمبيوتر المحمول والكتب.",
     images: [],
     status: { en: "Published", ar: "منشور" },
+    approved: true,
     createdAt: "2024-01-08T15:25:00Z",
     replies: [
       {

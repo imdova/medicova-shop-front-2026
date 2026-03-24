@@ -1,7 +1,6 @@
+import { apiClient } from "@/lib/apiClient";
 import { ReviewType } from "@/types/product";
 import { getProductById } from "./productService";
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://shop-api.medicova.net/api/v1";
 
 export interface ApiReview {
   _id: string;
@@ -12,6 +11,7 @@ export interface ApiReview {
   descriptionAr: string;
   images: string[];
   status: "published" | "pending" | "rejected" | "manual";
+  approved: boolean;
   createdAt: string;
   updatedAt: string;
   user?: {
@@ -31,31 +31,27 @@ export interface ApiReview {
 }
 
 export const getAllReviews = async (token: string, productId?: string): Promise<ReviewType[]> => {
-  const url = productId 
-    ? `${BASE_URL}/reviews/product/${productId}` 
-    : `${BASE_URL}/reviews`;
+  const endpoint = productId 
+    ? `/reviews/product/${productId}?populate=productId,userId` 
+    : `/reviews?populate=productId,userId`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  const res = await apiClient<any>({
+    endpoint,
+    method: "GET",
+    token,
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch reviews");
-  }
-
-  const data = await response.json();
-  const reviewsData = data.data.reviews || data.data || [];
-  const reviews = Array.isArray(reviewsData) ? reviewsData : (reviewsData.data || []);
+  const data = res.data || res;
+  const reviewsData = data.reviews || (Array.isArray(data) ? data : (data.data || []));
+  const reviews = Array.isArray(reviewsData) ? reviewsData : [];
 
   return reviews.map((r: any) => ({
     id: r._id,
     product: {
       id: String(r.productId?._id || r.productId || ""),
       title: {
-        en: r.product?.nameEn || r.product?.title?.en || "Product",
-        ar: r.product?.nameAr || r.product?.title?.ar || "منتج",
+        en: r.product?.nameEn || r.product?.title?.en || r.productId?.nameEn || r.productId?.title?.en || r.productNameEn || r.nameEn || r.productName || r.name || "Product",
+        ar: r.product?.nameAr || r.product?.title?.ar || r.productId?.nameAr || r.productId?.title?.ar || r.productNameAr || r.nameAr || r.productName || r.name || "منتج",
       },
       images: r.product?.media?.featuredImages ? [r.product.media.featuredImages] : (r.product?.images || []),
       price: r.product?.pricing?.salePrice || r.product?.price || 0,
@@ -74,75 +70,46 @@ export const getAllReviews = async (token: string, productId?: string): Promise<
       en: r.status ? (r.status.charAt(0).toUpperCase() + r.status.slice(1)) : "Pending",
       ar: r.status === "published" ? "منشور" : r.status === "pending" ? "قيد الانتظار" : "مرفوض",
     },
+    approved: r.approved || false,
     createdAt: r.createdAt,
     reviewType: r.status === "manual" ? "manual" : "system",
   }));
 };
 
 export const createReview = async (data: any, token: string) => {
-  const response = await fetch(`${BASE_URL}/reviews`, {
+  return apiClient({
+    endpoint: "/reviews",
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
+    body: data,
+    token,
   });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error("API Error in createReview:", JSON.stringify(errorData, null, 2));
-    throw new Error(errorData.message || "Failed to create review");
-  }
-
-  return response.json();
 };
 
 export const updateReview = async (id: string, data: any, token: string) => {
-  const response = await fetch(`${BASE_URL}/reviews/${id}`, {
+  return apiClient({
+    endpoint: `/reviews/${id}`,
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
+    body: data,
+    token,
   });
-
-  if (!response.ok) {
-    throw new Error("Failed to update review");
-  }
-
-  return response.json();
 };
 
 export const deleteReview = async (id: string, token: string) => {
-  const response = await fetch(`${BASE_URL}/reviews/${id}`, {
+  return apiClient({
+    endpoint: `/reviews/${id}`,
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    token,
   });
-
-  if (!response.ok) {
-    throw new Error("Failed to delete review");
-  }
-
-  return response.json();
 };
 
 export const getReviewById = async (id: string, token: string): Promise<ReviewType> => {
-  const response = await fetch(`${BASE_URL}/reviews/${id}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  const res = await apiClient<any>({
+    endpoint: `/reviews/${id}`,
+    method: "GET",
+    token,
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch review");
-  }
-
-  const data = await response.json();
-  const r = data.data;
+  const r = res.data || res;
 
   // Determine Product ID
   let productId = "";
@@ -199,6 +166,7 @@ export const getReviewById = async (id: string, token: string): Promise<ReviewTy
       en: r.status ? (r.status.charAt(0).toUpperCase() + r.status.slice(1)) : "Pending",
       ar: r.status === "published" ? "منشور" : r.status === "pending" ? "قيد الانتظار" : "مرفوض",
     },
+    approved: r.approved || false,
     createdAt: r.createdAt,
     reviewType: r.status === "manual" ? "manual" : "system",
   };

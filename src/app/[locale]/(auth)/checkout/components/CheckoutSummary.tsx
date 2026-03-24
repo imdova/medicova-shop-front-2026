@@ -52,8 +52,8 @@ export default function CheckoutSummary({
               {isAr ? "رسوم الشحن" : "Shipping Fee"}
             </span>
             {shippingFee === 0 ? (
-              <span className="font-bold italic text-primary">
-                {isAr ? "مجاني" : "Free"}
+              <span className="text-[10px] font-bold italic text-gray-400">
+                {isAr ? "يحدد بعد العنوان" : "Calculated after address"}
               </span>
             ) : (
               <span className="font-bold text-gray-900">

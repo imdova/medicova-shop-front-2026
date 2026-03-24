@@ -38,15 +38,6 @@ const ReviewTableContainer: React.FC<ReviewTableContainerProps> = ({
   const columns = useMemo(
     () => [
       {
-        key: "id",
-        header: t("id"),
-        render: (item: ReviewType) => (
-          <span className="font-mono text-[10px] font-bold text-gray-400">
-            #{item.id}
-          </span>
-        ),
-      },
-      {
         key: "product",
         header: t("product"),
         render: (item: ReviewType) => (
@@ -55,7 +46,7 @@ const ReviewTableContainer: React.FC<ReviewTableContainerProps> = ({
             href={`/${locale}/admin/products/details/${typeof item.product.id === "object" ? (item.product.id as any)._id || (item.product.id as any).id : item.product.id}`}
           >
             <span className="max-w-[120px] truncate text-xs">
-              {item.product.title[locale]}
+              {item.product.title?.[locale] || (locale === "en" ? "Product" : "منتج")}
             </span>
             <ExternalLink size={12} className="text-gray-300" />
           </Link>
@@ -173,12 +164,7 @@ const ReviewTableContainer: React.FC<ReviewTableContainerProps> = ({
             onClick: (item) => onApprove(item as ReviewType),
             icon: <CheckCircle className="h-4 w-4" />,
             color: "#10b981",
-          },
-          {
-            label: t("reject"),
-            onClick: (item) => onReject(item as ReviewType),
-            icon: <XCircle className="h-4 w-4" />,
-            color: "#f59e0b",
+            hide: (item: ReviewType) => item.approved,
           },
           {
             label: t("delete"),

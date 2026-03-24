@@ -61,7 +61,6 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
   const t = useTranslations("product");
   const common = useTranslations("common");
 
-  const reviews = allReviews; // Simplified for dummy data
   const recommendedProducts = allProducts
     .filter(
       (p) => p.category?.id === product?.category?.id && p.id !== product?.id,
@@ -84,6 +83,7 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
     isInCart,
     selectedOptions,
     unitSelections,
+    reviews,
     setSelectedSize,
     setSelectedColor,
     setQuantity,
