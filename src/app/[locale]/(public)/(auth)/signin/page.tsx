@@ -78,7 +78,7 @@ const SignInPage: React.FC = () => {
 
     try {
       const result = await signIn("credentials", {
-        email,
+        identifier: email,
         password,
         redirect: false,
       });

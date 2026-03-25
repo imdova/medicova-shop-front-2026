@@ -9,6 +9,8 @@ import AddressSection from "./components/AddressSection";
 import CheckoutItems from "./components/CheckoutItems";
 import PaymentSection from "./components/PaymentSection";
 import CheckoutSummary from "./components/CheckoutSummary";
+import { signIn } from "next-auth/react";
+import { callRegisterApi } from "@/lib/auth/registerApi";
 
 export default function CheckoutPage() {
   const {
@@ -33,8 +35,8 @@ export default function CheckoutPage() {
     handleSubmit,
     register,
     watch,
-    setValue,
     errors,
+    isNewUser,
   } = useCheckoutPage();
 
   const isAr = locale === "ar";
@@ -45,7 +47,35 @@ export default function CheckoutPage() {
   
   const isFormValid = !!fullName && !!phoneNumber && phoneNumber.length === 13 && !!shippingAddress;
 
-  const onSubmit = (data: any) => {
+  const onSubmit = async (data: any) => {
+    if (isNewUser) {
+      try {
+        const nameParts = (data.fullName || "").trim().split(" ");
+        const firstName = nameParts[0] || "User";
+        const lastName = nameParts.slice(1).join(" ") || "Medicova";
+
+        const registerRes = await callRegisterApi({
+          firstName,
+          lastName,
+          email: `${data.phoneNumber}@medicova.net`, // Dummy email if phone-only
+          password: data.password,
+          role: "user",
+          language: locale as string,
+        });
+
+        if (registerRes.status === "success") {
+          await signIn("credentials", {
+            redirect: false,
+            identifier: data.phoneNumber,
+            password: data.password,
+          });
+        }
+      } catch (err) {
+        console.error("Auto-registration during checkout failed:", err);
+        // Error handling should probably show a toast
+      }
+    }
+
     console.log("Checkout submitted:", {
       ...data,
       selectedAddress,
@@ -80,6 +110,7 @@ export default function CheckoutPage() {
                 register={register}
                 watch={watch}
                 errors={errors}
+                isNewUser={isNewUser}
               />
 
               <CheckoutItems

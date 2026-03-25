@@ -61,7 +61,7 @@ export default function ReviewsPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await getAllReviews(token);
+      const { reviews: data } = await getAllReviews(token);
       setReviews(data as ExtendedReviewType[]);
     } catch (err) {
       console.error("Failed to fetch reviews:", err);

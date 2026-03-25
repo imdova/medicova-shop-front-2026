@@ -7,6 +7,7 @@ interface ApiRequestConfig {
   headers?: Record<string, string>;
   token?: string;
   suppressErrorLog?: boolean;
+  suppressAutoLogout?: boolean;
 }
 
 function getBaseUrl(): string {
@@ -24,6 +25,33 @@ function getBaseUrl(): string {
   return baseUrl.replace(/\/$/, "");
 }
 
+function decodeJwt(token: string) {
+  try {
+    const base64Url = token.split(".")[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+async function handleLogout() {
+  if (typeof window !== "undefined") {
+    const { signOut } = await import("next-auth/react");
+    await signOut({ callbackUrl: "/signin", redirect: true });
+  } else {
+    const { redirect } = await import("next/navigation");
+    redirect("/signin");
+  }
+}
+
 export async function apiClient<T = unknown>({
   endpoint,
   method = "POST",
@@ -31,7 +59,22 @@ export async function apiClient<T = unknown>({
   headers,
   token,
   suppressErrorLog = false,
+  suppressAutoLogout = false,
 }: ApiRequestConfig): Promise<T> {
+  const isLoginEndpoint = endpoint.includes("/auth/login");
+
+  // Proactive token expiration check
+  if (token && !isLoginEndpoint && !suppressAutoLogout) {
+    const payload = decodeJwt(token);
+    if (payload?.exp && Date.now() / 1000 > payload.exp) {
+      console.warn(`Blocking request to ${endpoint}: Token expired`);
+      await handleLogout();
+      // If server-side redirect didn't happen yet (e.g. caught by caller), 
+      // return a promise that doesn't resolve to avoid proceeding.
+      return new Promise(() => {});
+    }
+  }
+
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
   const normalizedToken = token?.trim();

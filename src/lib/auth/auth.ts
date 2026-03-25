@@ -25,19 +25,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        identifier: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         try {
-          if (!credentials?.email || !credentials?.password) {
+          if (!credentials?.identifier || !credentials?.password) {
             console.error("Missing credentials");
             return null;
           }
 
-          console.log("Attempting login for email:", credentials.email);
+          console.log("Attempting login for identifier:", credentials.identifier);
           
-          const data = await callLoginApi(credentials.email as string, credentials.password as string) as ApiLoginResponse;
+          const data = await callLoginApi(credentials.identifier as string, credentials.password as string) as ApiLoginResponse;
 
           if (data.status === "success" && data.data) {
             const { user, accessToken, refreshToken } = data.data;

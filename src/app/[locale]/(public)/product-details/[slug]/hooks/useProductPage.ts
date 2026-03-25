@@ -34,6 +34,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   currentNudgeIndex: number;
   isDrawerOpen: boolean;
   isAuthModalOpen: boolean;
+  isQuickAuthModalOpen: boolean;
   isVariantModalOpen: boolean;
   alert: { message: string; type: "success" | "error" | "info" } | null;
   cartProducts: any[];
@@ -46,6 +47,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   setQuantity: (quantity: number) => void;
   setIsDrawerOpen: (isOpen: boolean) => void;
   setIsAuthModalOpen: (isOpen: boolean) => void;
+  setIsQuickAuthModalOpen: (isOpen: boolean) => void;
   setIsVariantModalOpen: (isOpen: boolean) => void;
   setAlert: (alert: { message: string; type: "success" | "error" | "info" } | null) => void;
   onUnitSelectionChange: (index: number, selection: UnitSelection) => void;
@@ -53,7 +55,10 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   confirmVariantSelection: () => void;
   handleCheckout: () => void;
   reviews: any[];
+  averageRating: number;
+  reviewCount: number;
   productTags: ProductTag[];
+  currentStock: number;
 } => {
   const t = useTranslations("product");
   const session = useSession();
@@ -66,6 +71,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   const [loading, setLoading] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isQuickAuthModalOpen, setIsQuickAuthModalOpen] = useState(false);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [alert, setAlert] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [currentNudgeIndex, setCurrentNudgeIndex] = useState(0);
@@ -77,7 +83,10 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     { size: undefined, color: undefined }
   ]);
   const [reviews, setReviews] = useState<any[]>([]);
+  const [averageRating, setAverageRating] = useState<number>(0);
+  const [reviewCount, setReviewCount] = useState<number>(0);
   const [productTags, setProductTags] = useState<ProductTag[]>([]);
+  const [distribution, setDistribution] = useState<any[]>([]);
 
   const cartProduct = cartProducts.find((item) => item.id === product?.id);
   const isInCart = !!cartProduct;
@@ -91,7 +100,27 @@ export const useProductPage = ({ product }: UseProductPageProps): {
           const res = await getSellerSelectedOptions(product.id, token, true);
           const data = (res as any)?.data || res;
           
-          if (data && data.options && Array.isArray(data.options)) {
+          if (data && data.distribution && Array.isArray(data.distribution) && data.distribution.length > 0) {
+            setDistribution(data.distribution);
+            
+            // Auto-detect attributes from distribution keys
+            const keys = Object.keys(data.distribution[0]).filter(
+              k => !["stock", "key", "_id", "id", "__v"].includes(k)
+            );
+
+            const detectedOptions = keys.map(key => {
+              const uniqueValues = Array.from(new Set(data.distribution.map((d: any) => d[key]))).filter(Boolean);
+              return {
+                label: { 
+                  en: key.charAt(0).toUpperCase() + key.slice(1), 
+                  ar: key === "color" ? "اللون" : key === "size" ? "المقاس" : key 
+                },
+                values: uniqueValues.map(v => ({ name: String(v), color: String(v) }))
+              };
+            });
+
+            setSelectedOptions(detectedOptions);
+          } else if (data && data.options && Array.isArray(data.options)) {
             const optionsWithLabels = await Promise.all(
               data.options.map(async (opt: any) => {
                 try {
@@ -139,24 +168,34 @@ export const useProductPage = ({ product }: UseProductPageProps): {
       const fetchReviews = async () => {
         try {
           const accessToken = (session.data as any)?.accessToken || "";
-          const apiReviews = await getAllReviews(accessToken, product.id);
-          
+          const { reviews: apiReviews, totalRate: apiTotalRate } =
+            await getAllReviews(accessToken, product.id);
+
           // Map to format expected by ProductReviews component
           const mappedReviews = apiReviews
             .filter((r: any) => r.approved === true)
             .map((r: any) => ({
-            id: r.id,
-            rating: r.rating,
-            content: r.comment,
-            author: {
-              id: r.user.id,
-              name: `${r.user.firstName} ${r.user.lastName}`.trim() || "Customer",
-              imgUrl: r.user.avatar || "",
-            },
-            date: r.createdAt ? format(new Date(r.createdAt), "dd MMM yyyy") : "",
-          }));
-          
+              id: r.id,
+              rating: r.rating,
+              content: r.comment,
+              author: {
+                id: r.user.id,
+                name:
+                  `${r.user.firstName} ${r.user.lastName}`.trim() || "Customer",
+                imgUrl: r.user.avatar || "",
+              },
+              date: r.createdAt
+                ? format(new Date(r.createdAt), "dd MMM yyyy")
+                : "",
+            }));
+
+          const avg = apiReviews.length > 0 
+            ? apiReviews.reduce((sum: number, r: any) => sum + (r.rate || r.rating || 0), 0) / apiReviews.length 
+            : 0;
+
           setReviews(mappedReviews);
+          setAverageRating(avg);
+          setReviewCount(apiReviews.length);
         } catch (err) {
           console.error("Failed to fetch reviews", err);
         }
@@ -203,8 +242,26 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     loadCart();
   }, [dispatch]);
 
-  // Set initial selections
+  // Set initial selections and handle distribution default
   useEffect(() => {
+    if (distribution.length > 0) {
+      const firstEntry = distribution[0];
+      const initialSelection: any = {};
+      
+      selectedOptions.forEach(opt => {
+        const key = opt.label.en.toLowerCase();
+        const value = firstEntry[key];
+        if (value) {
+          initialSelection[key] = value;
+          if (key === "size") setSelectedSize(value);
+          if (key === "color") setSelectedColor(value);
+        }
+      });
+      
+      setUnitSelections([initialSelection]);
+      return;
+    }
+
     const defaultSize = product?.sizes?.[0];
     const defaultColor = product?.colors?.en?.[0];
 
@@ -227,7 +284,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     });
 
     setUnitSelections([initialSelection]);
-  }, [product?.sizes, product?.colors, selectedOptions, setSelectedSize, setSelectedColor]);
+  }, [product?.sizes, product?.colors, selectedOptions, setSelectedSize, setSelectedColor, distribution]);
 
   // Nudge auto-rotation
   useEffect(() => {
@@ -264,6 +321,20 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     });
   }, [quantity]);
 
+  // Calculate current stock from distribution
+  const currentStock: number = (() => {
+    if (distribution.length > 0) {
+      const currentSelection = unitSelections[0];
+      const match = distribution.find(d => 
+        Object.keys(currentSelection).every(key => 
+          String(d[key]).toLowerCase() === String((currentSelection as any)[key]).toLowerCase()
+        )
+      );
+      return match ? (match.stock as number) : 0;
+    }
+    return (product?.stock as number) || 0;
+  })();
+
   const showAlert = useCallback((message: string, type: "success" | "error" | "info") => {
     setAlert({ message, type });
     setTimeout(() => setAlert(null), 3000);
@@ -293,6 +364,17 @@ export const useProductPage = ({ product }: UseProductPageProps): {
   const confirmVariantSelection = () => {
     if (!product?.id) return;
 
+    let effectiveStock = product.stock;
+    if (distribution.length > 0) {
+      const currentSelection = unitSelections[0];
+      const match = distribution.find(d => 
+        Object.keys(currentSelection).every(key => 
+          String(d[key]).toLowerCase() === String((currentSelection as any)[key]).toLowerCase()
+        )
+      );
+      if (match) effectiveStock = match.stock;
+    }
+
     dispatch(
       addItem({
         id: product.id,
@@ -308,13 +390,14 @@ export const useProductPage = ({ product }: UseProductPageProps): {
         brand: product.brand,
         deliveryTime: product.deliveryTime,
         sellers: product.sellers,
-        stock: product.stock,
+        stock: effectiveStock,
         color: unitSelections[0]?.color,
         size: unitSelections[0]?.size,
         shippingMethod: product.shippingMethod,
         weightKg: product.weightKg,
         unitSelections: unitSelections,
         totalPrice: (product.price ?? 0) * unitSelections.length,
+        extraData: unitSelections[0], // Pass the whole selection object
         shippingCostInsideCairo: product.shippingCostInsideCairo,
         shippingCostRegion1: product.shippingCostRegion1,
         shippingCostRegion2: product.shippingCostRegion2,
@@ -330,7 +413,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     if (session.data?.user) {
       router.push("/checkout");
     } else {
-      setIsAuthModalOpen(true);
+      setIsQuickAuthModalOpen(true);
     }
   };
 
@@ -343,6 +426,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     currentNudgeIndex,
     isDrawerOpen,
     isAuthModalOpen,
+    isQuickAuthModalOpen,
     isVariantModalOpen,
     alert,
     cartProducts,
@@ -355,6 +439,7 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     setQuantity,
     setIsDrawerOpen,
     setIsAuthModalOpen,
+    setIsQuickAuthModalOpen,
     setIsVariantModalOpen,
     setAlert,
     onUnitSelectionChange,
@@ -362,6 +447,9 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     confirmVariantSelection,
     handleCheckout,
     reviews,
+    averageRating,
+    reviewCount,
     productTags,
+    currentStock,
   };
 };

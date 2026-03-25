@@ -7,7 +7,6 @@ const intlMiddleware = createMiddleware(routing);
 
 // Routes that require authentication
 const protectedPatterns = [
-  "/checkout",
   "/user",
   "/seller",
   "/admin",

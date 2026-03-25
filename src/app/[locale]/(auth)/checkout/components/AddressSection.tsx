@@ -1,4 +1,5 @@
-import { Phone, User, MapPin, Loader2 } from "lucide-react";
+import { Phone, User, MapPin, Loader2, Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
 import { Address } from "@/types";
 import { LanguageType } from "@/util/translations";
 import { UseFormRegister, UseFormWatch, FieldErrors } from "react-hook-form";
@@ -13,6 +14,7 @@ interface AddressSectionProps {
   register: UseFormRegister<CheckoutFormData>;
   watch: UseFormWatch<CheckoutFormData>;
   errors: FieldErrors<CheckoutFormData>;
+  isNewUser?: boolean;
 }
 
 export default function AddressSection({
@@ -24,8 +26,10 @@ export default function AddressSection({
   register,
   watch,
   errors,
+  isNewUser,
 }: AddressSectionProps) {
   const isAr = locale === "ar";
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="mb-6 overflow-hidden rounded-xl border border-gray-100 bg-white/70 shadow-sm backdrop-blur-md transition-all hover:shadow-md">
@@ -82,6 +86,41 @@ export default function AddressSection({
               />
             </div>
           </div>
+
+          {/* Password Input (Only for new users) */}
+          {isNewUser && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-700">
+                {isAr ? "كلمة المرور" : "Password"} <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  {...register("password", {
+                    required: isNewUser ? (isAr ? "كلمة المرور مطلوبة" : "Password is required") : false,
+                    minLength: {
+                      value: 6,
+                      message: isAr ? "يجب أن تكون 6 أحرف على الأقل" : "Must be at least 6 characters"
+                    }
+                  })}
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className={`w-full rounded-lg border ${errors.password ? "border-red-300 ring-4 ring-red-50" : "border-gray-100"} bg-gray-50/50 py-2.5 px-3 text-sm focus:border-primary/50 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all ${isAr ? "pl-9" : "pr-9"}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className={`absolute bottom-2.5 top-2.5 h-4 w-4 text-gray-400 hover:text-primary ${
+                    isAr ? "left-3" : "right-3"
+                  }`}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+                {errors.password && (
+                  <p className="mt-1 text-[10px] text-red-500">{errors.password.message}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Address Input & Actions */}
           <div className="md:col-span-2 space-y-3">

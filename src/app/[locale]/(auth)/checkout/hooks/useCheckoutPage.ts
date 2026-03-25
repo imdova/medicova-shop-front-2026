@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { useSession, signIn } from "next-auth/react";
+import { callRegisterApi } from "@/lib/auth/registerApi";
 import { useForm } from "react-hook-form";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setCart } from "@/store/slices/cartSlice";
@@ -14,6 +17,7 @@ export type CheckoutFormData = {
   phoneNumber: string;
   shippingAddress: string;
   paymentMethod: "card" | "cod";
+  password?: string;
 };
 
 export function useCheckoutPage() {
@@ -23,14 +27,25 @@ export function useCheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<"card" | "cod">("card");
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const searchParams = useSearchParams();
+  const session = useSession();
+  
+  const phoneParam = searchParams.get("phone") || "";
+  const isNewUser = searchParams.get("isNew") === "true";
   
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CheckoutFormData>({
     defaultValues: {
       paymentMethod: "card",
       fullName: "",
-      phoneNumber: ""
+      phoneNumber: phoneParam || ""
     }
   });
+
+  useEffect(() => {
+    if (phoneParam) {
+      setValue("phoneNumber", phoneParam);
+    }
+  }, [phoneParam, setValue]);
   
   const { 
     products: productData, 
@@ -241,5 +256,7 @@ export function useCheckoutPage() {
     watch,
     setValue,
     errors,
+    isNewUser,
+    isLoading: session.status === "loading"
   };
 }

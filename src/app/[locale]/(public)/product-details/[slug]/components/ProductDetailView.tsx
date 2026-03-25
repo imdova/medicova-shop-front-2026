@@ -13,6 +13,7 @@ import ProductOverview from "./ProductOverview";
 import CartDrawer from "./CartDrawer";
 import ProductGallery from "./ProductGallery";
 import VariantSelectionModal from "./VariantSelectionModal";
+import QuickAuthModal from "@/components/shared/Modals/QuickAuthModal";
 
 import SectionHeader from "@/components/features/headings/SectionHeader";
 import MobileCartNavbar from "@/components/layouts/Layout/NavbarMobile/MobileCartNavbar";
@@ -76,6 +77,7 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
     currentNudgeIndex,
     isDrawerOpen,
     isAuthModalOpen,
+    isQuickAuthModalOpen,
     isVariantModalOpen,
     alert,
     cartProducts,
@@ -89,6 +91,7 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
     setQuantity,
     setIsDrawerOpen,
     setIsAuthModalOpen,
+    setIsQuickAuthModalOpen,
     setIsVariantModalOpen,
     setAlert,
     onUnitSelectionChange,
@@ -96,6 +99,9 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
     confirmVariantSelection,
     handleCheckout,
     productTags,
+    averageRating,
+    reviewCount,
+    currentStock,
   } = useProductPage({ product });
 
   if (!isClient) return <LoadingAnimation />;
@@ -182,6 +188,9 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
                 locale={locale}
                 currentNudgeIndex={currentNudgeIndex}
                 selectedOptions={selectedOptions}
+                averageRating={averageRating}
+                reviewCount={reviewCount}
+                currentStock={currentStock}
               />
 
             </div>
@@ -243,6 +252,15 @@ export default function ProductDetailView({ product, locale }: ProductDetailView
           loading={loading}
           locale={locale}
         />
+
+        {/* Quick Auth Modal for checkout */}
+        <Modal
+          isOpen={isQuickAuthModalOpen}
+          onClose={() => setIsQuickAuthModalOpen(false)}
+          size="lg"
+        >
+          <QuickAuthModal onClose={() => setIsQuickAuthModalOpen(false)} />
+        </Modal>
 
         {/* Auth Modal */}
         <Modal
