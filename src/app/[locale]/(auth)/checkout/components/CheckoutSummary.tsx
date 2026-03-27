@@ -12,6 +12,7 @@ interface CheckoutSummaryProps {
   discountAmount?: number;
   appliedCoupon?: string;
   disabled: boolean;
+  onShowSchema?: () => void;
   locale: LanguageType;
 }
 
@@ -24,6 +25,7 @@ export default function CheckoutSummary({
   discountAmount = 0,
   appliedCoupon = "",
   disabled,
+  onShowSchema,
   locale,
 }: CheckoutSummaryProps) {
   const isAr = locale === "ar";
@@ -108,6 +110,14 @@ export default function CheckoutSummary({
             <span className="relative z-10">
               {isAr ? "تأكيد الطلب الآن" : "PLACE ORDER NOW"}
             </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onShowSchema}
+            className="w-full rounded-xl border border-dashed border-gray-200 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary active:scale-[0.98]"
+          >
+            {isAr ? "عرض الـ Schema" : "Show Schema"}
           </button>
 
           <div className="bg-primary/5 border-primary/10 flex items-center gap-2 rounded-xl border p-3">

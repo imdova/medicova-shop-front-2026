@@ -1,15 +1,16 @@
-"use client";
 import React, { ReactNode } from "react";
-import { useSession } from "next-auth/react";
 import { Toaster } from "react-hot-toast";
 import Sidebar from "@/components/layouts/Layout/sidebar/Sidebar";
+import { auth } from "@/lib/auth/auth";
+
+import { SessionProvider } from "next-auth/react";
 
 interface AccountLayoutProps {
   children: ReactNode;
 }
 
-const AccountLayout: React.FC<AccountLayoutProps> = ({ children }) => {
-  const { data: session } = useSession();
+const AccountLayout = async ({ children }: AccountLayoutProps) => {
+  const session = await auth();
 
   const safeUser = {
     id: session?.user?.id || "",
@@ -20,7 +21,8 @@ const AccountLayout: React.FC<AccountLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <SessionProvider session={session}>
+      <div className="min-h-screen bg-[#F8FAFC]">
       <div className="container mx-auto flex gap-6 px-4 pb-4 pt-0 lg:max-w-[1536px]">
         <div className="hidden lg:block">
           <Sidebar user={safeUser} />
@@ -52,7 +54,8 @@ const AccountLayout: React.FC<AccountLayoutProps> = ({ children }) => {
           error: { iconTheme: { primary: "#ef4444", secondary: "#fff" } },
         }}
       />
-    </div>
+      </div>
+    </SessionProvider>
   );
 };
 

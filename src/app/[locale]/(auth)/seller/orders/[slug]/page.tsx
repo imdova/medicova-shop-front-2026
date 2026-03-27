@@ -18,13 +18,10 @@ import { Link } from "@/i18n/navigation";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import {
   getOrderById,
-  updateOrderStatus,
-  deleteOrder,
   ApiOrder,
 } from "@/services/orderService";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
 import { getProductById, mapApiProductToProduct } from "@/services/productService";
 
 function formatDateTime(value: Date, locale: string) {
@@ -39,7 +36,7 @@ function formatDateTime(value: Date, locale: string) {
   }).format(value);
 }
 
-export default function AdminOrderDetailsPage({
+export default function SellerOrderDetailsPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -47,27 +44,53 @@ export default function AdminOrderDetailsPage({
   const { slug } = use(params);
   const locale = useAppLocale();
   const isAr = locale === "ar";
-  const router = useRouter();
 
   const { data: session } = useSession();
   const token = (session as any)?.accessToken;
+  const sellerId = (session as any)?.user?.id;
+
   const [order, setOrder] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [note, setNote] = useState("");
 
   const fetchOrder = useCallback(async () => {
-    if (!token || !slug) return;
+    if (!token || !slug || !sellerId) return;
     setLoading(true);
     try {
       const data = await getOrderById(slug, token);
       if (data) {
         const d = data as any;
         
-        // Use orderStatus as a fallback for status
-        if (d.orderStatus && !d.status) {
-          d.status = d.orderStatus;
-        }
+        // Robust Payment Check (Case-insensitive)
+        const method = String(d.paymentMethod || "").toLowerCase();
+        const status = String(d.paymentStatus || "").toLowerCase();
+        const isPaidOrCod = status === "paid" || method === "cash_on_delivery" || method === "cod";
         
+        if (!isPaidOrCod) {
+          setOrder(null);
+          return;
+        }
+
+        // Filter items for this seller only
+        const sourceItems = (data.items && data.items.length > 0) ? data.items : (d.units || []);
+        
+        const filteredSourceItems = sourceItems.filter((it: any) => {
+          const itemSellerId = 
+            it.sellerId || 
+            (typeof it.productId === 'object' && it.productId?.sellerId) ||
+            it.seller?._id ||
+            it.seller?.id ||
+            (typeof it.productId === 'object' && it.productId?.seller?._id) ||
+            (typeof it.productId === 'object' && it.productId?.seller?.id) ||
+            d.sellerId; // Fallback to order-level sellerId
+          
+          return itemSellerId && sellerId && String(itemSellerId) === String(sellerId);
+        });
+
+        if (filteredSourceItems.length === 0) {
+          setOrder(null);
+          return;
+        }
+
         // Helper to ensure absolute URLs
         const ensureAbsoluteUrl = (url: any) => {
           if (!url || typeof url !== "string" || url === "h") return "/images/placeholder.png";
@@ -76,10 +99,7 @@ export default function AdminOrderDetailsPage({
           return `${apiBaseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
         };
 
-        // If items is missing or empty, use units as the source
-        const sourceItems = (data.items && data.items.length > 0) ? data.items : (d.units || []);
-
-        const itemsWithDetails = await Promise.all(sourceItems.map(async (item: any) => {
+        const itemsWithDetails = await Promise.all(filteredSourceItems.map(async (item: any) => {
           const productId = typeof item.productId === "object" ? item.productId?._id : item.productId;
           if (productId && typeof productId === "string") {
             try {
@@ -103,11 +123,9 @@ export default function AdminOrderDetailsPage({
 
         const transformed = {
           ...d,
-          status: d.status === "delivered" ? "completed" : d.status,
+          status: d.status === "delivered" ? "completed" : (d.status || d.orderStatus || "pending"),
           displayId: d.orderNumber || d.id || d._id,
           grandTotal: d.total || d.totalPrice || d.total_price || d.grandTotal || 0,
-          shippingPrice: d.shippingCost || d.shippingFee || d.shipping_fee || 0,
-          subTotal: d.subtotal || d.subTotal || d.sub_total || ((d.total || d.totalPrice || 0) - (d.shippingCost || 0)) || 0,
           createdAt: d.createdAt || d.created_at,
           paymentMethod: d.paymentMethod || "cash_on_delivery",
           shippingAddress: (() => {
@@ -115,19 +133,11 @@ export default function AdminOrderDetailsPage({
             const isObj = addr && typeof addr === "object" && Object.keys(addr).length > 0;
             const cust = typeof d.customerId === "object" ? d.customerId : (d.user || {});
             
-            const phoneSearch = [
-              isObj && (addr.phone || addr.phoneNumber || addr.phone_number || addr.mobile),
-              d.phoneNumber,
-              d.phone,
-              cust.phone,
-              cust.phoneNumber,
-            ].find(p => p && typeof p === "string" && p.length > 5);
-
             return {
               name: (isObj && (addr.name || addr.addressName || addr.fullName)) || (cust.firstName ? `${cust.firstName} ${cust.lastName}` : (d.userName || d.name || d.user?.name || "Customer")),
-              phone: phoneSearch || (d.phoneNumber || d.phone || cust.phone || "+2"),
-              address: (isObj && (addr.addressDetails || addr.address || addr.street || addr.details)) || d.shippingAddress || d.addressDetails || (typeof addr === "string" ? addr : "N/A"),
-              city: (isObj && (addr.city || addr.area || addr.governorate || addr.region)) || d.governorate || d.area || d.city || "N/A",
+              phone: (isObj && (addr.phone || addr.phoneNumber)) || (d.phoneNumber || d.phone || cust.phone || "+2"),
+              address: (isObj && (addr.addressDetails || addr.address)) || d.shippingAddress || d.addressDetails || "N/A",
+              city: (isObj && (addr.city || addr.area)) || d.governorate || d.area || d.city || "N/A",
               country: (isObj && addr.country) || "Egypt"
             };
           })(),
@@ -165,22 +175,11 @@ export default function AdminOrderDetailsPage({
     } finally {
       setLoading(false);
     }
-  }, [slug, token, isAr, locale]);
+  }, [slug, token, sellerId, isAr, locale]);
 
   useEffect(() => {
     fetchOrder();
   }, [fetchOrder]);
-
-  const handleUpdateStatus = async (newStatus: string) => {
-    if (!token || !order) return;
-    try {
-      await updateOrderStatus(order._id, newStatus, token);
-      toast.success(isAr ? "تم تحديث الحالة" : "Status updated");
-      fetchOrder();
-    } catch (err) {
-      toast.error(isAr ? "فشل في تحديث الحالة" : "Failed to update status");
-    }
-  };
 
   const statusConfig = {
     completed: { color: "bg-emerald-50 text-emerald-700 border-emerald-100", label: isAr ? "مكتمل" : "Completed" },
@@ -197,7 +196,7 @@ export default function AdminOrderDetailsPage({
       <div className="flex h-screen items-center justify-center bg-[#F8FAFC]">
         <div className="text-center">
           <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
-          <p className="mt-4 text-lg font-bold text-slate-600">
+          <p className="mt-4 text-sm font-bold text-gray-400">
             {isAr ? "جاري تحميل تفاصيل الطلب..." : "Loading order details..."}
           </p>
         </div>
@@ -212,10 +211,10 @@ export default function AdminOrderDetailsPage({
           <Package size={48} />
         </div>
         <h2 className="text-xl font-bold text-gray-900">
-          {isAr ? "الطلب غير موجود" : "Order Not Found"}
+          {isAr ? "الطلب غير موجود أو غير مصرّح لك بالوصول" : "Order Not Found or Access Denied"}
         </h2>
         <Link 
-          href={`/${locale}/admin/orders`}
+          href={`/${locale}/seller/orders`}
           className="mt-2 font-semibold text-primary hover:underline"
         >
           {isAr ? "العودة للطلبات" : "Back to Orders"}
@@ -230,7 +229,7 @@ export default function AdminOrderDetailsPage({
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Link 
-            href={`/${locale}/admin/orders`} 
+            href={`/${locale}/seller/orders`} 
             className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-100 bg-white transition-colors hover:bg-gray-50"
           >
             <ChevronLeft className={`${isAr ? 'rotate-180' : ''} text-gray-600`} size={20} />
@@ -248,27 +247,8 @@ export default function AdminOrderDetailsPage({
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <div className={`inline-flex items-center rounded-full border px-4 py-1.5 text-sm font-bold uppercase tracking-wider ${config.color}`}>
-            {config.label}
-          </div>
-          
-          <div className="relative group">
-            <button className="h-10 rounded-xl bg-white border border-gray-100 px-4 text-sm font-bold text-gray-700 hover:bg-gray-50">
-              {isAr ? "تحديث الحالة" : "Update Status"}
-            </button>
-            <div className="absolute right-0 top-full mt-2 hidden min-w-[160px] flex-col rounded-2xl border border-gray-100 bg-white p-2 shadow-xl group-hover:flex z-50">
-              {Object.keys(statusConfig).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => handleUpdateStatus(s)}
-                  className="flex w-full items-center px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-xl"
-                >
-                  {statusConfig[s as keyof typeof statusConfig]?.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className={`inline-flex items-center rounded-full border px-4 py-1.5 text-sm font-bold uppercase tracking-wider ${config.color}`}>
+          {config.label}
         </div>
       </div>
 
@@ -279,7 +259,7 @@ export default function AdminOrderDetailsPage({
           <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-gray-900">
               <ShoppingBag size={20} className="text-primary" />
-              {isAr ? "المنتجات" : "Order Items"}
+              {isAr ? "منتجاتي في هذا الطلب" : "My Products in this Order"}
             </h2>
             <div className="divide-y divide-gray-50">
               {order.items?.map((item: any, idx: number) => (
@@ -333,30 +313,6 @@ export default function AdminOrderDetailsPage({
               </div>
             </div>
           </section>
-
-          {/* Admin Internal Notes */}
-          <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-gray-900">
-              <FileText size={20} className="text-primary" />
-              {isAr ? "ملاحظات داخلية" : "Admin Internal Notes"}
-            </h2>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={isAr ? "أضف ملاحظة عن هذا الطلب..." : "Add a note about this order..."}
-              className="min-h-[120px] w-full resize-none rounded-2xl border border-gray-100 bg-gray-50/50 p-4 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-primary/20"
-            />
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-400">
-                {isAr ? "الملاحظات مرئية لفريق المتجر فقط." : "Notes are only visible to marketplace staff."}
-              </p>
-              <button 
-                className="rounded-xl bg-primary px-6 py-2 text-sm font-bold text-white transition-colors hover:bg-primary/90"
-              >
-                {isAr ? "حفظ الملاحظة" : "Save Note"}
-              </button>
-            </div>
-          </section>
         </div>
 
         {/* Sidebar Summary */}
@@ -364,26 +320,14 @@ export default function AdminOrderDetailsPage({
           <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm sticky top-8">
             <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-gray-900">
               <CreditCard size={20} className="text-primary" />
-              {isAr ? "ملخص الدفع" : "Payment Summary"}
+              {isAr ? "نظام الدفع" : "Payment Info"}
             </h2>
             
             <div className="space-y-4">
               <div className="flex justify-between text-sm text-gray-500">
-                <span>{isAr ? "المجموع الفرعي" : "Subtotal"}</span>
-                <span className="font-semibold text-gray-900">
-                   {isAr ? "جنيه" : "EGP"} {order.subTotal?.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm text-gray-500">
                 <span>{isAr ? "طريقة الدفع" : "Payment Method"}</span>
                 <span className="font-semibold text-gray-900 uppercase">
-                  {order.paymentMethod === "cash_on_delivery"
-                    ? "COD"
-                    : order.paymentMethod === "wallet"
-                      ? (isAr ? "محفظة" : "Wallet")
-                      : order.paymentMethod === "card" || order.paymentMethod === "online" || order.paymentMethod === "credit_card"
-                        ? (isAr ? "بطاقة" : "Card")
-                        : order.paymentMethod || "Other"}
+                  {order.paymentMethod === "cash_on_delivery" ? "COD" : (isAr ? "بطاقة/محفظة" : "Card/Wallet")}
                 </span>
               </div>
               
@@ -395,28 +339,25 @@ export default function AdminOrderDetailsPage({
                   <span className="text-2xl font-black text-primary">
                     {isAr ? "جنيه" : "EGP"} {order.grandTotal?.toLocaleString()}
                   </span>
-                  <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-emerald-700 ring-1 ring-emerald-100">
+                  <div className={`inline-flex rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest ring-1 ${order.paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100'}`}>
                     {order.paymentStatus === "paid" ? (isAr ? "مدفوع" : "Paid") : (isAr ? "معلق" : "Pending")}
                   </div>
                 </div>
               </div>
-
-              <div className="mt-8 pt-6 border-t border-gray-50">
-                <button
-                  onClick={() => {
-                    if (window.confirm(isAr ? "هل أنت متأكد من حذف هذا الطلب؟" : "Are you sure you want to delete this order?")) {
-                      deleteOrder(order._id, token).then(() => {
-                        toast.success(isAr ? "تم حذف الطلب" : "Order deleted");
-                        router.push(`/${locale}/admin/orders`);
-                      });
-                    }
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50/50 py-3 text-sm font-bold text-red-600 transition-colors hover:bg-red-50"
-                >
-                  {isAr ? "حذف الطلب" : "Delete Order"}
-                </button>
-              </div>
             </div>
+          </section>
+
+          <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+             <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
+              <FileText size={20} className="text-primary" />
+              {isAr ? "حالة الطلب" : "Order Status"}
+            </h2>
+            <div className={`inline-flex items-center rounded-full border px-4 py-1.5 text-xs font-black uppercase tracking-widest ${config.color}`}>
+              {config.label}
+            </div>
+            <p className="mt-4 text-xs font-semibold text-gray-400">
+               {isAr ? "يتم تحديث الحالة من قبل إدارة المتجر." : "Status is updated by marketplace administration."}
+            </p>
           </section>
         </div>
       </div>

@@ -4,6 +4,8 @@ import { User } from "next-auth";
 export interface Order {
   id: string;
   status: "completed" | "cancelled" | "processing" | "shipped";
+  paymentMethod: string;
+  paymentStatus: string;
   date: string;
   time: string;
   productName: string;
@@ -13,6 +15,7 @@ export interface Order {
   orderId: string;
   createdAt: number;
 }
+
 
 export interface SidebarItem {
   title: string;

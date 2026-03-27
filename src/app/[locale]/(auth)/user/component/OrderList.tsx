@@ -40,7 +40,7 @@ const OrderList: React.FC<OrderListProps> = ({ orders, locale }) => {
       <AnimatePresence mode="popLayout">
         {orders.map((order, index) => (
           <motion.div
-            key={order.orderId}
+            key={order.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}

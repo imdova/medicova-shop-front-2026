@@ -142,8 +142,8 @@ const SignInPage: React.FC = () => {
               <Label htmlFor="email">{t("email")}</Label>
               <Input
                 id="email"
-                type="email"
-                placeholder="m@example.com"
+                type="text"
+                placeholder="Type Your Email or Phone Number"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

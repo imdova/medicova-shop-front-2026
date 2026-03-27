@@ -3,7 +3,7 @@
 import React from "react";
 import { Order } from "@/app/[locale]/(auth)/user/types/account";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ChevronRight, Calendar, Hash, Tag } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
@@ -34,11 +34,29 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, locale }) => {
       color: "bg-sky-50 text-sky-700 border-sky-100",
       label: t("status_shipped") || "Shipped",
     },
+    cod: {
+      color: "bg-amber-50 text-amber-700 border-amber-100",
+      label: locale === "ar" ? "الدفع عند الاستلام" : "COD",
+    },
+    paid: {
+      color: "bg-emerald-50 text-emerald-700 border-emerald-100",
+      label: locale === "ar" ? "تم الدفع" : "Paid",
+    },
   };
 
-  const config =
+  let config =
     statusConfig[order.status as keyof typeof statusConfig] ||
     statusConfig.processing;
+
+
+  if (order.paymentMethod === "cash_on_delivery") {
+    config = statusConfig.cod;
+  } else if (order.paymentStatus === "paid" || (order.paymentMethod === "credit_card" && order.status === "processing")) {
+ 
+    config = statusConfig.paid;
+  }
+
+
 
   return (
     <motion.div
@@ -76,10 +94,6 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, locale }) => {
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5 rounded-md border border-gray-100 bg-gray-50 px-2 py-1 font-mono text-xs text-gray-400">
-                <Hash size={12} />
-                {order.orderId}
-              </div>
             </div>
 
             <div className="space-y-1">
@@ -102,7 +116,6 @@ const OrderItem: React.FC<OrderItemProps> = ({ order, locale }) => {
           </div>
         </div>
 
-        {/* Floating Action Hint */}
         <div
           className={`absolute ${isRTL ? "left-5" : "right-5"} top-1/2 -translate-x-4 -translate-y-1/2 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100`}
         >

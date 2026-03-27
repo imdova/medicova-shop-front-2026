@@ -111,7 +111,7 @@ const VariantSelectionModal: React.FC<VariantSelectionModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {selectedOptions.map((opt, optIdx) => {
                   const label = isAr ? opt.label.ar : opt.label.en;
-                  const key = opt.label.en.toLowerCase();
+                  const key = opt.label.en;
                   
                   return (
                     <div key={optIdx} className="space-y-1.5">

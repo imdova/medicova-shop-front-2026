@@ -249,12 +249,12 @@ export const useProductPage = ({ product }: UseProductPageProps): {
       const initialSelection: any = {};
       
       selectedOptions.forEach(opt => {
-        const key = opt.label.en.toLowerCase();
-        const value = firstEntry[key];
+        const key = opt.label.en;
+        const value = firstEntry[key.toLowerCase()] || firstEntry[key];
         if (value) {
           initialSelection[key] = value;
-          if (key === "size") setSelectedSize(value);
-          if (key === "color") setSelectedColor(value);
+          if (key.toLowerCase() === "size") setSelectedSize(value);
+          if (key.toLowerCase() === "color") setSelectedColor(value);
         }
       });
       
@@ -269,14 +269,13 @@ export const useProductPage = ({ product }: UseProductPageProps): {
     if (defaultColor) setSelectedColor(defaultColor);
 
     const initialSelection: any = {};
-    if (defaultSize) initialSelection.size = defaultSize;
-    if (defaultColor) initialSelection.color = defaultColor;
     
     // Also try to match with any dynamic labels from selectedOptions if they are fetched
     selectedOptions.forEach(opt => {
-      const key = opt.label.en.toLowerCase();
-      if (key === "size") initialSelection[key] = defaultSize;
-      if (key === "color") initialSelection[key] = defaultColor;
+      const key = opt.label.en;
+      if (key.toLowerCase() === "size") initialSelection[key] = defaultSize;
+      if (key.toLowerCase() === "color") initialSelection[key] = defaultColor;
+      
       // If we have a default value in opt.values, we could use it here
       if (!initialSelection[key] && opt.values.length > 0) {
         initialSelection[key] = opt.values[0].name;
@@ -346,8 +345,11 @@ export const useProductPage = ({ product }: UseProductPageProps): {
       next[index] = selection;
       // Sync first unit with top-level selection for legacy compatibility
       if (index === 0) {
-        setSelectedSize(selection.size);
-        setSelectedColor(selection.color);
+        // Try all casing variants for syncing
+        const sizeVal = selection.size || (selection as any).Size || (selection as any).SIZE;
+        const colorVal = selection.color || (selection as any).Color || (selection as any).COLOR;
+        setSelectedSize(sizeVal);
+        setSelectedColor(colorVal);
       }
       return next;
     });

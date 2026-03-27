@@ -1,20 +1,37 @@
-"use client";
-
-import { CreditCard, Banknote, CheckCircle2 } from "lucide-react";
+import { CreditCard, Banknote, CheckCircle2, Wallet, Smartphone } from "lucide-react";
 import { LanguageType } from "@/util/translations";
+import { PaymobMethod } from "@/services/paymentService";
 
 interface PaymentSectionProps {
-  paymentMethod: "card" | "cod";
-  onSelectMethod: (method: "card" | "cod") => void;
+  paymentMethod: string;
+  onSelectMethod: (method: string) => void;
   locale: LanguageType;
+  paymobMethods: PaymobMethod[];
 }
 
 export default function PaymentSection({
   paymentMethod,
   onSelectMethod,
   locale,
+  paymobMethods,
 }: PaymentSectionProps) {
   const isAr = locale === "ar";
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "card":
+        return <CreditCard className="h-5 w-5" />;
+      case "ewallet":
+      case "wallet":
+        return <Wallet className="h-5 w-5" />;
+      case "kiosk":
+        return <Smartphone className="h-5 w-5" />;
+      case "cash_on_delivery":
+        return <Banknote className="h-5 w-5" />;
+      default:
+        return <CreditCard className="h-5 w-5" />;
+    }
+  };
 
   return (
     <div className="mb-8 overflow-hidden rounded-2xl border border-gray-100 bg-white/70 shadow-sm backdrop-blur-md transition-all hover:shadow-md">
@@ -27,73 +44,66 @@ export default function PaymentSection({
         </h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Card Option */}
-          <div
-            className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border-2 p-5 transition-all duration-300 ${
-              paymentMethod === "card"
-                ? "bg-primary/5 border-primary shadow-inner"
-                : "hover:border-primary/30 hover:bg-primary/5 border-gray-100 bg-white"
-            }`}
-            onClick={() => onSelectMethod("card")}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <div
-                className={`rounded-lg p-2 ${paymentMethod === "card" ? "bg-primary text-white" : "bg-gray-50 text-gray-400 group-hover:bg-white"}`}
-              >
-                <CreditCard className="h-5 w-5" />
-              </div>
-              {paymentMethod === "card" && (
-                <CheckCircle2 className="fill-primary/10 h-5 w-5 text-primary" />
-              )}
-            </div>
-
-            <div>
-              <p
-                className={`text-sm font-bold ${paymentMethod === "card" ? "text-primary" : "text-gray-800"}`}
-              >
-                {isAr ? "بطاقة ائتمان / خصم" : "Debit/Credit Card"}
-              </p>
-              <p className="mt-1 text-[10px] leading-tight text-gray-500">
-                {isAr
-                  ? "خطط التقسيط الشهرية متوفرة للدفع الآمن"
-                  : "Secure payment with monthly installments available"}
-              </p>
-            </div>
-          </div>
-
           {/* COD Option */}
           <div
             className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border-2 p-5 transition-all duration-300 ${
-              paymentMethod === "cod"
+              paymentMethod === "cash_on_delivery"
                 ? "bg-primary/5 border-primary shadow-inner"
                 : "hover:border-primary/30 hover:bg-primary/5 border-gray-100 bg-white"
             }`}
-            onClick={() => onSelectMethod("cod")}
+            onClick={() => onSelectMethod("cash_on_delivery")}
           >
             <div className="mb-3 flex items-center justify-between">
               <div
-                className={`rounded-lg p-2 ${paymentMethod === "cod" ? "bg-primary text-white" : "bg-gray-50 text-gray-400 group-hover:bg-white"}`}
+                className={`rounded-lg p-2 ${paymentMethod === "cash_on_delivery" ? "bg-primary text-white" : "bg-gray-50 text-gray-400 group-hover:bg-white"}`}
               >
                 <Banknote className="h-5 w-5" />
               </div>
-              {paymentMethod === "cod" && (
+              {paymentMethod === "cash_on_delivery" && (
                 <CheckCircle2 className="fill-primary/10 h-5 w-5 text-primary" />
               )}
             </div>
 
             <div>
               <p
-                className={`text-sm font-bold ${paymentMethod === "cod" ? "text-primary" : "text-gray-800"}`}
+                className={`text-sm font-bold ${paymentMethod === "cash_on_delivery" ? "text-primary" : "text-gray-800"}`}
               >
                 {isAr ? "الدفع عند الاستلام" : "Cash On Delivery"}
               </p>
-              <p className="mt-1 text-[10px] leading-tight text-gray-500">
-                {isAr
-                  ? "قد يتم فرض رسوم إضافية بقيمة 9.00 جنيه"
-                  : "Extra charge of EGP 9.00 applies for this method"}
-              </p>
             </div>
           </div>
+
+          {/* Paymob Methods */}
+          {paymobMethods.filter(m => m.enabled).map((method) => (
+            <div
+              key={method.type}
+              className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border-2 p-5 transition-all duration-300 ${
+                paymentMethod === method.type
+                  ? "bg-primary/5 border-primary shadow-inner"
+                  : "hover:border-primary/30 hover:bg-primary/5 border-gray-100 bg-white"
+              }`}
+              onClick={() => onSelectMethod(method.type)}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <div
+                  className={`rounded-lg p-2 ${paymentMethod === method.type ? "bg-primary text-white" : "bg-gray-50 text-gray-400 group-hover:bg-white"}`}
+                >
+                  {getIcon(method.type)}
+                </div>
+                {paymentMethod === method.type && (
+                  <CheckCircle2 className="fill-primary/10 h-5 w-5 text-primary" />
+                )}
+              </div>
+
+              <div>
+                <p
+                  className={`text-sm font-bold ${paymentMethod === method.type ? "text-primary" : "text-gray-800"}`}
+                >
+                  {method.label}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
