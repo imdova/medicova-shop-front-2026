@@ -11,6 +11,7 @@ type FormData = {
   email: string;
   password: string;
   name?: string;
+  phone?: string;
 };
 
 type AuthLoginProps = {
@@ -72,6 +73,7 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ redirect }) => {
           password: data.password,
           role: "user",
           language: locale as string,
+          phone: data.phone || "",
         });
 
         if (registerData.status === "success") {
@@ -259,6 +261,33 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ redirect }) => {
                   {errors.name && (
                     <p className="mt-1 text-sm text-red-500">
                       {errors.name.message}
+                    </p>
+                  )}
+                </motion.div>
+              )}
+
+              {!isLogin && (
+                <motion.div className="mb-4">
+                  <label
+                    htmlFor="phone"
+                    className="mb-1 block text-sm font-medium text-gray-700"
+                  >
+                    {t("phoneLabel") || (locale === "ar" ? "رقم الهاتف" : "Phone Number")}
+                  </label>
+                  <input
+                    id="phone"
+                    type="tel"
+                    {...register("phone", {
+                      required: !isLogin ? "Phone is required" : false,
+                    })}
+                    className={`w-full rounded-lg border px-4 py-3 outline-none transition-all ${
+                      errors.phone ? "border-red-500" : "border-gray-300"
+                    }`}
+                    placeholder={t("phonePlaceholder") || "+20..."}
+                  />
+                  {errors.phone && (
+                    <p className="mt-1 text-sm text-red-500">
+                      {errors.phone.message}
                     </p>
                   )}
                 </motion.div>

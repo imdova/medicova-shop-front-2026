@@ -1,4 +1,5 @@
 import { useLocale } from "next-intl";
+import { useParams } from "next/navigation";
 import type { Locale } from "@/i18n/routing";
 
 /**
@@ -20,7 +21,15 @@ export type BilingualText = {
  * ```
  */
 export function useAppLocale(): Locale {
-  return useLocale() as Locale;
+  const params = useParams();
+  const localeFromParams = params?.locale as Locale;
+  
+  try {
+    const locale = useLocale() as Locale;
+    return locale || localeFromParams || "en";
+  } catch (e) {
+    return localeFromParams || "en";
+  }
 }
 
 /**

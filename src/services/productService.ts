@@ -200,6 +200,7 @@ export async function getProducts(token?: string): Promise<ApiProduct[]> {
       method: "GET",
       token: authToken,
       suppressErrorLog: true,
+      suppressAutoLogout: true,
     });
 
   try {
@@ -234,6 +235,7 @@ export async function getProductById(id: string, token?: string): Promise<ApiPro
       method: "GET",
       token: authToken,
       suppressErrorLog: true,
+      suppressAutoLogout: true,
     });
 
   try {

@@ -36,6 +36,10 @@ const translations = {
     en: "Password",
     ar: "كلمة المرور",
   },
+  phone: {
+    en: "Phone Number",
+    ar: "رقم الهاتف",
+  },
   createAccount: {
     en: "Create My Account",
     ar: "إنشاء حسابي",
@@ -87,6 +91,7 @@ const RegisterPage: React.FC = () => {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [isSeller, setIsSeller] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +133,7 @@ const RegisterPage: React.FC = () => {
         password,
         role: isSeller ? "seller" : "user",
         language: locale,
+        phone,
       });
 
       if (registerData.status === "success" && registerData.data) {
@@ -514,6 +520,20 @@ const RegisterPage: React.FC = () => {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full"
+              />
+            </div>
+
+            {/* Phone Field */}
+            <div className="space-y-2">
+              <Label htmlFor="phone">{t("phone")}</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+201234567890"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 required
                 className="w-full"
               />

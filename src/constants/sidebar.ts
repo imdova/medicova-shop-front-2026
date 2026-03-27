@@ -130,11 +130,6 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
           href: "/seller/returns",
           icon: Undo2,
         },
-        {
-          title: { en: "Wishlist", ar: "المفضلة" },
-          href: "/wishlist",
-          icon: Heart,
-        },
       ],
     },
     {
@@ -144,31 +139,6 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
           title: { en: "Profile", ar: "الملف الشخصي" },
           href: "/seller/profile",
           icon: UserRoundPen,
-        },
-        {
-          title: { en: "Addresses", ar: "العناوين" },
-          href: "/seller/addresses",
-          icon: MapPin,
-        },
-        {
-          title: { en: "Payments", ar: "المدفوعات" },
-          href: "/seller/payments",
-          icon: WalletCards,
-        },
-      ],
-    },
-    {
-      title: { en: "Others", ar: "أخرى" },
-      items: [
-        {
-          title: { en: "Notifications", ar: "الإشعارات" },
-          href: "/seller/notifications",
-          icon: Bell,
-        },
-        {
-          title: { en: "Security Settings", ar: "إعدادات الأمان" },
-          href: "/seller/security",
-          icon: ShieldUser,
         },
       ],
     },

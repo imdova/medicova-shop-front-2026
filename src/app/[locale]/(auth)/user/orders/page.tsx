@@ -8,57 +8,7 @@ import { OrderHeader } from "../component/OrderHeader";
 import { OrderFilters } from "../component/OrderFilters";
 import OrderList from "../component/OrderList";
 import { OrderPagination } from "../component/OrderPagination";
-
-const mockOrders: Order[] = [
-  {
-    id: "1",
-    status: "cancelled",
-    productImage:
-      "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-    date: "Tuesday, 27th May",
-    time: "06:50 PM",
-    productName: "Jeep Buluo Leather Cross Body Bag Black",
-    orderId: "NEBHIB0642330781",
-    createdAt: new Date("2023-05-27").getTime(),
-  },
-  {
-    id: "2",
-    status: "cancelled",
-    productImage:
-      "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-    date: "Tuesday, 27th May",
-    time: "06:50 PM",
-    productName: "B.S COLLECTION: Ywingo waterproof bag shoulder or backpack",
-    productBrand: "B.S",
-    productDescription: "Cafe color",
-    orderId: "NEBHIB0642330782",
-    createdAt: new Date("2023-05-27").getTime(),
-  },
-  {
-    id: "3",
-    status: "completed",
-    productImage:
-      "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-    date: "Monday, 15th June",
-    time: "10:30 AM",
-    productName: "Wireless greentooth Headphones",
-    productBrand: "SoundMaster",
-    orderId: "NEBHIB0642330783",
-    createdAt: new Date("2023-06-15").getTime(),
-  },
-  {
-    id: "4",
-    status: "completed",
-    productImage:
-      "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-    date: "Friday, 1st September",
-    time: "03:45 PM",
-    productName: "Smart Watch Pro",
-    productBrand: "TechGadgets",
-    orderId: "NEBHIB0642330784",
-    createdAt: new Date("2023-09-01").getTime(),
-  },
-];
+import { ShoppingBag } from "lucide-react";
 
 const OrdersPage: React.FC = () => {
   const locale = useAppLocale();
@@ -70,7 +20,31 @@ const OrdersPage: React.FC = () => {
     paginatedOrders,
     filteredCount,
     updateSearchParam,
-  } = useUserOrders(mockOrders, 8);
+    loading,
+    error
+  } = useUserOrders([], 8); // Pass empty array instead of mock
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 text-center">
+        <div className="rounded-full bg-red-50 p-4 text-red-500">
+          <ShoppingBag size={48} />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900">
+          {locale === "ar" ? "فشل في تحميل الطلبات" : "Failed to load orders"}
+        </h2>
+        <p className="text-gray-500">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl pb-20">

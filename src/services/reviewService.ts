@@ -30,50 +30,95 @@ export interface ApiReview {
   };
 }
 
-export const getAllReviews = async (token: string, productId?: string): Promise<ReviewType[]> => {
-  const endpoint = productId 
-    ? `/reviews/product/${productId}?populate=productId,userId` 
+export const getAllReviews = async (
+  token: string,
+  productId?: string,
+): Promise<{ reviews: ReviewType[]; totalRate: number }> => {
+  const endpoint = productId
+    ? `/reviews/product/${productId}?populate=productId,userId`
     : `/reviews?populate=productId,userId`;
 
-  const res = await apiClient<any>({
-    endpoint,
-    method: "GET",
-    token,
-  });
+  let res: any;
+  try {
+    res = await apiClient<any>({
+      endpoint,
+      method: "GET",
+      token,
+      suppressErrorLog: true,
+      suppressAutoLogout: true,
+    });
+  } catch (err) {
+    console.warn("getAllReviews failed (suppressed):", err);
+    return { reviews: [], totalRate: 0 };
+  }
 
   const data = res.data || res;
-  const reviewsData = data.reviews || (Array.isArray(data) ? data : (data.data || []));
-  const reviews = Array.isArray(reviewsData) ? reviewsData : [];
+  const reviewsData =
+    data.reviews || (Array.isArray(data) ? data : data.data || []);
+  const totalRate = data.total_rate || 0;
 
-  return reviews.map((r: any) => ({
+  const reviews = Array.isArray(reviewsData)
+    ? reviewsData.filter((r: any) => r.productId)
+    : [];
+
+  const mappedReviews = reviews.map((r: any) => ({
     id: r._id,
     product: {
       id: String(r.productId?._id || r.productId || ""),
       title: {
-        en: r.product?.nameEn || r.product?.title?.en || r.productId?.nameEn || r.productId?.title?.en || r.productNameEn || r.nameEn || r.productName || r.name || "Product",
-        ar: r.product?.nameAr || r.product?.title?.ar || r.productId?.nameAr || r.productId?.title?.ar || r.productNameAr || r.nameAr || r.productName || r.name || "منتج",
+        en:
+          r.product?.nameEn ||
+          r.product?.title?.en ||
+          r.productId?.nameEn ||
+          r.productId?.title?.en ||
+          r.productNameEn ||
+          r.nameEn ||
+          r.productName ||
+          r.name ||
+          "Product",
+        ar:
+          r.product?.nameAr ||
+          r.product?.title?.ar ||
+          r.productId?.nameAr ||
+          r.productId?.title?.ar ||
+          r.productNameAr ||
+          r.nameAr ||
+          r.productName ||
+          r.name ||
+          "منتج",
       },
-      images: r.product?.media?.featuredImages ? [r.product.media.featuredImages] : (r.product?.images || []),
+      images: r.product?.media?.featuredImages
+        ? [r.product.media.featuredImages]
+        : r.product?.images || [],
       price: r.product?.pricing?.salePrice || r.product?.price || 0,
     },
     user: {
       id: r.userId,
       firstName: r.user?.firstName || r.userName || "Customer",
       lastName: r.user?.lastName || "",
-      email: r.userEmail || "", 
+      email: r.userEmail || "",
       avatar: r.user?.profileImage || r.userImage || "",
     },
     rating: r.rate || r.rating || 0,
     comment: r.descriptionEn || r.comment || "",
     images: r.images || [],
     status: {
-      en: r.status ? (r.status.charAt(0).toUpperCase() + r.status.slice(1)) : "Pending",
-      ar: r.status === "published" ? "منشور" : r.status === "pending" ? "قيد الانتظار" : "مرفوض",
+      en: r.status
+        ? r.status.charAt(0).toUpperCase() + r.status.slice(1)
+        : "Pending",
+      ar:
+        r.status === "published"
+          ? "منشور"
+          : r.status === "pending"
+            ? "قيد الانتظار"
+            : "مرفوض",
     },
     approved: r.approved || false,
     createdAt: r.createdAt,
-    reviewType: r.status === "manual" ? "manual" : "system",
+    reviewType: (r.status === "manual" ? "manual" : "system") as "manual" | "system",
   }));
+
+  return { reviews: mappedReviews, totalRate };
 };
 
 export const createReview = async (data: any, token: string) => {

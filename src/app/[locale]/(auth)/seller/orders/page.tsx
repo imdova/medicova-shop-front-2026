@@ -1,243 +1,279 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import {
+  CalendarDays,
+  ChevronDown,
+  Eye,
+  Package,
+  Search,
+  Receipt,
+  ShoppingCart,
+  TrendingUp,
+  Loader2,
+} from "lucide-react";
 
-import { Search } from "lucide-react";
+import { Link } from "@/i18n/navigation";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { Order } from "../../user/types/account";
-import OrderList from "../components/OrderList";
+import { getSellerOrders, ApiOrder } from "@/services/orderService";
+import { useSession } from "next-auth/react";
+import { toast } from "react-hot-toast";
 
-const mockOrders: Order[] = [
-  {
-    id: "1",
-    status: "cancelled",
-    productImage:
-      "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-    date: "Tuesday, 27th May",
-    time: "06:50 PM",
-    productName: "Jeep Buluo Leather Cross Body Bag Black",
-    orderId: "NEBHIB0642330781",
-    createdAt: new Date("2023-05-27").getTime(),
-  },
-  {
-    id: "2",
-    status: "cancelled",
-    productImage:
-      "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-    date: "Tuesday, 27th May",
-    time: "06:50 PM",
-    productName: "B.S COLLECTION: Ywingo waterproof bag shoulder or backpack",
-    productBrand: "B.S",
-    productDescription: "Cafe color",
-    orderId: "NEBHIB0642330782",
-    createdAt: new Date("2023-05-27").getTime(),
-  },
-  {
-    id: "3",
-    status: "completed",
-    productImage:
-      "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-    date: "Monday, 15th June",
-    time: "10:30 AM",
-    productName: "Wireless greentooth Headphones",
-    productBrand: "SoundMaster",
-    orderId: "NEBHIB0642330783",
-    createdAt: new Date("2023-06-15").getTime(),
-  },
-  {
-    id: "4",
-    status: "completed",
-    productImage:
-      "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-    date: "Friday, 1st September",
-    time: "03:45 PM",
-    productName: "Smart Watch Pro",
-    productBrand: "TechGadgets",
-    orderId: "NEBHIB0642330784",
-    createdAt: new Date("2023-09-01").getTime(),
-  },
-];
-
-const translations = {
-  title: {
-    en: "Orders",
-    ar: "الطلبات",
-  },
-  subtitle: {
-    en: "View the delivery status for items and your order history",
-    ar: "عرض حالة التسليم وسجل الطلبات الخاص بك",
-  },
-  searchPlaceholder: {
-    en: "Search by product, brand, or order ID...",
-    ar: "ابحث حسب المنتج أو الماركة أو رقم الطلب...",
-  },
-  allOrders: {
-    en: "All Orders",
-    ar: "كل الطلبات",
-  },
-  last3months: {
-    en: "Last 3 Months",
-    ar: "آخر 3 شهور",
-  },
-  orderFound: {
-    en: "order found",
-    ar: "طلب تم العثور عليه",
-  },
-  ordersFound: {
-    en: "orders found",
-    ar: "طلبات تم العثور عليها",
-  },
-  prev: {
-    en: "Prev",
-    ar: "السابق",
-  },
-  next: {
-    en: "Next",
-    ar: "التالي",
-  },
-  pageLabel: {
-    en: "Page",
-    ar: "الصفحة",
-  },
-  ofLabel: {
-    en: "of",
-    ar: "من",
-  },
-};
-
-const OrdersPage: React.FC = () => {
+export default function SellerOrdersPage() {
   const locale = useAppLocale();
-  const searchParams = useSearchParams();
+  const isArabic = locale === "ar";
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const searchTerm = searchParams.get("search") || "";
-  const timeFilter =
-    (searchParams.get("timeFilter") as "all" | "last3months") || "all";
-  const page = parseInt(searchParams.get("page") || "1", 10);
-  const pageSize = 8;
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const sellerId = (session as any)?.user?.id;
 
-  const updateSearchParam = (param: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+  const [ordersData, setOrdersData] = useState<ApiOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 8;
 
-    if (value.trim()) {
-      params.set(param, value);
-    } else {
-      params.delete(param);
+  const fetchOrders = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await getSellerOrders(token);
+      const filtered = data.filter(o => {
+        const method = String(o.paymentMethod || "").toLowerCase();
+        const status = String(o.paymentStatus || "").toLowerCase();
+        const isPaidOrCod = status === "paid" || method === "cash_on_delivery" || method === "cod";
+        return isPaidOrCod;
+      });
+      setOrdersData(filtered);
+    } catch (err) {
+      console.error("Failed to fetch orders:", err);
+      toast.error(isArabic ? "فشل في تحميل الطلبات" : "Failed to load orders");
+    } finally {
+      setLoading(false);
     }
+  }, [token, sellerId, isArabic]);
 
-    if (["search", "timeFilter"].includes(param)) {
-      params.set("page", "1");
-    }
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
-    router.push(`/user/orders?${params.toString()}`);
-  };
-  const filteredOrders = useMemo(() => {
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  function formatMoneyEGP(value: number) {
+    const loc = locale === "ar" ? "ar-EG" : "en-US";
+    return new Intl.NumberFormat(loc, {
+      style: "currency",
+      currency: "EGP",
+      maximumFractionDigits: 0,
+    }).format(value);
+  }
 
-    return mockOrders.filter((order) => {
-      const matchesSearch =
-        order.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.productBrand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.orderId.toLowerCase().includes(searchTerm.toLowerCase());
+  const enriched = useMemo(() => {
+    return ordersData.map((o) => {
+      const oid = o.orderId || o._id || (o as any).id || "unknown";
+      const orderIdLabel = o.orderNumber || (o.orderId ? `#HM-${o.orderId.substring(Math.max(0, o.orderId.length - 6))}` : "#HM-NEW");
+      const customerName = (o as any).user?.name || o.name || "Customer";
+      const customerSubtitle = (o as any).user?.email || o.email || "";
+      
+      const totalAmount = o.totalPrice || o.total || (o as any).grandTotal || 0;
 
-      const matchesTimePeriod =
-        timeFilter === "all" || order.createdAt >= threeMonthsAgo.getTime();
-
-      return matchesSearch && matchesTimePeriod;
+      return {
+        ...o,
+        id: oid,
+        orderIdLabel,
+        customerName,
+        customerSubtitle,
+        totalAmount,
+        dateLabel: new Date(o.createdAt || new Date()).toLocaleDateString(isArabic ? "ar-EG" : "en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+        }),
+      };
     });
-  }, [searchTerm, timeFilter]);
+  }, [isArabic, ordersData]);
 
-  const totalPages = Math.ceil(filteredOrders.length / pageSize);
-  const currentPage = Math.min(Math.max(page, 1), totalPages);
-  const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return enriched.filter((o) => {
+      const matchesSearch =
+        !q ||
+        o.orderIdLabel.toLowerCase().includes(q) ||
+        o.customerName.toLowerCase().includes(q) ||
+        o.customerSubtitle.toLowerCase().includes(q);
+      
+      return matchesSearch;
+    });
+  }, [enriched, searchQuery]);
+
+  const metrics = useMemo(() => {
+    const totalOrders = filtered.length;
+    const totalRevenue = filtered.reduce((acc, o) => acc + o.totalAmount, 0);
+    const avgOrder = totalOrders ? totalRevenue / totalOrders : 0;
+    return { totalOrders, totalRevenue, avgOrder };
+  }, [filtered]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+  const pageRows = filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
+  if (loading && ordersData.length === 0) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center bg-white rounded-3xl border border-gray-100 shadow-sm">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
+          <p className="mt-4 text-sm font-bold text-gray-400">
+            {isArabic ? "جاري تحميل الطلبات..." : "Loading orders..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-700">
+      {/* Title */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-700">
-          {translations.title[locale]}
-        </h2>
-        <p className="text-sm text-secondary">
-          {translations.subtitle[locale]}
+        <h1 className="text-3xl font-black text-gray-900">
+          {isArabic ? "طلباتي" : "My Orders"}
+        </h1>
+        <p className="mt-1 text-sm font-semibold text-gray-400">
+          {isArabic ? "تتبع وإدارة طلبات عملائك" : "Track and manage your customer orders"}
         </p>
       </div>
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="w-1/3 text-sm text-gray-500">
-          {filteredOrders.length}{" "}
-          {filteredOrders.length === 1
-            ? translations.orderFound[locale]
-            : translations.ordersFound[locale]}
-        </div>
-        <div className="flex w-full gap-3">
-          <div className="relative w-full">
-            <input
-              type="text"
-              placeholder={translations.searchPlaceholder[locale]}
-              className="w-full rounded-md border border-gray-300 px-4 py-2 pl-10 placeholder:text-sm focus:outline-none"
-              value={searchTerm}
-              onChange={(e) => updateSearchParam("search", e.target.value)}
-            />
-            <Search
-              size={15}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary"
-            />
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {[
+          {
+            label: isArabic ? "إجمالي الطلبات" : "Total Orders",
+            value: metrics.totalOrders.toLocaleString(),
+            icon: ShoppingCart,
+            color: "text-emerald-600 bg-emerald-50 ring-emerald-100",
+          },
+          {
+            label: isArabic ? "إجمالي الإيراد" : "Total Revenue",
+            value: formatMoneyEGP(metrics.totalRevenue),
+            icon: Receipt,
+            color: "text-blue-600 bg-blue-50 ring-blue-100",
+          },
+          {
+            label: isArabic ? "متوسط الطلب" : "Avg Order",
+            value: formatMoneyEGP(metrics.avgOrder),
+            icon: TrendingUp,
+            color: "text-indigo-600 bg-indigo-50 ring-indigo-100",
+          },
+        ].map((k) => (
+          <div key={k.label} className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-gray-400 mb-1">{k.label}</p>
+                <p className="text-2xl font-black text-gray-900">{k.value}</p>
+              </div>
+              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 ${k.color}`}>
+                <k.icon size={24} />
+              </div>
+            </div>
           </div>
+        ))}
+      </div>
 
-          <div>
-            <select
-              className="h-full rounded-md border border-gray-300 px-2 py-2 focus:outline-none"
-              value={timeFilter}
-              onChange={(e) => updateSearchParam("timeFilter", e.target.value)}
-            >
-              <option value="all">{translations.allOrders[locale]}</option>
-              <option value="last3months">
-                {translations.last3months[locale]}
-              </option>
-            </select>
-          </div>
+      {/* Filter Bar */}
+      <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-300" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={isArabic ? "ابحث برقم الطلب أو العميل..." : "Search by order ID or customer..."}
+            className="h-12 w-full rounded-2xl border-none bg-gray-50/50 pl-12 pr-4 text-sm font-bold text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary/20"
+          />
         </div>
       </div>
 
-      <OrderList orders={paginatedOrders} locale={locale} />
-
-      {totalPages > 1 && (
-        <div className="mt-4 flex justify-center gap-2">
-          <button
-            disabled={currentPage === 1}
-            onClick={() => updateSearchParam("page", String(currentPage - 1))}
-            className={`rounded px-4 py-2 ${
-              currentPage === 1
-                ? "bg-gray-300 text-gray-500"
-                : "bg-green-600 text-white"
-            }`}
-          >
-            {translations.prev[locale]}
-          </button>
-          <span className="px-4 py-2 text-sm">
-            {translations.pageLabel[locale]} {currentPage}{" "}
-            {translations.ofLabel[locale]} {totalPages}
-          </span>
-          <button
-            disabled={currentPage === totalPages}
-            onClick={() => updateSearchParam("page", String(currentPage + 1))}
-            className={`rounded px-4 py-2 ${
-              currentPage === totalPages
-                ? "bg-gray-300 text-gray-500"
-                : "bg-green-600 text-white"
-            }`}
-          >
-            {translations.next[locale]}
-          </button>
+      {/* Table */}
+      <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-50 bg-gray-50/30 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                <th className="px-6 py-4">{isArabic ? "رقم الطلب" : "Order ID"}</th>
+                <th className="px-6 py-4">{isArabic ? "العميل" : "Customer"}</th>
+                <th className="px-6 py-4">{isArabic ? "التاريخ" : "Date"}</th>
+                <th className="px-6 py-4">{isArabic ? "الإجمالي" : "Total"}</th>
+                <th className="px-6 py-4">{isArabic ? "الدفع" : "Payment"}</th>
+                <th className="px-6 py-4 text-right">{isArabic ? "إجراء" : "Action"}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 font-bold text-gray-700">
+              {pageRows.map((o) => (
+                <tr key={o.id} className="transition-colors hover:bg-gray-50/50">
+                  <td className="px-6 py-5">
+                    <Link href={`/${locale}/seller/orders/${o.id}`} className="text-primary hover:underline">
+                      {o.orderIdLabel}
+                    </Link>
+                  </td>
+                  <td className="px-6 py-5">
+                    <p className="text-gray-900">{o.customerName}</p>
+                    <p className="text-[10px] text-gray-400">{o.customerSubtitle}</p>
+                  </td>
+                  <td className="px-6 py-5 text-gray-500">{o.dateLabel}</td>
+                  <td className="px-6 py-5 text-gray-900">{formatMoneyEGP(o.totalAmount)}</td>
+                  <td className="px-6 py-5">
+                    <span className="uppercase text-[10px] font-black tracking-widest">
+                      {o.paymentMethod === "cash_on_delivery" ? "COD" : (isArabic ? "بطاقة/محفظة" : "Card/Wallet")}
+                    </span>
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <Link
+                      href={`/${locale}/seller/orders/${o.id}`}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gray-50 text-gray-400 transition-colors hover:bg-primary hover:text-white"
+                    >
+                      <Eye size={18} />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+              {pageRows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-20 text-center">
+                    <Package size={48} className="mx-auto text-gray-100 mb-4" />
+                    <p className="text-sm font-bold text-gray-400">
+                      {isArabic ? "لا توجد طلبات لعرضها" : "No orders found"}
+                    </p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-50 px-6 py-4">
+            <p className="text-xs font-bold text-gray-400">
+              {isArabic ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
+            </p>
+            <div className="flex gap-2">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(p => p - 1)}
+                className="h-9 rounded-xl border border-gray-100 bg-white px-4 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                {isArabic ? "السابق" : "Prev"}
+              </button>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage(p => p + 1)}
+                className="h-9 rounded-xl border border-gray-100 bg-white px-4 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                {isArabic ? "التالي" : "Next"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
-};
-
-export default OrdersPage;
+}

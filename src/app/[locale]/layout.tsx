@@ -11,6 +11,7 @@ import LoadingAnimation from "@/components/layouts/LoadingAnimation";
 import StoreProvider from "@/store/StoreProvider";
 import { NextAuthProvider } from "@/NextAuthProvider";
 import DynamicFooter from "@/components/layouts/Layout/Footer/DynamicFooter";
+import { auth } from "@/lib/auth/auth";
 
 const raleway = Raleway({
   subsets: ["latin"],
@@ -61,6 +62,8 @@ export default async function LocaleLayout({ children, params }: Props) {
     headerLinks = staticHeaderLinks;
   }
 
+  const session = await auth();
+
   return (
     <html lang={locale} dir={direction} suppressHydrationWarning>
       <body
@@ -69,7 +72,7 @@ export default async function LocaleLayout({ children, params }: Props) {
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
           <StoreProvider>
-            <NextAuthProvider>
+            <NextAuthProvider session={session}>
               <DynamicHeaderWrapper headerLinks={headerLinks}>
                 {children}
                 <DynamicFooter footerData={footerData} />

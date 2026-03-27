@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { useSession, signIn } from "next-auth/react";
+import { callRegisterApi } from "@/lib/auth/registerApi";
 import { useForm } from "react-hook-form";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setCart } from "@/store/slices/cartSlice";
@@ -8,29 +11,70 @@ import { useAppLocale } from "@/hooks/useAppLocale";
 import { getEncrypted } from "@/util/encryptedCookieStorage";
 import { useSyncCart } from "@/hooks/useSyncCart";
 import { cities } from "@/constants/cities";
+import { getPaymobMethods, initializePaymobPayment, PaymobMethod } from "@/services/paymentService";
+import { createOrderWithDetails } from "@/services/orderService";
 
 export type CheckoutFormData = {
   fullName: string;
   phoneNumber: string;
   shippingAddress: string;
-  paymentMethod: "card" | "cod";
+  governorate: string;
+  paymentMethod: string;
+  password?: string;
 };
 
 export function useCheckoutPage() {
   const { syncCart } = useSyncCart();
+  const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [showCreditCardModal, setShowCreditCardModal] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "cod">("card");
+  const [paymentMethod, setPaymentMethod] = useState<string>("card");
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const [paymobMethods, setPaymobMethods] = useState<PaymobMethod[]>([]);
+  const searchParams = useSearchParams();
+  const session = useSession();
+  const dispatch = useAppDispatch();
   
+  const { 
+    phoneNumber: reduxPhone, 
+    isNewUser: reduxIsNew,
+    step: currentStep 
+  } = useAppSelector((state) => state.checkout);
+
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CheckoutFormData>({
     defaultValues: {
       paymentMethod: "card",
       fullName: "",
-      phoneNumber: ""
+      phoneNumber: reduxPhone || "",
+      governorate: "",
     }
   });
+
+  useEffect(() => {
+    if (session?.data?.user) {
+      const user = session.data.user as any;
+      if (user.firstName && user.lastName) {
+        setValue("fullName", `${user.firstName} ${user.lastName}`);
+      } else if (user.name) {
+        setValue("fullName", user.name);
+      }
+      
+      if (user.phone) {
+        // Remove +2 for the input field display if it exists, or just keep as is
+        // The user says "hides the field" so we just need the value for the form state
+        setValue("phoneNumber", user.phone.replace("+2", ""));
+      } else if (user.phoneNumber) {
+        setValue("phoneNumber", user.phoneNumber.replace("+2", ""));
+      }
+    }
+  }, [session, setValue]);
+
+  useEffect(() => {
+    if (reduxPhone) {
+      setValue("phoneNumber", reduxPhone);
+    }
+  }, [reduxPhone, setValue]);
   
   const { 
     products: productData, 
@@ -40,9 +84,16 @@ export function useCheckoutPage() {
   } = useAppSelector(
     (state) => state.cart,
   );
-  const dispatch = useAppDispatch();
   const [isClient, setIsClient] = useState(false);
   const locale = useAppLocale();
+
+  useEffect(() => {
+    const fetchMethods = async () => {
+      const methods = await getPaymobMethods();
+      setPaymobMethods(methods);
+    };
+    fetchMethods();
+  }, []);
 
   useEffect(() => {
     const loadCart = async () => {
@@ -63,15 +114,9 @@ export function useCheckoutPage() {
     loadCart();
   }, [dispatch]);
 
-  const handleSelectMethod = (method: "card" | "cod") => {
-    if (method === "card") {
-      setPaymentMethod("card");
-      setValue("paymentMethod", "card");
-      setShowCreditCardModal(true);
-    } else if (method === "cod") {
-      setPaymentMethod("cod");
-      setValue("paymentMethod", "cod");
-    }
+  const handleSelectMethod = (method: string) => {
+    setPaymentMethod(method as any);
+    setValue("paymentMethod", method);
   };
 
   const reverseGeocode = useCallback(
@@ -180,6 +225,7 @@ export function useCheckoutPage() {
 
   const productShippingFees = useMemo(() => {
     const destination = (selectedAddress?.country_code as DestinationKey) || "EG";
+    const selectedGov = watch("governorate");
 
     return productData.map((item) => {
       const shippingMethod = item.shippingMethod || "standard";
@@ -189,7 +235,7 @@ export function useCheckoutPage() {
       const feeInput = {
         shippingMethod,
         destination,
-        city: selectedAddress?.city,
+        city: selectedGov || selectedAddress?.city,
         cartTotal: itemPrice * item.quantity,
         weightKg: itemWeight * item.quantity,
         shippingCostInsideCairo: (item as any).shippingCostInsideCairo,
@@ -204,7 +250,7 @@ export function useCheckoutPage() {
         quantity: item.quantity,
       };
     });
-  }, [productData, selectedAddress]);
+  }, [productData, selectedAddress, watch("governorate")]);
 
   const totalShippingFee = useMemo(
     () => productShippingFees.reduce((total, item) => total + item.fee, 0),
@@ -213,7 +259,7 @@ export function useCheckoutPage() {
 
   const subtotal = totalPrice;
   const shippingFee = totalShippingFee;
-  const paymentFee = paymentMethod === "cod" ? 9.0 : 0;
+  const paymentFee = 0; // Removed COD fee as requested
   const discountAmount = reduxDiscount || 0;
   const total = subtotal + shippingFee + paymentFee - discountAmount;
 
@@ -233,6 +279,8 @@ export function useCheckoutPage() {
     appliedCoupon: reduxCoupon,
     total,
     productShippingFees,
+    isSchemaModalOpen,
+    setIsSchemaModalOpen,
     setShowCreditCardModal,
     handleSelectMethod,
     handleLocateMe,
@@ -241,5 +289,9 @@ export function useCheckoutPage() {
     watch,
     setValue,
     errors,
+    isNewUser: reduxIsNew,
+    currentStep,
+    paymobMethods,
+    isLoading: session.status === "loading"
   };
 }

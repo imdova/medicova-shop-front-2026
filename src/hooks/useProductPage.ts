@@ -85,8 +85,11 @@ export const useProductPage = ({ product }: UseProductPageProps) => {
       const fetchReviews = async () => {
         try {
           const accessToken = (session.data as any)?.accessToken || "";
-          const apiReviews = await getAllReviews(accessToken, product.id);
-          
+          const { reviews: apiReviews } = await getAllReviews(
+            accessToken,
+            product.id,
+          );
+
           // Map to format expected by ProductReviews component
           const mappedReviews = apiReviews.map((r: any) => ({
             id: r.id,

@@ -13,6 +13,9 @@ interface PriceSectionProps {
     label: { en: string; ar: string }; 
     values: { name: string; color: string }[] 
   }[];
+  averageRating: number;
+  reviewCount: number;
+  currentStock: number;
 }
 
 const StarRating = ({ rating }: { rating: number }) => (
@@ -75,6 +78,9 @@ const PriceSection = ({
   locale,
   currentNudgeIndex,
   selectedOptions,
+  averageRating,
+  reviewCount,
+  currentStock,
 }: PriceSectionProps) => {
   const t = useTranslations("product");
   const common = useTranslations("common");
@@ -87,9 +93,9 @@ const PriceSection = ({
         <div
           className={`flex items-center gap-2 ${locale === "ar" && "flex-row-reverse"}`}
         >
-          <StarRating rating={product.rating ?? 0} />
+          <StarRating rating={averageRating ?? 0} />
           <span className="cursor-pointer text-xs text-blue-600 hover:underline">
-            {product.rating} ★ ({product.reviewCount?.toLocaleString()}{" "}
+            {averageRating.toFixed(1)} ★ ({reviewCount?.toLocaleString()}{" "}
             {t("ratings")})
           </span>
         </div>
@@ -113,9 +119,7 @@ const PriceSection = ({
 
         {/* Stock */}
         <div className="flex items-center gap-4">
-          {product.stock && (
-            <StockBadge stock={product.stock} locale={locale} />
-          )}
+          <StockBadge stock={currentStock} locale={locale} />
         </div>
       </div>
 

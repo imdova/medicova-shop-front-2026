@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import Modal from "@/components/shared/Modals/DynamicModal";
 import AuthLogin from "@/components/shared/Modals/loginAuth";
 import { useAppLocale } from "@/hooks/useAppLocale";
+import QuickAuthModal from "@/components/shared/Modals/QuickAuthModal";
 import { useTranslations } from "next-intl";
 import { Address, DestinationKey } from "@/types";
 import { useCartCalculations } from "./hooks/useCartCalculations";
@@ -38,6 +39,7 @@ export default function CartPage() {
   } | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isQuickAuthOpen, setIsQuickAuthOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("standard");
 
@@ -162,7 +164,7 @@ export default function CartPage() {
     if (session.data?.user) {
       router.push("/checkout");
     } else {
-      setIsModalOpen(true);
+      setIsQuickAuthOpen(true);
     }
   };
 
@@ -219,6 +221,14 @@ export default function CartPage() {
       </div>
 
       <div className="relative z-[1000]">
+        <Modal
+          isOpen={isQuickAuthOpen}
+          onClose={() => setIsQuickAuthOpen(false)}
+          size="lg"
+        >
+          <QuickAuthModal onClose={() => setIsQuickAuthOpen(false)} />
+        </Modal>
+
         <Modal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}

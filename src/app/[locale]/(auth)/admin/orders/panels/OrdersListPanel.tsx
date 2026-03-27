@@ -16,6 +16,7 @@ import {
 
 import { orders, Order } from "../constants";
 import { getOrders, deleteOrder, ApiOrder } from "@/services/orderService";
+import { getSellers, Seller } from "@/services/sellerService";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
 
@@ -36,7 +37,22 @@ export default function OrdersListPanel({
   const { data: session } = useSession();
   const token = (session as any)?.accessToken;
   const [ordersData, setOrdersData] = useState<ApiOrder[]>([]);
+  const [sellers, setSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (token) {
+      getSellers(token).then(setSellers).catch(console.error);
+    }
+  }, [token]);
+
+  const sellerMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    sellers.forEach((s) => {
+      map[s.id] = s.storeName || s.name;
+    });
+    return map;
+  }, [sellers]);
 
   const fetchOrders = useCallback(async () => {
     if (!token) return;
@@ -88,18 +104,16 @@ export default function OrdersListPanel({
     return Number.parseFloat(m[0].replace(/,/g, "")) || 0;
   }
 
-  function formatMoneyUSD(value: number) {
+  function formatMoneyEGP(value: number) {
     const loc = locale === "ar" ? "ar-EG" : "en-US";
     return new Intl.NumberFormat(loc, {
       style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      currency: "EGP",
+      maximumFractionDigits: 0,
     }).format(value);
   }
 
   function formatDateLabel(raw: string) {
-    // raw like "15/5/2025" (d/m/yyyy)
     const parts = raw.split("/").map((x) => Number.parseInt(x, 10));
     const d =
       parts.length === 3
@@ -115,54 +129,54 @@ export default function OrdersListPanel({
 
   const enriched = useMemo(() => {
     return ordersData.map((o) => {
-      const h = hashToNumber(`order:${o._id}:${o.orderNumber}`);
+      const oid = (o as any).orderId || o._id || (o as any).id || "unknown";
+      const h = hashToNumber(`order:${oid}`);
       const orderIdLabel =
-        o.orderNumber || `#HM-${o._id.substring(o._id.length - 4)}`;
-      const customerSubtitle =
-        h % 4 === 0
-          ? isArabic
-            ? "قسم المشتريات"
-            : "Procurement Dept."
-          : h % 4 === 1
-            ? isArabic
-              ? "مدير التوريد"
-              : "Supply Manager"
-            : h % 4 === 2
-              ? isArabic
-                ? "صيدلية داخلية"
-                : "Internal Pharmacy"
-              : isArabic
-                ? "إدارة العمليات"
-                : "Operations";
+        (o as any).orderId
+          ? `#HM-${(o as any).orderId.substring(Math.max(0, (o as any).orderId.length - 6))}`
+          : "#HM-NEW";
+      
+      const customerName = (o as any).user?.name || o.name || "Customer";
+      const customerSubtitle = (o as any).user?.email || o.email || (isArabic ? "عميل" : "Customer");
+      const customerLocation = (o as any).address?.city ? `${(o as any).address.city}${ (o as any).address.area ? `, ${(o as any).address.area}` : ""}` : (isArabic ? "مصر" : "Egypt");
 
-      const paymentStatus = o.paymentStatus;
-      const fulfillmentStatus = o.status;
+      const paymentStatus = o.paymentStatus || "pending";
+      const fulfillmentStatus = (o as any).orderStatus || o.status || "pending";
 
       const orderType = h % 3 === 0 ? "b2b" : "b2c";
 
-      const totalNumber = o.total;
-      const totalUSD = totalNumber ? totalNumber / 50 : 0;
+      const totalAmount =
+        (o as any).totalPrice ||
+        o.total ||
+        (o as any).grandTotal ||
+        (o as any).payment?.amount ||
+        0;
+
+      const sellerName =
+        o.sellerId && typeof o.sellerId === "string"
+          ? sellerMap[o.sellerId] || (isArabic ? "ميديكوفا" : "Medicova")
+          : (o as any).sellerName ||
+            (o as any).seller?.name ||
+            (isArabic ? "ميديكوفا" : "Medicova");
 
       return {
         ...o,
-        id: o._id,
+        id: oid,
         orderIdLabel,
-        customerName:
-          `${o.customerId?.firstName || ""} ${o.customerId?.lastName || ""}`.trim() ||
-          "Unknown",
-        customerLocation: isArabic ? "مصر" : "Egypt", // Location not directly in schema top-level
+        customerName,
+        customerLocation,
         customerSubtitle,
         paymentStatus,
         fulfillmentStatus,
         orderType,
-        totalUSD,
+        totalAmount,
         dateLabel: formatDateLabel(
-          new Date(o.createdAt).toLocaleDateString("en-GB"),
+          new Date(o.createdAt || new Date()).toLocaleDateString("en-GB"),
         ),
-        sellerName: isArabic ? "ميديكوفا" : "Medicova", // Seller object not in this schema sample as expected
+        sellerName,
       };
     });
-  }, [isArabic, ordersData]);
+  }, [isArabic, ordersData, sellerMap]);
 
   const sellerOptions = useMemo(() => {
     const unique = Array.from(
@@ -174,6 +188,11 @@ export default function OrdersListPanel({
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return enriched.filter((o) => {
+      // Show only orders that are 'paid' or 'cash_on_delivery'
+      const isPaidOrCod =
+        o.paymentStatus === "paid" || o.paymentMethod === "cash_on_delivery";
+      if (!isPaidOrCod) return false;
+
       const matchesSearch =
         !q ||
         o.orderIdLabel.toLowerCase().includes(q) ||
@@ -181,29 +200,29 @@ export default function OrdersListPanel({
         o.customerName.toLowerCase().includes(q) ||
         o.customerLocation.toLowerCase().includes(q) ||
         o.sellerName.toLowerCase().includes(q);
+      
       const sellerOk =
         sellerFilter === "all" ? true : o.sellerName === sellerFilter;
-      const fulfillmentOk =
-        fulfillmentFilter === "any"
-          ? true
-          : o.fulfillmentStatus === fulfillmentFilter;
+
       const orderTypeOk =
         orderTypeFilter === "b2b-b2c" ? true : o.orderType === orderTypeFilter;
 
-      // dateRange is cosmetic for now (mock data); keep state for UI
-      return matchesSearch && sellerOk && fulfillmentOk && orderTypeOk;
+      return matchesSearch && sellerOk && orderTypeOk;
     });
-  }, [enriched, fulfillmentFilter, orderTypeFilter, searchQuery, sellerFilter]);
+  }, [enriched, orderTypeFilter, searchQuery, sellerFilter]);
+
+  const paidOrCodOrders = useMemo(() => {
+    return enriched.filter((o) =>
+      o.paymentStatus === "paid" || o.paymentMethod === "cash_on_delivery"
+    );
+  }, [enriched]);
 
   const metrics = useMemo(() => {
-    const totalOrders = enriched.length;
-    const pendingFulfillment = enriched.filter(
-      (o) => o.fulfillmentStatus === "processing",
-    ).length;
-    const totalRevenue = enriched.reduce((acc, o) => acc + o.totalUSD, 0);
+    const totalOrders = paidOrCodOrders.length;
+    const totalRevenue = paidOrCodOrders.reduce((acc, o) => acc + (o as any).totalAmount, 0);
     const avgOrder = totalOrders ? totalRevenue / totalOrders : 0;
-    return { totalOrders, pendingFulfillment, totalRevenue, avgOrder };
-  }, [enriched]);
+    return { totalOrders, totalRevenue, avgOrder };
+  }, [paidOrCodOrders]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   const safePage = Math.min(page, totalPages);
@@ -228,20 +247,14 @@ export default function OrdersListPanel({
             iconTone: "bg-emerald-50 text-emerald-700 ring-emerald-100",
           },
           {
-            label: isArabic ? "بانتظار التجهيز" : "Pending Fulfillment",
-            value: metrics.pendingFulfillment.toLocaleString(),
-            icon: Package,
-            iconTone: "bg-amber-50 text-amber-700 ring-amber-100",
-          },
-          {
             label: isArabic ? "إجمالي الإيراد" : "Total Revenue",
-            value: formatMoneyUSD(metrics.totalRevenue),
+            value: formatMoneyEGP(metrics.totalRevenue),
             icon: Receipt,
             iconTone: "bg-emerald-50 text-emerald-700 ring-emerald-100",
           },
           {
             label: isArabic ? "متوسط قيمة الطلب" : "Average Order Value",
-            value: formatMoneyUSD(metrics.avgOrder),
+            value: formatMoneyEGP(metrics.avgOrder),
             icon: TrendingUp,
             iconTone: "bg-indigo-50 text-indigo-700 ring-indigo-100",
           },
@@ -343,38 +356,6 @@ export default function OrdersListPanel({
             </div>
           </div>
 
-          <div className="lg:col-span-3">
-            <div className="mb-1 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-              {isArabic ? "حالة التجهيز" : "Fulfillment Status"}
-            </div>
-            <div className="relative">
-              <select
-                value={fulfillmentFilter}
-                onChange={(e) => {
-                  setFulfillmentFilter(e.target.value);
-                  setPage(1);
-                }}
-                className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              >
-                <option value="any">
-                  {isArabic ? "أي حالة" : "Any Status"}
-                </option>
-                <option value="processing">
-                  {isArabic ? "قيد المعالجة" : "Processing"}
-                </option>
-                <option value="shipped">
-                  {isArabic ? "تم الشحن" : "Shipped"}
-                </option>
-                <option value="delivered">
-                  {isArabic ? "تم التسليم" : "Delivered"}
-                </option>
-                <option value="cancelled">
-                  {isArabic ? "ملغي" : "Cancelled"}
-                </option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            </div>
-          </div>
 
           <div className="lg:col-span-2">
             <div className="mb-1 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
@@ -434,9 +415,6 @@ export default function OrdersListPanel({
                   <th className="px-5 py-3">
                     {isArabic ? "الدفع" : "Payment"}
                   </th>
-                  <th className="px-5 py-3">
-                    {isArabic ? "التجهيز" : "Fulfillment"}
-                  </th>
                   <th className="px-5 py-3 text-right">
                     {isArabic ? "الإجراءات" : "Actions"}
                   </th>
@@ -490,45 +468,16 @@ export default function OrdersListPanel({
                         {o.dateLabel}
                       </td>
                       <td className="px-5 py-4 text-sm font-extrabold text-slate-900">
-                        {formatMoneyUSD(o.totalUSD)}
+                        {formatMoneyEGP((o as any).totalAmount)}
                       </td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${paymentTone}`}
-                        >
-                          {o.paymentStatus === "paid"
-                            ? isArabic
-                              ? "مدفوع"
-                              : "Paid"
-                            : o.paymentStatus === "pending"
-                              ? isArabic
-                                ? "معلق"
-                                : "Pending"
-                              : isArabic
-                                ? "مسترجع"
-                                : "Refunded"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${fulfillmentTone}`}
-                        >
-                          {o.fulfillmentStatus === "shipped"
-                            ? isArabic
-                              ? "تم الشحن"
-                              : "Shipped"
-                            : o.fulfillmentStatus === "processing"
-                              ? isArabic
-                                ? "قيد المعالجة"
-                                : "Processing"
-                              : o.fulfillmentStatus === "delivered"
-                                ? isArabic
-                                  ? "تم التسليم"
-                                  : "Delivered"
-                                : isArabic
-                                  ? "ملغي"
-                                  : "Cancelled"}
-                        </span>
+                      <td className="px-5 py-4 text-sm font-extrabold text-slate-900 uppercase">
+                        {o.paymentMethod === "cash_on_delivery"
+                          ? "COD"
+                          : o.paymentMethod === "wallet"
+                            ? (isArabic ? "محفظة" : "Wallet")
+                            : o.paymentMethod === "card" || o.paymentMethod === "online" || o.paymentMethod === "credit_card"
+                              ? (isArabic ? "بطاقة" : "Card")
+                              : o.paymentMethod || "Other"}
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">

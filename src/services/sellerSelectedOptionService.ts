@@ -41,12 +41,19 @@ export async function updateSellerSelectedOptions(
 export async function getSellerSelectedOptions(
   productId: string,
   token?: string,
-  suppressErrorLog?: boolean
+  suppressErrorLog?: boolean,
+  suppressAutoLogout: boolean = true,
 ) {
-  return apiClient({
-    endpoint: `/seller-selected-option/by-product/${productId}`,
-    method: "GET",
-    token,
-    suppressErrorLog,
-  });
+  try {
+    return await apiClient({
+      endpoint: `/seller-selected-option/by-product/${productId}`,
+      method: "GET",
+      token,
+      suppressErrorLog: true, // Force true for public-facing calls
+      suppressAutoLogout,
+    });
+  } catch (err) {
+    console.warn("getSellerSelectedOptions failed (suppressed):", err);
+    return null;
+  }
 }

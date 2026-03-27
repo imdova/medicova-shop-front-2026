@@ -204,6 +204,7 @@ export async function getVariantById(id: string, token?: string): Promise<Produc
       endpoint: `/product-variants/${id}`,
       method: "GET",
       token,
+      suppressErrorLog: true,
     });
     return mapVariant(response.data || response);
   } catch (error) {

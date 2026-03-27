@@ -12,8 +12,9 @@ export type CartFormValues = {
 };
 
 export interface UnitSelection {
-  size?: SizeType | NumericSizeType | LiquidSizeType;
+  size?: any;
   color?: string;
+  [key: string]: any;
 }
 
 export interface CartItem {
