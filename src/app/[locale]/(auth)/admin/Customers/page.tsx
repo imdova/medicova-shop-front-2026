@@ -1,13 +1,13 @@
 "use client";
 
-import { Plus, Store } from "lucide-react";
-import SellersListPanel from "./panels/SellersListPanel";
+import { Plus, Users } from "lucide-react";
+import CustomersListPanel from "./panels/CustomersListPanel";
 import { useState } from "react";
 import AddSellerModal from "../components/AddSellerModal";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { useTranslations } from "next-intl";
 
-export default function SellersPage() {
+export default function CustomersPage() {
   const t = useTranslations("admin");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const locale = useAppLocale();
@@ -21,16 +21,16 @@ export default function SellersPage() {
           <div>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-                <Store className="h-5 w-5 text-[#31533A]" />
+                <Users className="h-5 w-5 text-[#31533A]" />
               </div>
               <div>
                 <h1 className="text-2xl font-black tracking-tight text-gray-900 md:text-3xl">
-                  {isArabic ? "إدارة البائعين" : "Sellers Management"}
+                  {isArabic ? "إدارة العملاء" : "Customers Management"}
                 </h1>
                 <p className="mt-0.5 text-sm font-medium text-gray-400">
                   {isArabic
-                    ? "راقب وأدر بائعين سوق الرعاية الصحية."
-                    : "Monitor and manage marketplace healthcare vendors."}
+                    ? "راقب وأدر قاعدة عملائك بشكل فعال."
+                    : "Monitor and manage your customer base efficiently."}
                 </p>
               </div>
             </div>
@@ -43,11 +43,11 @@ export default function SellersPage() {
               size={18}
               className="transition-transform duration-300 group-hover:rotate-90"
             />
-            <span>{isArabic ? "إضافة بائع" : "Onboard New Seller"}</span>
+            <span>{isArabic ? "إضافة عميل" : "Onboard New Customer"}</span>
           </button>
         </div>
 
-        <SellersListPanel locale={locale} />
+        <CustomersListPanel locale={locale} />
 
         <AddSellerModal
           isModalOpen={isModalOpen}
