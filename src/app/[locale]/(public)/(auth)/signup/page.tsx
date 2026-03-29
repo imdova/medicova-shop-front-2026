@@ -1,7 +1,7 @@
 "use client";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Input, PasswordInput } from "@/components/shared/input";
 import { Label } from "@/components/shared/label";
@@ -9,6 +9,94 @@ import { Button } from "@/components/shared/button";
 import { Checkbox } from "@/components/shared/Check-Box";
 import { callRegisterApi } from "@/lib/auth/registerApi";
 import Link from "next/link";
+
+// Country code data – Egypt is first (default)
+const COUNTRY_CODES = [
+  { name: "Egypt", code: "EG", dialCode: "+20", flag: "🇪🇬" },
+  { name: "Saudi Arabia", code: "SA", dialCode: "+966", flag: "🇸🇦" },
+  { name: "UAE", code: "AE", dialCode: "+971", flag: "🇦🇪" },
+  { name: "Kuwait", code: "KW", dialCode: "+965", flag: "🇰🇼" },
+  { name: "Qatar", code: "QA", dialCode: "+974", flag: "🇶🇦" },
+  { name: "Bahrain", code: "BH", dialCode: "+973", flag: "🇧🇭" },
+  { name: "Oman", code: "OM", dialCode: "+968", flag: "🇴🇲" },
+  { name: "Jordan", code: "JO", dialCode: "+962", flag: "🇯🇴" },
+  { name: "Lebanon", code: "LB", dialCode: "+961", flag: "🇱🇧" },
+  { name: "Iraq", code: "IQ", dialCode: "+964", flag: "🇮🇶" },
+  { name: "Libya", code: "LY", dialCode: "+218", flag: "🇱🇾" },
+  { name: "Tunisia", code: "TN", dialCode: "+216", flag: "🇹🇳" },
+  { name: "Algeria", code: "DZ", dialCode: "+213", flag: "🇩🇿" },
+  { name: "Morocco", code: "MA", dialCode: "+212", flag: "🇲🇦" },
+  { name: "Sudan", code: "SD", dialCode: "+249", flag: "🇸🇩" },
+  { name: "Palestine", code: "PS", dialCode: "+970", flag: "🇵🇸" },
+  { name: "Syria", code: "SY", dialCode: "+963", flag: "🇸🇾" },
+  { name: "Yemen", code: "YE", dialCode: "+967", flag: "🇾🇪" },
+  { name: "United States", code: "US", dialCode: "+1", flag: "🇺🇸" },
+  { name: "United Kingdom", code: "GB", dialCode: "+44", flag: "🇬🇧" },
+  { name: "Germany", code: "DE", dialCode: "+49", flag: "🇩🇪" },
+  { name: "France", code: "FR", dialCode: "+33", flag: "🇫🇷" },
+  { name: "Italy", code: "IT", dialCode: "+39", flag: "🇮🇹" },
+  { name: "Spain", code: "ES", dialCode: "+34", flag: "🇪🇸" },
+  { name: "Netherlands", code: "NL", dialCode: "+31", flag: "🇳🇱" },
+  { name: "Turkey", code: "TR", dialCode: "+90", flag: "🇹🇷" },
+  { name: "India", code: "IN", dialCode: "+91", flag: "🇮🇳" },
+  { name: "Pakistan", code: "PK", dialCode: "+92", flag: "🇵🇰" },
+  { name: "China", code: "CN", dialCode: "+86", flag: "🇨🇳" },
+  { name: "Japan", code: "JP", dialCode: "+81", flag: "🇯🇵" },
+  { name: "South Korea", code: "KR", dialCode: "+82", flag: "🇰🇷" },
+  { name: "Brazil", code: "BR", dialCode: "+55", flag: "🇧🇷" },
+  { name: "Canada", code: "CA", dialCode: "+1", flag: "🇨🇦" },
+  { name: "Australia", code: "AU", dialCode: "+61", flag: "🇦🇺" },
+  { name: "South Africa", code: "ZA", dialCode: "+27", flag: "🇿🇦" },
+  { name: "Nigeria", code: "NG", dialCode: "+234", flag: "🇳🇬" },
+  { name: "Kenya", code: "KE", dialCode: "+254", flag: "🇰🇪" },
+  { name: "Russia", code: "RU", dialCode: "+7", flag: "🇷🇺" },
+  { name: "Mexico", code: "MX", dialCode: "+52", flag: "🇲🇽" },
+  { name: "Argentina", code: "AR", dialCode: "+54", flag: "🇦🇷" },
+  { name: "Indonesia", code: "ID", dialCode: "+62", flag: "🇮🇩" },
+  { name: "Malaysia", code: "MY", dialCode: "+60", flag: "🇲🇾" },
+  { name: "Thailand", code: "TH", dialCode: "+66", flag: "🇹🇭" },
+  { name: "Philippines", code: "PH", dialCode: "+63", flag: "🇵🇭" },
+  { name: "Vietnam", code: "VN", dialCode: "+84", flag: "🇻🇳" },
+  { name: "Bangladesh", code: "BD", dialCode: "+880", flag: "🇧🇩" },
+  { name: "Sri Lanka", code: "LK", dialCode: "+94", flag: "🇱🇰" },
+  { name: "Singapore", code: "SG", dialCode: "+65", flag: "🇸🇬" },
+  { name: "New Zealand", code: "NZ", dialCode: "+64", flag: "🇳🇿" },
+  { name: "Sweden", code: "SE", dialCode: "+46", flag: "🇸🇪" },
+  { name: "Norway", code: "NO", dialCode: "+47", flag: "🇳🇴" },
+  { name: "Denmark", code: "DK", dialCode: "+45", flag: "🇩🇰" },
+  { name: "Finland", code: "FI", dialCode: "+358", flag: "🇫🇮" },
+  { name: "Poland", code: "PL", dialCode: "+48", flag: "🇵🇱" },
+  { name: "Belgium", code: "BE", dialCode: "+32", flag: "🇧🇪" },
+  { name: "Austria", code: "AT", dialCode: "+43", flag: "🇦🇹" },
+  { name: "Switzerland", code: "CH", dialCode: "+41", flag: "🇨🇭" },
+  { name: "Portugal", code: "PT", dialCode: "+351", flag: "🇵🇹" },
+  { name: "Greece", code: "GR", dialCode: "+30", flag: "🇬🇷" },
+  { name: "Romania", code: "RO", dialCode: "+40", flag: "🇷🇴" },
+  { name: "Czech Republic", code: "CZ", dialCode: "+420", flag: "🇨🇿" },
+  { name: "Hungary", code: "HU", dialCode: "+36", flag: "🇭🇺" },
+  { name: "Ukraine", code: "UA", dialCode: "+380", flag: "🇺🇦" },
+  { name: "Ireland", code: "IE", dialCode: "+353", flag: "🇮🇪" },
+  { name: "Israel", code: "IL", dialCode: "+972", flag: "🇮🇱" },
+  { name: "Ethiopia", code: "ET", dialCode: "+251", flag: "🇪🇹" },
+  { name: "Ghana", code: "GH", dialCode: "+233", flag: "🇬🇭" },
+  { name: "Tanzania", code: "TZ", dialCode: "+255", flag: "🇹🇿" },
+  { name: "Colombia", code: "CO", dialCode: "+57", flag: "🇨🇴" },
+  { name: "Peru", code: "PE", dialCode: "+51", flag: "🇵🇪" },
+  { name: "Chile", code: "CL", dialCode: "+56", flag: "🇨🇱" },
+  { name: "Venezuela", code: "VE", dialCode: "+58", flag: "🇻🇪" },
+  { name: "Cuba", code: "CU", dialCode: "+53", flag: "🇨🇺" },
+  { name: "Dominican Republic", code: "DO", dialCode: "+1-809", flag: "🇩🇴" },
+  { name: "Jamaica", code: "JM", dialCode: "+1-876", flag: "🇯🇲" },
+  { name: "Nepal", code: "NP", dialCode: "+977", flag: "🇳🇵" },
+  { name: "Myanmar", code: "MM", dialCode: "+95", flag: "🇲🇲" },
+  { name: "Cambodia", code: "KH", dialCode: "+855", flag: "🇰🇭" },
+  { name: "Afghanistan", code: "AF", dialCode: "+93", flag: "🇦🇫" },
+  { name: "Iran", code: "IR", dialCode: "+98", flag: "🇮🇷" },
+  { name: "Somalia", code: "SO", dialCode: "+252", flag: "🇸🇴" },
+  { name: "Mauritania", code: "MR", dialCode: "+222", flag: "🇲🇷" },
+  { name: "Comoros", code: "KM", dialCode: "+269", flag: "🇰🇲" },
+  { name: "Djibouti", code: "DJ", dialCode: "+253", flag: "🇩🇯" },
+];
 
 // UI text translations
 const translations = {
@@ -84,6 +172,10 @@ const translations = {
     en: "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g., @$!%*?&#)",
     ar: "يجب أن تحتوي كلمة المرور على حرف كبير وحرف صغير ورقم ورمز خاص واحد على الأقل (مثلاً @$!%*?&#)",
   },
+  phoneInvalid: {
+    en: "Phone number must be 10 digits and start with 1",
+    ar: "رقم الهاتف يجب أن يكون 10 أرقام ويبدأ بـ 1",
+  },
 };
 
 const RegisterPage: React.FC = () => {
@@ -91,7 +183,8 @@ const RegisterPage: React.FC = () => {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
+  const [countryCode, setCountryCode] = useState("+20");
+  const [phoneLocal, setPhoneLocal] = useState("");
   const [isSeller, setIsSeller] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,10 +194,36 @@ const RegisterPage: React.FC = () => {
 
   const t = (key: keyof typeof translations) => translations[key][locale];
 
+  // Handle phone input – only digits, must start with 1
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, ""); // strip non-digits
+    if (val.length === 0) {
+      setPhoneLocal("");
+      return;
+    }
+    // First digit must be 1
+    if (val[0] !== "1") return;
+    if (val.length > 10) return;
+    setPhoneLocal(val);
+  };
+
+  // Find the currently selected country for display
+  const selectedCountry = useMemo(
+    () => COUNTRY_CODES.find((c) => c.dialCode === countryCode) || COUNTRY_CODES[0],
+    [countryCode],
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+
+    // Phone validation – exactly 10 digits starting with 1
+    if (phoneLocal.length !== 10 || phoneLocal[0] !== "1") {
+      setError(t("phoneInvalid"));
+      setIsLoading(false);
+      return;
+    }
 
     // Password validation
     const hasUpper = /[A-Z]/.test(password);
@@ -124,6 +243,8 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
+    const fullPhone = countryCode + phoneLocal;
+
     try {
       // Call the registration API
       const registerData = await callRegisterApi({
@@ -133,37 +254,33 @@ const RegisterPage: React.FC = () => {
         password,
         role: isSeller ? "seller" : "user",
         language: locale,
-        phone,
+        phone: fullPhone,
       });
 
       if (registerData.status === "success" && registerData.data) {
-        // After successful registration, automatically sign in the user
-        // The registration API returns tokens, so we can use them directly
-        const result = await signIn("credentials", {
+        // After successful registration, attempt auto sign-in
+        await signIn("credentials", {
           email,
           password,
           redirect: false,
         });
 
-        if (result?.error) {
-          setError(t("registrationFailed"));
-        } else {
-          // Redirect based on user role
-          const userRole = registerData.data.user.role;
-          switch (userRole) {
-            case "admin":
-              router.push("/admin");
-              break;
-            case "seller":
-              router.push("/seller");
-              break;
-            case "user":
-            default:
-              router.push("/");
-              break;
-          }
-          router.refresh();
+        // Redirect based on user role regardless of signIn result
+        // (account is already created; if signIn failed, auth will redirect to login)
+        const userRole = registerData.data.user.role;
+        switch (userRole) {
+          case "admin":
+            router.push("/admin");
+            break;
+          case "seller":
+            router.push("/seller");
+            break;
+          case "user":
+          default:
+            router.push("/user");
+            break;
         }
+        router.refresh();
       } else {
         throw new Error(registerData.message || t("registrationFailed"));
       }
@@ -525,18 +642,51 @@ const RegisterPage: React.FC = () => {
               />
             </div>
 
-            {/* Phone Field */}
+            {/* Phone Field with Country Code */}
             <div className="space-y-2">
               <Label htmlFor="phone">{t("phone")}</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="+201234567890"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-                className="w-full"
-              />
+              <div className="flex gap-2">
+                {/* Country code dropdown */}
+                <div className="relative">
+                  <select
+                    id="countryCode"
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="h-10 appearance-none rounded-md border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    style={{ minWidth: "110px" }}
+                  >
+                    {COUNTRY_CODES.map((country) => (
+                      <option key={country.code} value={country.dialCode}>
+                        {country.flag} {country.dialCode}
+                      </option>
+                    ))}
+                  </select>
+                  {/* Custom dropdown arrow */}
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {/* Local phone number input */}
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="1XXXXXXXXXX"
+                  value={phoneLocal}
+                  onChange={handlePhoneChange}
+                  maxLength={10}
+                  required
+                  className="w-full"
+                />
+              </div>
+              {/* Helper text */}
+              <p className="text-xs text-gray-400">
+                {locale === "ar"
+                  ? `يبدأ بـ 1 — ${phoneLocal.length}/10 رقم`
+                  : `Starts with 1 — ${phoneLocal.length}/10 digits`}
+              </p>
             </div>
 
             {/* Seller Role Checkbox */}

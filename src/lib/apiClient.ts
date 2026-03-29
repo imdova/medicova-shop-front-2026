@@ -106,12 +106,21 @@ export async function apiClient<T = unknown>({
   }
 
   let response: Response;
-  try {
-    response = await fetch(url, fetchOptions);
-  } catch (error: any) {
-    throw new Error(
-      `Connection failed to ${url}: ${error?.message || "Unknown network error"}`,
-    );
+  const MAX_RETRIES = 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      response = await fetch(url, fetchOptions);
+      break;
+    } catch (error: any) {
+      if (attempt < MAX_RETRIES) {
+        // Wait briefly before retrying on transient network failures
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+      throw new Error(
+        `Connection failed to ${url}: ${error?.message || "Unknown network error"}`,
+      );
+    }
   }
 
   const responseText = await response.text();

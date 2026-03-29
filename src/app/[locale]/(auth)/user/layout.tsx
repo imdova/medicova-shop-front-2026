@@ -1,24 +1,25 @@
-"use client";
 import React, { ReactNode } from "react";
 import Sidebar from "@/components/layouts/Layout/sidebar/Sidebar";
-import { useSession } from "next-auth/react";
 import GoBackButton from "@/components/shared/Buttons/GoBackButton";
-import { useAppLocale } from "@/hooks/useAppLocale";
+import { auth } from "@/lib/auth/auth";
+import { NextAuthProvider } from "@/NextAuthProvider";
+import { Toaster } from "react-hot-toast";
 
 interface AccountLayoutProps {
   children: ReactNode;
+  params: Promise<{ locale: string }>;
 }
 
-const AccountLayout: React.FC<AccountLayoutProps> = ({ children }) => {
-  const { data: session } = useSession();
-  const locale = useAppLocale();
+export default async function AccountLayout({ children, params }: AccountLayoutProps) {
+  const { locale } = await params;
+  const session = await auth();
 
   const safeUser = {
     id: session?.user?.id || "",
     name: session?.user?.name || "",
     email: session?.user?.email || "",
     image: session?.user?.image || "",
-    role: session?.user?.role || "user",
+    role: (session?.user as any)?.role || "user",
   };
 
   return (
@@ -40,18 +41,33 @@ const AccountLayout: React.FC<AccountLayoutProps> = ({ children }) => {
         {/* Main Content Area */}
         <main className="min-w-0 flex-1">
           <div className="mb-6 flex items-center justify-between">
-            <GoBackButton locale={locale} />
+            <GoBackButton locale={locale as any} />
           </div>
 
           <div className="rounded-[2rem] border border-white/60 bg-white/40 p-1 shadow-2xl shadow-gray-200/50 backdrop-blur-xl">
             <div className="rounded-[1.8rem] bg-white p-6 shadow-inner md:p-10 lg:p-12">
-              {children}
+              <NextAuthProvider session={session}>
+                {children}
+              </NextAuthProvider>
             </div>
           </div>
         </main>
       </div>
+
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            borderRadius: "16px",
+            padding: "12px 20px",
+            fontSize: "14px",
+            fontWeight: 600,
+          },
+          success: { iconTheme: { primary: "#10b981", secondary: "#fff" } },
+          error: { iconTheme: { primary: "#ef4444", secondary: "#fff" } },
+        }}
+      />
     </div>
   );
-};
-
-export default AccountLayout;
+}

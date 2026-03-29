@@ -3,7 +3,7 @@ import { Toaster } from "react-hot-toast";
 import Sidebar from "@/components/layouts/Layout/sidebar/Sidebar";
 import { auth } from "@/lib/auth/auth";
 
-import { SessionProvider } from "next-auth/react";
+import { NextAuthProvider } from "@/NextAuthProvider";
 
 interface AccountLayoutProps {
   children: ReactNode;
@@ -21,7 +21,7 @@ const AccountLayout = async ({ children }: AccountLayoutProps) => {
   };
 
   return (
-    <SessionProvider session={session}>
+    <NextAuthProvider session={session}>
       <div className="min-h-screen bg-[#F8FAFC]">
       <div className="container mx-auto flex gap-6 px-4 pb-4 pt-0 lg:max-w-[1536px]">
         <div className="hidden lg:block">
@@ -55,7 +55,7 @@ const AccountLayout = async ({ children }: AccountLayoutProps) => {
         }}
       />
       </div>
-    </SessionProvider>
+    </NextAuthProvider>
   );
 };
 

@@ -1,94 +1,110 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { ReturnOrder } from "../types/account";
 import { useUserReturns } from "../hooks/useUserReturns";
 import { ReturnHeader } from "../component/ReturnHeader";
 import { ReturnFilters } from "../component/ReturnFilters";
 import { ReturnList } from "../component/ReturnList";
-
-const mockReturns: ReturnOrder[] = [
-  {
-    id: "RET-54321",
-    orderId: "ORD-12345",
-    date: "2025-05-18",
-    status: {
-      en: "Delivered",
-      ar: "تم التوصيل",
-    },
-    totalRefund: 189.98,
-    trackingNumber: "TRK789012345",
-    carrier: "Aramex",
-    items: [
-      {
-        id: "ITEM-001",
-        name: {
-          en: "Wireless Bluetooth Earbuds",
-          ar: "سماعات بلوتوث لاسلكية",
-        },
-        image:
-          "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-        price: 59.99,
-        quantity: 1,
-        reason: {
-          en: "Changed my mind",
-          ar: "غيرت رأيي",
-        },
-        returnOption: {
-          en: "Refund to original payment",
-          ar: "استرداد على وسيلة الدفع الأصلية",
-        },
-        status: {
-          en: "Delivered",
-          ar: "تم التوصيل",
-        },
-        refundAmount: 59.99,
-        estimatedRefundDate: "2025-06-05",
-      },
-    ],
-  },
-  {
-    id: "RET-98765",
-    orderId: "ORD-67890",
-    date: "2025-05-25",
-    status: {
-      en: "Requested",
-      ar: "تم الطلب",
-    },
-    totalRefund: 39.98,
-    items: [
-      {
-        id: "ITEM-003",
-        name: {
-          en: "USB-C Fast Charger",
-          ar: "شاحن سريع USB-C",
-        },
-        image:
-          "https://f.nooncdn.com/p/v1640702431/N52265998A_1.jpg?format=avif&width=original",
-        price: 19.99,
-        quantity: 2,
-        reason: {
-          en: "Product damaged",
-          ar: "المنتج تالف",
-        },
-        returnOption: {
-          en: "Replacement",
-          ar: "استبدال",
-        },
-        status: {
-          en: "Requested",
-          ar: "تم الطلب",
-        },
-      },
-    ],
-  },
-];
+import { getReturns } from "@/services/orderService";
+import { getProductById } from "@/services/productService";
+import { useSession } from "next-auth/react";
 
 const ReturnsPage = () => {
   const locale = useAppLocale();
+  const isAr = locale === "ar";
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+
+  const [apiReturns, setApiReturns] = useState<ReturnOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchReturns() {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const rows = await getReturns(token);
+
+        const transformed: ReturnOrder[] = await Promise.all(
+          rows.map(async (row: any) => {
+            // Fetch product image if not present
+            let image = "/images/placeholder.jpg";
+            if (row.productId) {
+              const p = await getProductById(row.productId, token);
+              if (p) {
+                image =
+                  p.media?.featuredImages ||
+                  (p.media?.galleryImages && p.media.galleryImages[0]) ||
+                  "/images/placeholder.jpg";
+                
+                if (image && !image.startsWith("http") && image !== "/images/placeholder.jpg") {
+                  image = `https://shop-api.medicova.net${image.startsWith("/") ? "" : "/"}${image}`;
+                }
+              }
+            }
+
+            const statusMapping: Record<string, { en: string; ar: string }> = {
+              requested: { en: "Requested", ar: "تم الطلب" },
+              approved: { en: "Approved", ar: "تمت الموافقة" },
+              rejected: { en: "Rejected", ar: "مرفوض" },
+              in_transit: { en: "In Transit", ar: "قيد التوصيل" },
+              delivered: { en: "Delivered", ar: "تم التوصيل" },
+            };
+
+            const statusKey = (row.returnStatus || row.status || "requested").toLowerCase();
+            const status = statusMapping[statusKey] || {
+              en: row.returnStatus || "Requested",
+              ar: row.returnStatus || "تم الطلب",
+            };
+
+            return {
+              id: row._id || row.id,
+              orderId: row.orderId,
+              date: row.createdAt
+                ? new Date(row.createdAt).toLocaleDateString()
+                : new Date().toLocaleDateString(),
+              status: status as any,
+              totalRefund: row.amount || 0,
+              items: [
+                {
+                  id: row._id || row.id,
+                  name: {
+                    en: row.productName || "Product",
+                    ar: row.productNameAr || row.productName || "منتج",
+                  },
+                  image: image,
+                  price: row.amount || 0,
+                  quantity: 1, // Usually 1 per row in this flat structure
+                  reason: {
+                    en: row.description || "No reason provided",
+                    ar: row.description || "لم يتم توفير سبب",
+                  },
+                  returnOption: {
+                    en: "Original Payment",
+                    ar: "وسيلة الدفع الأصلية",
+                  },
+                  status: status as any,
+                },
+              ],
+            };
+          }),
+        );
+
+        setApiReturns(transformed);
+      } catch (err) {
+        console.error("Failed to fetch returns:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchReturns();
+  }, [token]);
+
   const { activeTab, setActiveTab, filteredReturns, counts } =
-    useUserReturns(mockReturns);
+    useUserReturns(apiReturns);
 
   return (
     <div className="mx-auto max-w-6xl pb-20">
@@ -101,7 +117,13 @@ const ReturnsPage = () => {
         locale={locale}
       />
 
-      <ReturnList returns={filteredReturns} locale={locale} />
+      {loading ? (
+        <div className="flex justify-center p-12">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-green-600 border-t-transparent"></div>
+        </div>
+      ) : (
+        <ReturnList returns={filteredReturns} locale={locale} />
+      )}
     </div>
   );
 };

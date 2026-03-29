@@ -1,572 +1,418 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
-import { Checkbox } from "@/components/shared/Check-Box";
 import {
-  Camera,
   CheckCircle2,
   ChevronRight,
   Clipboard,
-  ImagePlus,
   Search,
   ShieldCheck,
-  Upload,
+  ExternalLink,
+  RotateCcw,
+  Send,
+  AlertCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { getCustomers, ApiCustomer } from "@/services/customerService";
+import { getOrders, ApiOrder, requestReturn, getOrderById } from "@/services/orderService";
+import { useSession } from "next-auth/react";
+import { NextAuthProvider } from "@/NextAuthProvider";
 
-type ReturnItem = {
-  id: string;
-  name: string;
-  sku: string;
-  orderQty: number;
-  maxReturnQty: number;
-};
-
-type ResolutionType = "refund" | "exchange" | "store_credit";
-
-function formatDateLabel(locale: string) {
+function formatDateLabel(dateStr: string, locale: string) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "";
   const loc = locale === "ar" ? "ar-EG" : "en-US";
   return new Intl.DateTimeFormat(loc, {
     month: "short",
     day: "2-digit",
     year: "numeric",
-  }).format(new Date());
+  }).format(date);
 }
 
 export default function CreateReturnRequestPage() {
   const locale = useAppLocale();
   const isArabic = locale === "ar";
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
 
-  // Step 1: Order lookup
-  const [orderRef, setOrderRef] = useState("HM-2024-8831");
-  const [customerLookup, setCustomerLookup] = useState("");
-  const [verified, setVerified] = useState(false);
+  // Step 1: User & Order lookup
+  const [users, setUsers] = useState<ApiCustomer[]>([]);
+  const [selectedUser, setSelectedUser] = useState<ApiCustomer | null>(null);
+  const [userOrders, setUserOrders] = useState<ApiOrder[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<ApiOrder | null>(null);
+  
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Step 2: Items
-  const [items, setItems] = useState<ReturnItem[]>([
-    {
-      id: "gloves",
-      name: "Sterile Surgical Gloves (Pack of 50)",
-      sku: "SG-88-MED",
-      orderQty: 10,
-      maxReturnQty: 10,
-    },
-    {
-      id: "monitor",
-      name: "Portable Digital BP Monitor",
-      sku: "BP-70-DIG",
-      orderQty: 1,
-      maxReturnQty: 1,
-    },
-    {
-      id: "masks",
-      name: "N95 Protective Masks",
-      sku: "MSK-N95-PRO",
-      orderQty: 100,
-      maxReturnQty: 100,
-    },
-  ]);
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([
-    "gloves",
-    "masks",
-  ]);
-  const [returnQty, setReturnQty] = useState<Record<string, number>>({
-    gloves: 2,
-    monitor: 0,
-    masks: 50,
-  });
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Step 3: Reason + Resolution
-  const [primaryReason, setPrimaryReason] = useState("damaged_packaging");
-  const [resolution, setResolution] = useState<ResolutionType>("refund");
+  // Return Details (simplified)
+  const [primaryReason, setPrimaryReason] = useState("damaged");
   const [notes, setNotes] = useState("");
 
-  // Step 4: Evidence upload
-  const [files, setFiles] = useState<File[]>([]);
-  const previews = useMemo(() => {
-    return files.map((f) => ({
-      file: f,
-      url: URL.createObjectURL(f),
-    }));
-  }, [files]);
-
+  // Fetch all customers on mount
   useEffect(() => {
-    return () => {
-      previews.forEach((p) => URL.revokeObjectURL(p.url));
-    };
-  }, [previews]);
+    if (!token) return;
+    async function fetchAllUsers() {
+      setLoadingUsers(true);
+      const data = await getCustomers(token);
+      setUsers(data);
+      setLoadingUsers(false);
+    }
+    fetchAllUsers();
+  }, [token]);
 
-  const selectedItems = useMemo(() => {
-    const s = new Set(selectedItemIds);
-    return items
-      .filter((i) => s.has(i.id))
-      .map((i) => ({
-        ...i,
-        qty: Math.max(0, Math.min(i.maxReturnQty, returnQty[i.id] ?? 0)),
-      }))
-      .filter((i) => i.qty > 0);
-  }, [items, returnQty, selectedItemIds]);
+  // Fetch orders when user is selected
+  useEffect(() => {
+    if (!token || !selectedUser) {
+      setUserOrders([]);
+      return;
+    }
+    async function fetchUserOrders() {
+      setLoadingOrders(true);
+      const allOrders = await getOrders(token);
+      const filtered = allOrders.filter(o => {
+        if (!selectedUser) return false;
+        const isThisUser = o.user?.id === selectedUser._id || (o as any).userId === selectedUser._id;
+        const method = String(o.paymentMethod || "").toLowerCase();
+        const status = String(o.paymentStatus || "").toLowerCase();
+        const isPaidOrCod = status === "paid" || method === "cash_on_delivery" || method === "cod";
+        return isThisUser && isPaidOrCod;
+      });
+      setUserOrders(filtered);
+      setLoadingOrders(false);
+    }
+    fetchUserOrders();
+  }, [token, selectedUser]);
 
-  const canSubmit = verified && selectedItems.length > 0;
-
-  const onVerify = () => {
-    setVerified(true);
+  const handleReset = () => {
+    setSelectedUser(null);
+    setSelectedOrder(null);
+    setNotes("");
+    setCustomerSearch("");
+    setUserOrders([]);
   };
 
-  const onCancel = () => {
-    toast.error(isArabic ? "تم الإلغاء (واجهة فقط)" : "Cancelled (UI only)");
+  const handleUnselectOrder = () => {
+    setSelectedOrder(null);
   };
 
-  const onSaveDraft = () => {
-    toast.success(
-      isArabic ? "تم حفظ المسودة (واجهة فقط)" : "Saved as draft (UI only)",
+  const handleReturnSubmission = async () => {
+    if (!token || !selectedOrder) return;
+    try {
+      setSubmitting(true);
+      
+      // Fetch full order to get products if missing in list view
+      const fullOrder = await getOrderById(selectedOrder._id, token);
+      const items = (fullOrder as any)?.items || (fullOrder as any)?.units || 
+                   (selectedOrder as any)?.items || (selectedOrder as any)?.units || [];
+      
+      if (items.length === 0) {
+        throw new Error(isArabic ? "لا توجد منتجات في هذا الطلب" : "No items found in this order");
+      }
+
+      const promises = items.map((item: any) => 
+        requestReturn({
+          orderId: selectedOrder._id,
+          productId: item.productId || item.sku || item.id || item._id,
+          description: `Full Order Return (${primaryReason}): ${notes}`.trim()
+        }, token)
+      );
+
+      await Promise.all(promises);
+      toast.success(isArabic ? "تم إرسال طلب المرتجع بنجاح!" : "Return request submitted successfully!");
+      handleReset();
+    } catch (err: any) {
+      toast.error(err.message || (isArabic ? "فشل إرسال الطلب" : "Failed to submit request"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const filteredUsers = useMemo(() => {
+    if (!customerSearch) return users;
+    return users.filter(u => 
+      u.firstName?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+      u.lastName?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+      u.email?.toLowerCase().includes(customerSearch.toLowerCase())
     );
-  };
+  }, [users, customerSearch]);
 
-  const onSubmit = () => {
-    toast.success(
-      isArabic
-        ? "تم إرسال الطلب (واجهة فقط)"
-        : "Return request submitted (UI only)",
-    );
+  const getBrandedId = (id: string) => {
+    if (!id) return "";
+    return `#HM-${id.slice(-6).toUpperCase()}`;
   };
 
   return (
-    <div
-      className="animate-in fade-in min-h-screen bg-[#F8FAFC] p-4 duration-700 md:p-8"
-      dir={isArabic ? "rtl" : "ltr"}
-    >
-      <div className="mx-auto max-w-[1200px]">
-        {/* Breadcrumbs */}
-        <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <Link href="/admin/returns" className="hover:text-slate-700">
-            {isArabic ? "المرتجعات" : "Returns"}
-          </Link>
-          <ChevronRight className="h-4 w-4" />
-          <span>{isArabic ? "إضافة مرتجع" : "Add New Return"}</span>
-        </div>
-
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-              {isArabic ? "إنشاء طلب مرتجع" : "Create Return Request"}
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">
-              {isArabic
-                ? "ابدأ ووثّق طلب إرجاع جديد للإمدادات الطبية ومعدات الرعاية الصحية."
-                : "Initiate and document a new return for medical supplies and healthcare equipment."}
-            </p>
+    <NextAuthProvider session={session}>
+      <div
+        className="animate-in fade-in min-h-screen bg-[#F8FAFC] p-4 duration-700 md:p-8"
+        dir={isArabic ? "rtl" : "ltr"}
+      >
+        <div className="mx-auto max-w-[1200px]">
+          {/* Breadcrumbs */}
+          <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <Link href="/admin/returns" className="hover:text-slate-700">
+              {isArabic ? "المرتجعات" : "Returns"}
+            </Link>
+            <ChevronRight className="h-4 w-4" />
+            <span>{isArabic ? "إضافة مرتجع" : "Add New Return"}</span>
           </div>
-        </div>
 
-        <div className="space-y-6">
-          {/* Step 1 */}
-          <section className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-            <div className="flex items-center gap-3 border-b border-slate-100 p-5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-extrabold text-white">
-                1
-              </div>
-              <div className="text-sm font-extrabold text-slate-900">
-                {isArabic ? "بحث الطلب" : "Order Lookup"}
-              </div>
+          {/* Header */}
+          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+                {isArabic ? "إنشاء طلب مرتجع" : "Create Return Request"}
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">
+                {isArabic
+                  ? "ابدأ ووثّق طلب إرجاع جديد للمستخدم المختار."
+                  : "Initiate and document a new return for the selected user."}
+              </p>
             </div>
+          </div>
 
-            <div className="p-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <div className="mb-1 text-[12px] font-semibold text-slate-600">
-                    {isArabic ? "رقم الطلب أو المرجع" : "Order ID or Reference"}
-                  </div>
-                  <div className="relative">
-                    <Clipboard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      value={orderRef}
-                      onChange={(e) => setOrderRef(e.target.value)}
-                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                  </div>
+          <div className="space-y-6">
+            {/* Step 1: User Selection */}
+            <section className="rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+              <div className="flex items-center gap-3 border-b border-slate-100 p-5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-extrabold text-white">
+                  1
                 </div>
+                <div className="text-sm font-extrabold text-slate-900">
+                  {isArabic ? "اختيار المستخدم" : "User Selection"}
+                </div>
+              </div>
 
-                <div>
+              <div className="p-5">
+                <div className="relative mb-4">
                   <div className="mb-1 text-[12px] font-semibold text-slate-600">
-                    {isArabic ? "اسم العميل / رقم" : "Customer Name / ID"}
+                    {isArabic ? "ابحث عن عميل (الاسم أو البريد)" : "Search for Customer (Name or Email)"}
                   </div>
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
-                      value={customerLookup}
-                      onChange={(e) => setCustomerLookup(e.target.value)}
-                      placeholder={isArabic ? "ابحث بالاسم" : "Search by name"}
+                      value={customerSearch}
+                      onFocus={() => setIsDropdownOpen(true)}
+                      onClick={() => setIsDropdownOpen(true)}
+                      onChange={(e) => {
+                        setCustomerSearch(e.target.value);
+                        setIsDropdownOpen(true);
+                        if (selectedUser) setSelectedUser(null);
+                      }}
+                      placeholder={isArabic ? "ابحث هنا..." : "Search here..."}
                       className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                     />
                   </div>
-                </div>
-              </div>
 
-              <div className="mt-4 flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={onVerify}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  {isArabic ? "تحقق من الطلب" : "Verify Order"}
-                </button>
-              </div>
-
-              {verified ? (
-                <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-700 ring-1 ring-emerald-100">
-                      <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-extrabold text-slate-900">
-                        {isArabic ? "تم التحقق من الطلب" : "Order Verified"}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-500">
-                        {isArabic ? "التاريخ" : "Date"}:{" "}
-                        {formatDateLabel(locale)} •{" "}
-                        {isArabic ? "المرجع" : "Ref"}: {orderRef}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </section>
-
-          {/* Step 2 */}
-          <section className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-            <div className="flex items-center gap-3 border-b border-slate-100 p-5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-extrabold text-white">
-                2
-              </div>
-              <div className="text-sm font-extrabold text-slate-900">
-                {isArabic ? "اختيار العناصر" : "Item Selection"}
-              </div>
-            </div>
-
-            <div className="p-5">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                      <th className="px-3 py-3">
-                        {isArabic ? "اختر" : "Select"}
-                      </th>
-                      <th className="px-3 py-3">
-                        {isArabic ? "العنصر الطبي" : "Medical Item"}
-                      </th>
-                      <th className="px-3 py-3">SKU</th>
-                      <th className="px-3 py-3">
-                        {isArabic ? "كمية الطلب" : "Order Qty"}
-                      </th>
-                      <th className="px-3 py-3">
-                        {isArabic ? "كمية المرتجع" : "Return Qty"}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((it) => {
-                      const checked = selectedItemIds.includes(it.id);
-                      const qty = returnQty[it.id] ?? 0;
-                      return (
-                        <tr
-                          key={it.id}
-                          className="border-b border-slate-100 last:border-b-0"
-                        >
-                          <td className="px-3 py-3">
-                            <Checkbox
-                              id={`sel-${it.id}`}
-                              checked={checked}
-                              onCheckedChange={() => {
-                                setSelectedItemIds((prev) =>
-                                  prev.includes(it.id)
-                                    ? prev.filter((x) => x !== it.id)
-                                    : [...prev, it.id],
-                                );
+                  {isDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)} />
+                      <div className="absolute left-0 right-0 z-20 mt-2 max-h-[300px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-top-2 duration-200">
+                        {loadingUsers ? (
+                          <div className="p-4 text-center text-sm text-slate-500 animate-pulse">
+                            {isArabic ? "جاري تحميل العملاء..." : "Loading customers..."}
+                          </div>
+                        ) : filteredUsers.length === 0 ? (
+                          <div className="p-4 text-center text-sm text-slate-500 italic">
+                            {isArabic ? "لا يوجد نتائج" : "No results found"}
+                          </div>
+                        ) : (
+                          filteredUsers.map(user => (
+                            <div
+                              key={user._id}
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setCustomerSearch(`${user.firstName} ${user.lastName}`);
+                                setIsDropdownOpen(false);
                               }}
-                            />
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="font-semibold text-slate-900">
-                              {it.name}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-xs font-semibold text-slate-500">
-                            {it.sku}
-                          </td>
-                          <td className="px-3 py-3 text-sm font-semibold text-slate-700">
-                            {it.orderQty}
-                          </td>
-                          <td className="px-3 py-3">
-                            <Input
-                              type="number"
-                              value={qty}
-                              onChange={(e) => {
-                                const v =
-                                  Number.parseInt(e.target.value || "0", 10) ||
-                                  0;
-                                setReturnQty((prev) => ({
-                                  ...prev,
-                                  [it.id]: Math.max(
-                                    0,
-                                    Math.min(it.maxReturnQty, v),
-                                  ),
-                                }));
-                              }}
-                              disabled={!checked}
-                              className="h-10 w-24 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-3 text-xs font-semibold text-slate-500">
-                {isArabic ? "العناصر المحددة" : "Selected items"}:{" "}
-                <span className="font-extrabold text-slate-900">
-                  {selectedItems.length}
-                </span>
-              </div>
-            </div>
-          </section>
-
-          {/* Step 3 */}
-          <section className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-            <div className="flex items-center gap-3 border-b border-slate-100 p-5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-extrabold text-white">
-                3
-              </div>
-              <div className="text-sm font-extrabold text-slate-900">
-                {isArabic ? "سبب المرتجع والحل" : "Return Reason & Resolution"}
-              </div>
-            </div>
-
-            <div className="p-5">
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                <div className="lg:col-span-6">
-                  <div className="mb-1 text-[12px] font-semibold text-slate-600">
-                    {isArabic ? "سبب المرتجع الأساسي" : "Primary Return Reason"}
-                  </div>
-                  <select
-                    value={primaryReason}
-                    onChange={(e) => setPrimaryReason(e.target.value)}
-                    className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  >
-                    <option value="damaged_packaging">
-                      {isArabic ? "تلف التغليف" : "Damaged Packaging"}
-                    </option>
-                    <option value="wrong_item">
-                      {isArabic ? "عنصر غير صحيح" : "Wrong Item"}
-                    </option>
-                    <option value="defective">
-                      {isArabic ? "منتج معيب" : "Defective"}
-                    </option>
-                    <option value="other">{isArabic ? "أخرى" : "Other"}</option>
-                  </select>
-
-                  <div className="mt-5 text-[12px] font-semibold text-slate-600">
-                    {isArabic ? "نوع الحل" : "Resolution Type"}
-                  </div>
-                  <div className="mt-2 space-y-3">
-                    {[
-                      {
-                        key: "refund" as const,
-                        title: isArabic ? "استرداد" : "Refund",
-                        desc: isArabic
-                          ? "إرجاع الأموال إلى طريقة الدفع الأصلية."
-                          : "Return funds to original payment method.",
-                      },
-                      {
-                        key: "exchange" as const,
-                        title: isArabic ? "استبدال" : "Exchange",
-                        desc: isArabic
-                          ? "استبدال العنصر وإرساله للعميل."
-                          : "Replace item(s) and ship to customer.",
-                      },
-                      {
-                        key: "store_credit" as const,
-                        title: isArabic ? "رصيد متجر" : "Store Credit",
-                        desc: isArabic
-                          ? "إصدار رصيد/قسيمة لاستخدام مستقبلي."
-                          : "Issue credit/voucher for future use.",
-                      },
-                    ].map((opt) => {
-                      const active = resolution === opt.key;
-                      return (
-                        <button
-                          key={opt.key}
-                          type="button"
-                          onClick={() => setResolution(opt.key)}
-                          className={[
-                            "w-full rounded-2xl border p-4 text-left transition",
-                            active
-                              ? "border-emerald-200 bg-emerald-50/40 ring-1 ring-emerald-100"
-                              : "border-slate-200/70 bg-white hover:bg-slate-50/40",
-                          ].join(" ")}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span
-                              className={[
-                                "mt-0.5 flex h-5 w-5 items-center justify-center rounded-full ring-1",
-                                active
-                                  ? "bg-emerald-600 text-white ring-emerald-200"
-                                  : "bg-white text-slate-300 ring-slate-200",
-                              ].join(" ")}
+                              className={`flex cursor-pointer items-center justify-between rounded-lg p-3 transition-colors hover:bg-emerald-50/50 ${selectedUser?._id === user._id ? 'bg-emerald-50 ring-1 ring-emerald-100' : ''}`}
                             >
-                              {active ? (
-                                <CheckCircle2 className="h-4 w-4" />
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-emerald-700 ring-1 ring-slate-100">
+                                  <Clipboard className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-extrabold text-slate-900">{user.firstName} {user.lastName}</div>
+                                  <div className="text-[11px] font-semibold text-slate-500">{user.email}</div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* Step 2: Order Selection */}
+            {selectedUser && (
+              <section className="animate-in fade-in slide-in-from-top-4 overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm duration-500">
+                <div className="flex items-center justify-between border-b border-slate-100 p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-extrabold text-white">2</div>
+                    <div className="text-sm font-extrabold text-slate-900">{isArabic ? "اختيار الطلب" : "Order Selection"}</div>
+                  </div>
+                  {selectedOrder && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={handleUnselectOrder}
+                      className="h-8 gap-1.5 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 hover:text-rose-600"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      {isArabic ? "تغيير الطلب" : "Change Order"}
+                    </Button>
+                  )}
+                </div>
+
+                <div className="p-5">
+                  {loadingOrders ? (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {[1, 2, 3, 4].map(i => <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-50 ring-1 ring-slate-100" />)}
+                    </div>
+                  ) : userOrders.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-12 text-center">
+                      <div className="mb-3 flex justify-center"><div className="rounded-full bg-slate-100 p-3 text-slate-400"><Clipboard className="h-6 w-6" /></div></div>
+                      <div className="text-sm font-extrabold text-slate-900">{isArabic ? "لا توجد طلبات" : "No orders found"}</div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {userOrders.map(order => {
+                        const isSelected = selectedOrder?._id === order._id;
+                        const shouldHide = selectedOrder && !isSelected;
+                        if (shouldHide) return null;
+
+                        return (
+                          <div
+                            key={order._id}
+                            className={`flex flex-col gap-3 rounded-2xl border p-4 transition-all ${isSelected ? 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/5' : 'border-slate-100 bg-slate-50/10 hover:border-emerald-200 hover:bg-emerald-50/30'}`}
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ${isSelected ? 'text-emerald-700 ring-emerald-100' : 'text-slate-400 ring-slate-100'}`}>
+                                <ShieldCheck className="h-5 w-5" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between">
+                                  <div className="truncate text-sm font-extrabold text-slate-900">{getBrandedId(order.orderId || order._id)}</div>
+                                  <div className="text-[11px] font-extrabold text-emerald-700">
+                                    {(order as any).totalPrice || order.total || (order as any).grandTotal || 0} {isArabic ? "جنيه" : "EGP"}
+                                  </div>
+                                </div>
+                                <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+                                  <span>{formatDateLabel(order.createdAt, locale)}</span>
+                                  <span className="capitalize">{order.status}</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-2 flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(`/admin/orders/${order.orderId || order._id}`, '_blank')}
+                                className="h-9 flex-1 gap-1.5 rounded-xl border-slate-200 bg-white text-[11px] font-extrabold text-slate-700 hover:bg-slate-50"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                {isArabic ? "التفاصيل" : "Details"}
+                              </Button>
+                              {!isSelected ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => setSelectedOrder(order)}
+                                  className={`h-9 flex-1 gap-1.5 rounded-xl text-[11px] font-extrabold bg-slate-900 text-white hover:bg-slate-800`}
+                                >
+                                  {isArabic ? "اختيار" : "Select"}
+                                </Button>
                               ) : (
-                                <span className="h-2 w-2 rounded-full bg-current" />
+                                 <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={handleUnselectOrder}
+                                  className={`h-9 flex-1 gap-1.5 rounded-xl text-[11px] font-extrabold border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100`}
+                                >
+                                  {isArabic ? "إلغاء الاختيار" : "Unselect"}
+                                </Button>
                               )}
-                            </span>
-                            <div>
-                              <div className="text-sm font-extrabold text-slate-900">
-                                {opt.title}
-                              </div>
-                              <div className="mt-0.5 text-xs font-semibold text-slate-500">
-                                {opt.desc}
-                              </div>
                             </div>
                           </div>
-                        </button>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* New Final Step: Return Action */}
+            {selectedOrder && (
+              <section className="animate-in fade-in slide-in-from-top-4 rounded-3xl border border-emerald-200 bg-white p-8 shadow-xl shadow-emerald-500/5 duration-500">
+                <div className="flex items-center gap-5 mb-8">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm ring-1 ring-emerald-100">
+                     <AlertCircle className="h-7 w-7" />
+                  </div>
+                  <div>
+                     <h2 className="text-xl font-extrabold text-slate-900">
+                        {isArabic ? "إرسال طلب مرتجع نهائي" : "Final Return Request"}
+                     </h2>
+                     <p className="text-sm font-semibold text-slate-500 mt-1">
+                        {isArabic ? "سيتم إرسال طلب مرتجع لجميع محتويات الطلب:" : "Submitting return for the entire order contents:"} 
+                        <span className="text-emerald-600 ml-1">{getBrandedId(selectedOrder.orderId || selectedOrder._id)}</span>
+                     </p>
                   </div>
                 </div>
 
-                <div className="lg:col-span-6">
-                  <div className="mb-1 text-[12px] font-semibold text-slate-600">
-                    {isArabic
-                      ? "ملاحظات وتفاصيل الفحص"
-                      : "Inspection Notes & Details"}
+                <div className="grid grid-cols-1 gap-8 md:grid-cols-2 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                  <div>
+                    <label className="mb-2 block text-xs font-extrabold text-slate-700 uppercase tracking-wider">{isArabic ? "سبب المرتجع" : "Return Reason"}</label>
+                    <select value={primaryReason} onChange={(e) => setPrimaryReason(e.target.value)} className="w-full h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all">
+                      <option value="damaged">{isArabic ? "تلف / عيب" : "Damaged / Defective"}</option>
+                      <option value="wrong">{isArabic ? "منتج خاطئ" : "Wrong Item"}</option>
+                      <option value="other">{isArabic ? "أخرى" : "Other"}</option>
+                    </select>
                   </div>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder={
-                      isArabic
-                        ? "أضف ملاحظات الفحص هنا..."
-                        : "Add detailed inspection notes here..."
-                    }
-                    className="min-h-[210px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  />
+                  <div className="flex flex-col">
+                     <label className="mb-2 block text-xs font-extrabold text-slate-700 uppercase tracking-wider">{isArabic ? "ملاحظات إضافية" : "Additional Notes"}</label>
+                     <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full min-h-[100px] rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all" placeholder={isArabic ? "اكتب ملاحظات الفحص هنا..." : "Write inspection notes here..."} />
+                  </div>
                 </div>
+
+                <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-8">
+                   <button onClick={handleReset} className="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors uppercase tracking-widest">{isArabic ? "إعادة تعيين" : "Reset Flow"}</button>
+                   <Button onClick={handleReturnSubmission} disabled={submitting} className="h-14 rounded-2xl bg-emerald-600 px-12 text-sm font-extrabold text-white shadow-2xl shadow-emerald-500/30 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
+                      {submitting ? (
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Send className="h-5 w-5" />
+                          <span>{isArabic ? "إرسال طلب المرتجع" : "Submit Return Request"}</span>
+                        </div>
+                      )}
+                   </Button>
+                </div>
+              </section>
+            )}
+
+            {/* Empty Selection Placeholder */}
+            {!selectedUser && (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-300">
+                 <Clipboard className="h-12 w-12 mb-4 opacity-20" />
+                 <p className="text-sm font-extrabold uppercase tracking-widest">{isArabic ? "ابدأ باختيار مستخدم" : "Start by selecting a user"}</p>
               </div>
-            </div>
-          </section>
-
-          {/* Step 4 */}
-          <section className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-            <div className="flex items-center gap-3 border-b border-slate-100 p-5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-extrabold text-white">
-                4
-              </div>
-              <div className="text-sm font-extrabold text-slate-900">
-                {isArabic ? "الأدلة ورفع الصور" : "Evidence & Photo Upload"}
-              </div>
-            </div>
-
-            <div className="p-5">
-              <div className="flex flex-wrap gap-4">
-                <label className="group flex h-28 w-44 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-slate-500 transition hover:bg-slate-50">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      const list = Array.from(e.target.files ?? []);
-                      if (!list.length) return;
-                      setFiles((prev) => [...prev, ...list].slice(0, 6));
-                      e.currentTarget.value = "";
-                    }}
-                  />
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-                    <Upload className="h-5 w-5 text-slate-500" />
-                  </div>
-                  <div className="mt-2 text-xs font-extrabold">
-                    {isArabic ? "رفع صورة" : "Upload Photo"}
-                  </div>
-                </label>
-
-                {previews.map((p) => (
-                  <div
-                    key={p.url}
-                    className="relative h-28 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white"
-                  >
-                    <Image
-                      src={p.url}
-                      alt={p.file.name}
-                      fill
-                      className="object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFiles((prev) => prev.filter((f) => f !== p.file))
-                      }
-                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/90 text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-white"
-                      aria-label="Remove"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-3 text-xs font-semibold text-slate-500">
-                {isArabic
-                  ? "الصيغ المدعومة: JPG, PNG. الحد الأقصى: 10MB لكل ملف."
-                  : "Supported formats: JPG, PNG. Max size: 10MB per file."}
-              </div>
-            </div>
-          </section>
-
-          {/* Footer actions */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              className="h-11 rounded-xl border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              {isArabic ? "إلغاء المرتجع" : "Cancel Return"}
-            </Button>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onSaveDraft}
-                className="h-11 rounded-xl border-emerald-200 bg-emerald-50 px-5 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-100"
-              >
-                {isArabic ? "حفظ كمسودة" : "Save as Draft"}
-              </Button>
-              <Button
-                type="button"
-                onClick={onSubmit}
-                disabled={!canSubmit}
-                className="h-11 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Camera className="h-4 w-4" />
-                {isArabic ? "إرسال طلب المرتجع" : "Submit Return Request"}
-              </Button>
-            </div>
+            )}
           </div>
         </div>
       </div>
-    </div>
+    </NextAuthProvider>
   );
 }

@@ -1,7 +1,7 @@
 import { apiClient } from "@/lib/apiClient";
 
 export interface PaymobMethod {
-  type: "card" | "ewallet" | "kiosk";
+  type: "card" | "wallet" | "kiosk";
   label: string;
   enabled: boolean;
 }

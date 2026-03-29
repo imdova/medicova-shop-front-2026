@@ -19,8 +19,8 @@ const translations = {
     ar: "أدخل بريدك الإلكتروني أدناه لتسجيل الدخول إلى حسابك",
   },
   email: {
-    en: "Email",
-    ar: "البريد الإلكتروني",
+    en: "Email or Phone Number",
+    ar: "البريد الإلكتروني أو رقم الهاتف",
   },
   password: {
     en: "Password",

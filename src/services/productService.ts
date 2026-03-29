@@ -168,6 +168,7 @@ export interface ApiProduct {
     lastName?: string;
   } | string;
   sellers?: any; // sometimes plural in dummy data
+  rate?: number;
 }
 
 export async function createProduct(payload: CreateProductPayload, token?: string, suppressErrorLog?: boolean) {

@@ -30,15 +30,12 @@ interface RegisterRequest {
 export async function callRegisterApi(
   data: RegisterRequest,
 ): Promise<RegisterResponse> {
-  // Ensure phone formatting +2010...
+  // Phone is already formatted with country code from the signup form (e.g. +201XXXXXXXXX)
   const phone = (data.phone || "").trim();
-  const formattedPhone = phone.startsWith("0") 
-    ? "+2" + phone 
-    : (phone.startsWith("+") ? phone : "+20" + phone);
 
   return apiClient<RegisterResponse>({
     endpoint: "/auth/register",
     method: "POST",
-    body: { ...data, phone: formattedPhone } as unknown as Record<string, unknown>,
+    body: { ...data, phone } as unknown as Record<string, unknown>,
   });
 }

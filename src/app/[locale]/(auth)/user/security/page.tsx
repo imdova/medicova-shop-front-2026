@@ -4,6 +4,10 @@ import Modal from "@/components/shared/Modals/DynamicModal";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useSession } from "next-auth/react";
+import { updateMyPassword } from "@/services/userService";
+import { Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 type PasswordFormInputs = {
   currentPassword: string;
@@ -32,7 +36,8 @@ const translations = {
     errors: {
       current: "Current password is required",
       new: "New password is required",
-      newLength: "Password must be at least 6 characters",
+      newLength: "Password must be at least 8 characters",
+      newComplexity: "Password must contain uppercase, lowercase, number, and special character",
       confirm: "Please confirm your new password",
       mismatch: "Passwords do not match",
     },
@@ -57,7 +62,8 @@ const translations = {
     errors: {
       current: "كلمة المرور الحالية مطلوبة",
       new: "كلمة المرور الجديدة مطلوبة",
-      newLength: "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل",
+      newLength: "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
+      newComplexity: "يجب أن تحتوي كلمة المرور على حرف كبير، حرف صغير، رقم ورمز خاص",
       confirm: "يرجى تأكيد كلمة المرور الجديدة",
       mismatch: "كلمتا المرور غير متطابقتين",
     },
@@ -67,9 +73,12 @@ const translations = {
 const SecuritySettingsPage = () => {
   const locale = useAppLocale();
   const t = translations[locale];
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const {
     register,
@@ -79,15 +88,28 @@ const SecuritySettingsPage = () => {
     formState: { errors },
   } = useForm<PasswordFormInputs>();
 
-  const onSubmit = (data: PasswordFormInputs) => {
-    alert("Password changed successfully");
-    setShowPasswordModal(false);
-    reset();
-    console.log(data);
+  const onSubmit = async (data: PasswordFormInputs) => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      await updateMyPassword({ 
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+        confirmNewPassword: data.confirmPassword
+      }, token);
+      
+      toast.success(locale === "ar" ? "تم تغيير كلمة المرور بنجاح" : "Password changed successfully");
+      setShowPasswordModal(false);
+      reset();
+    } catch (err: any) {
+      toast.error(err.message || (locale === "ar" ? "حدث خطأ ما" : "An error occurred"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAccountDeletion = () => {
-    alert("Account deletion request submitted");
+    window.alert("Account deletion request submitted");
     setShowDeleteConfirmation(false);
   };
 
@@ -165,10 +187,10 @@ const SecuritySettingsPage = () => {
               {...register("currentPassword", {
                 required: t.errors.current,
               })}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500/20"
             />
             {errors.currentPassword && (
-              <p className="text-sm text-red-600">
+              <p className="mt-1 text-xs text-red-600 font-medium">
                 {errors.currentPassword.message}
               </p>
             )}
@@ -182,12 +204,16 @@ const SecuritySettingsPage = () => {
               type="password"
               {...register("newPassword", {
                 required: t.errors.new,
-                minLength: { value: 6, message: t.errors.newLength },
+                minLength: { value: 8, message: t.errors.newLength },
+                pattern: {
+                  value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+                  message: t.errors.newComplexity,
+                }
               })}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500/20"
             />
             {errors.newPassword && (
-              <p className="text-sm text-red-600">
+              <p className="mt-1 text-xs text-red-600 font-medium">
                 {errors.newPassword.message}
               </p>
             )}
@@ -204,10 +230,10 @@ const SecuritySettingsPage = () => {
                 validate: (value) =>
                   value === watch("newPassword") || t.errors.mismatch,
               })}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500/20"
             />
             {errors.confirmPassword && (
-              <p className="text-sm text-red-600">
+              <p className="mt-1 text-xs text-red-600 font-medium">
                 {errors.confirmPassword.message}
               </p>
             )}
@@ -216,6 +242,7 @@ const SecuritySettingsPage = () => {
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
+              disabled={loading}
               onClick={() => {
                 setShowPasswordModal(false);
                 reset();
@@ -226,13 +253,16 @@ const SecuritySettingsPage = () => {
             </button>
             <button
               type="submit"
-              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700"
+              disabled={loading}
+              className="flex items-center gap-2 rounded-md bg-green-600 px-6 py-2 text-sm font-bold text-white transition hover:bg-green-700 disabled:opacity-50"
             >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {t.saveChanges}
             </button>
           </div>
         </form>
       </Modal>
+
     </div>
   );
 };

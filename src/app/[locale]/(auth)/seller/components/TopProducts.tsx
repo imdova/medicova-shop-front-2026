@@ -3,13 +3,15 @@
 import { ApexOptions } from "apexcharts";
 import { ChartColumn, List, Star } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { LanguageType } from "@/util/translations";
+import { ApiProduct } from "@/services/productService";
+import { ApiOrder } from "@/services/orderService";
 
 // Dynamically import ApexCharts
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
-type Product = {
+type TopProduct = {
   id: string;
   name: string;
   sales: number;
@@ -18,51 +20,10 @@ type Product = {
   rating: number;
 };
 
-const topProductsData: Product[] = [
-  {
-    id: "1",
-    name: "Wireless Headphones",
-    sales: 156,
-    revenue: 3120,
-    stock: 24,
-    rating: 4.7,
-  },
-  {
-    id: "2",
-    name: "Smart Watch Pro",
-    sales: 128,
-    revenue: 4480,
-    stock: 15,
-    rating: 4.5,
-  },
-  {
-    id: "3",
-    name: "Bluetooth Speaker",
-    sales: 98,
-    revenue: 1960,
-    stock: 32,
-    rating: 4.3,
-  },
-  {
-    id: "4",
-    name: "USB-C Charger",
-    sales: 87,
-    revenue: 870,
-    stock: 56,
-    rating: 4.2,
-  },
-  {
-    id: "5",
-    name: "Ergonomic Mouse",
-    sales: 76,
-    revenue: 1140,
-    stock: 18,
-    rating: 4.6,
-  },
-];
-
 type Props = {
   locale?: LanguageType;
+  products?: ApiProduct[];
+  orders?: ApiOrder[];
 };
 
 const translations = {
@@ -88,14 +49,38 @@ const translations = {
   },
 };
 
-const TopProducts = ({ locale = "en" }: Props) => {
+const TopProducts = ({ locale = "en", products = [], orders = [] }: Props) => {
   const t = translations[locale];
   const [view, setView] = useState<"list" | "chart">("list");
   const [sortBy, setSortBy] = useState<"sales" | "revenue">("sales");
 
-  const sortedProducts = [...topProductsData].sort(
-    (a, b) => b[sortBy] - a[sortBy],
-  );
+  const topProducts = useMemo(() => {
+    const productStats: Record<string, { sales: number; revenue: number }> = {};
+    
+    // Aggregating stats from all orders
+    orders.forEach(order => {
+      order.items?.forEach(item => {
+        if (!item.productId) return;
+        if (!productStats[item.productId]) {
+          productStats[item.productId] = { sales: 0, revenue: 0 };
+        }
+        productStats[item.productId].sales += item.quantity || 0;
+        productStats[item.productId].revenue += (item.unitPrice || 0) * (item.quantity || 0);
+      });
+    });
+
+    return products.map(p => {
+      const stats = productStats[p._id] || { sales: 0, revenue: 0 };
+      return {
+        id: p._id,
+        name: locale === "ar" ? (p.nameAr || p.nameEn) : (p.nameEn || p.nameAr),
+        sales: stats.sales,
+        revenue: stats.revenue,
+        stock: p.stockQuantity || p.inventory?.stockQuantity || 0,
+        rating: p.rate || 0
+      } as TopProduct;
+    }).sort((a, b) => b[sortBy] - a[sortBy]).slice(0, 5);
+  }, [products, orders, sortBy, locale]);
 
   const chartOptions: ApexOptions = {
     chart: {
@@ -112,7 +97,7 @@ const TopProducts = ({ locale = "en" }: Props) => {
     },
     dataLabels: { enabled: false },
     xaxis: {
-      categories: sortedProducts.map((product) => product.name),
+      categories: topProducts.map((p) => p.name),
       labels: {
         style: {
           colors: "#9ca3af",
@@ -134,7 +119,7 @@ const TopProducts = ({ locale = "en" }: Props) => {
       borderColor: "#f3f4f6",
       strokeDashArray: 4,
     },
-    colors: ["var(--primary)"],
+    colors: ["#10b981"], // Emerald 600
     tooltip: {
       theme: "light",
       style: {
@@ -146,7 +131,7 @@ const TopProducts = ({ locale = "en" }: Props) => {
   const chartSeries = [
     {
       name: sortBy === "sales" ? t.sales : t.revenue,
-      data: sortedProducts.map((p) =>
+      data: topProducts.map((p) =>
         sortBy === "sales" ? p.sales : p.revenue,
       ),
     },
@@ -180,7 +165,7 @@ const TopProducts = ({ locale = "en" }: Props) => {
 
         <button
           onClick={() => setView(view === "list" ? "chart" : "list")}
-          className="hover:bg-primary/5 flex items-center justify-center rounded-xl bg-gray-50/50 p-2.5 text-gray-400 ring-1 ring-gray-100 transition-all duration-300 hover:text-primary"
+          className="flex items-center justify-center rounded-xl bg-gray-50/50 p-2.5 text-gray-400 ring-1 ring-gray-100 transition-all duration-300 hover:bg-emerald-50 hover:text-emerald-600"
         >
           {view === "list" ? <ChartColumn size={18} /> : <List size={18} />}
         </button>
@@ -205,26 +190,26 @@ const TopProducts = ({ locale = "en" }: Props) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {sortedProducts.map((product) => (
+                {topProducts.map((product) => (
                   <tr
                     key={product.id}
                     className="group transition-colors duration-200 hover:bg-gray-50/50"
                   >
-                    <td className="whitespace-nowrap py-4 text-sm font-bold text-gray-900">
+                    <td className="whitespace-nowrap py-4 text-sm font-bold text-gray-900 max-w-[200px] truncate">
                       {product.name}
                     </td>
                     <td className="whitespace-nowrap py-4 text-center text-sm font-medium text-gray-600">
                       {product.sales}
                     </td>
                     <td className="whitespace-nowrap py-4 text-center text-sm font-bold text-gray-900">
-                      ${product.revenue.toLocaleString()}
+                      {locale === "ar" ? "ر.س" : "$"}{product.revenue.toLocaleString()}
                     </td>
                     <td className="whitespace-nowrap py-4 text-center">
                       <span
                         className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-bold ring-1 ${
                           product.stock > 20
                             ? "bg-emerald-50 text-emerald-700 ring-emerald-600/10"
-                            : product.stock > 5
+                            : product.stock > 0
                               ? "bg-amber-50 text-amber-700 ring-amber-600/10"
                               : "bg-rose-50 text-rose-700 ring-rose-600/10"
                         }`}
@@ -247,12 +232,18 @@ const TopProducts = ({ locale = "en" }: Props) => {
           </div>
         ) : (
           <div className="h-[400px]">
-            <Chart
-              options={chartOptions}
-              series={chartSeries}
-              type="bar"
-              height="100%"
-            />
+             {topProducts.length > 0 ? (
+               <Chart
+                options={chartOptions}
+                series={chartSeries}
+                type="bar"
+                height="100%"
+              />
+             ) : (
+               <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                 No data available
+               </div>
+             )}
           </div>
         )}
       </div>

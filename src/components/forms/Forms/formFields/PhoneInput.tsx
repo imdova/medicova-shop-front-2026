@@ -184,7 +184,9 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 }) => {
   const { control, setValue, register } = useFormContext();
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0]);
+  const [selectedCountry, setSelectedCountry] = useState<Country>(
+    COUNTRIES.find((c) => c.code === "EG") || COUNTRIES[0],
+  );
   const t = useTranslations("common");
   const contextLocale = useLocale() as LanguageType;
   const locale = propsLocale || contextLocale;
@@ -223,14 +225,72 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 
   return (
     <div className="w-full" dir={isRTL ? "rtl" : "ltr"}>
-      <label
-        htmlFor={name}
-        className={`mb-1 block text-sm font-medium text-gray-700 ${isRTL ? "text-right" : "text-left"}`}
-      >
-        {t("phoneNumber")}
-      </label>
+      <div className="relative flex rounded-xl border border-gray-100 bg-gray-50/50 transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500/10 h-11">
+        {/* Country code dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            className={`flex h-full items-center justify-center gap-2 px-3 text-sm font-bold text-gray-700 hover:bg-gray-100/50 transition-colors ${
+              isRTL ? "border-l border-gray-100 rounded-r-xl" : "border-r border-gray-100 rounded-l-xl"
+            }`}
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            <Image
+              width={20}
+              height={20}
+              src={`https://flagcdn.com/h20/${selectedCountry.flag.toString()}.png`}
+              alt={selectedCountry.name[locale]}
+              className="h-4 w-4 rounded-full object-cover"
+            />
+            <span className="text-gray-900">{selectedCountry.dialCode}</span>
+            <ChevronDown className="h-4 w-4 text-gray-400" />
+          </button>
 
-      <div className="relative flex rounded-md shadow-sm">
+          {isOpen && (
+            <div
+              className={`absolute z-50 mt-2 max-h-60 w-64 overflow-auto rounded-xl border border-gray-100 bg-white p-2 shadow-xl ${
+                isRTL ? "right-0" : "left-0"
+              }`}
+            >
+              <div className="mb-2">
+                <input
+                  type="text"
+                  placeholder={t("searchCountries")}
+                  className="w-full rounded-lg border border-gray-100 bg-gray-50/50 p-2 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  dir={isRTL ? "rtl" : "ltr"}
+                />
+              </div>
+              <ul className="space-y-0.5">
+                {filteredCountries.map((country) => (
+                  <li
+                    key={country.code}
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-emerald-50/50 ${
+                      country.code === selectedCountry.code ? "bg-emerald-50 text-emerald-700" : "text-gray-600"
+                    } ${isRTL ? "flex-row-reverse" : ""}`}
+                    onClick={() => {
+                      setSelectedCountry(country);
+                      setIsOpen(false);
+                      setSearchTerm("");
+                    }}
+                  >
+                    <Image
+                      width={20}
+                      height={20}
+                      src={`https://flagcdn.com/h20/${country.flag.toString()}.png`}
+                      alt={country.name[locale]}
+                      className="h-4 w-4 rounded-full object-cover"
+                    />
+                    <span className="flex-1 font-medium">{country.name[locale]}</span>
+                    <span className="text-xs font-bold text-gray-400">{country.dialCode}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
         {/* Phone number input */}
         <Controller
           name={name}
@@ -243,90 +303,15 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
               message: t("invalidPhone"),
             },
           }}
-          render={({ field, fieldState: { error } }) => (
+          render={({ field }) => (
             <div className="flex-1">
-              <div className="flex flex-row-reverse">
-                <input
-                  {...field}
-                  type="tel"
-                  className={`block w-full rounded-r-md border border-gray-300 px-3 py-2 text-sm focus:outline-none ${
-                    isRTL ? "rounded-l-md rounded-r-none" : ""
-                  }`}
-                  placeholder={t("phonePlaceholder")}
-                  dir={isRTL ? "rtl" : "ltr"}
-                />
-                {/* Country code dropdown */}
-                <div className="relative" ref={dropdownRef}>
-                  <button
-                    type="button"
-                    className={`inline-flex h-full items-center justify-center gap-1 text-sm ${locale === "ar" ? "rounded-r-md" : "rounded-l-md"} border border-gray-300 bg-gray-50 px-2 py-2 text-gray-700 hover:bg-gray-100 focus:outline-none ${
-                      isRTL ? "flex-row-reverse" : ""
-                    }`}
-                    onClick={() => setIsOpen(!isOpen)}
-                  >
-                    <Image
-                      width={300}
-                      height={300}
-                      src={`https://flagcdn.com/h20/${selectedCountry.flag.toString()}.png`}
-                      alt={selectedCountry.name[locale]}
-                      className={`h-4 w-4 rounded-full ${isRTL ? "ml-1" : "mr-1"}`}
-                    />
-                    <span>{selectedCountry.dialCode}</span>
-                    <ChevronDown className={`h-4 w-4 text-gray-700`} />
-                  </button>
-
-                  {isOpen && (
-                    <div
-                      className={`absolute z-10 mt-1 max-h-60 w-64 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg ${
-                        isRTL ? "right-0" : "left-0"
-                      }`}
-                    >
-                      <div className="p-2">
-                        <input
-                          type="text"
-                          placeholder={t("searchCountries")}
-                          className="mb-2 w-full rounded-md border border-gray-300 p-2 outline-none"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          dir={isRTL ? "rtl" : "ltr"}
-                        />
-                      </div>
-                      <ul>
-                        {filteredCountries.map((country) => (
-                          <li
-                            key={country.code}
-                            className={`flex cursor-pointer items-center gap-2 px-4 py-2 hover:bg-gray-100 ${
-                              isRTL ? "flex-row-reverse" : ""
-                            }`}
-                            onClick={() => {
-                              setSelectedCountry(country);
-                              setIsOpen(false);
-                              setSearchTerm("");
-                            }}
-                          >
-                            <Image
-                              width={300}
-                              height={300}
-                              src={`https://flagcdn.com/h20/${country.flag.toString()}.png`}
-                              alt={country.name[locale]}
-                              className={`h-5 w-5 rounded-full ${isRTL ? "ml-1" : "mr-1"}`}
-                            />
-                            <span className={isRTL ? "ml-2" : "mr-2"}>
-                              {country.dialCode}
-                            </span>
-                            <span className="text-sm text-gray-600">
-                              {country.name[locale]}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-              {error && (
-                <p className="mt-1 text-sm text-red-600">{error.message}</p>
-              )}
+              <input
+                {...field}
+                type="tel"
+                className="h-full w-full bg-transparent px-4 py-2 text-sm font-bold text-gray-900 placeholder:font-medium placeholder:text-gray-300 focus:outline-none"
+                placeholder={locale === "ar" ? "10 1234 5678" : "10 1234 5678"}
+                dir={isRTL ? "rtl" : "ltr"}
+              />
             </div>
           )}
         />
@@ -336,6 +321,13 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
           {...register("phone_code")}
         />
       </div>
+      <Controller
+        name={name}
+        control={control}
+        render={({ fieldState: { error } }) => (
+          error ? <p className="mt-1.5 text-[11px] font-bold text-red-500 pl-1">{error.message}</p> : <></>
+        )}
+      />
     </div>
   );
 };

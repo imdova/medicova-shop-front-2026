@@ -143,6 +143,7 @@ const Sidebar: React.FC<AccountPageProps> = ({ user }) => {
             onClick={async () => {
               await signOut({ redirect: false });
               router.push("/");
+              router.refresh();
             }}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-gray-600 transition-all duration-300 hover:bg-rose-50 hover:text-rose-600 hover:shadow-inner"
           >
