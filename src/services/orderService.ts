@@ -258,4 +258,27 @@ export async function createOrderWithDetails(payload: CreateOrderWithDetailsPayl
   //   body: payload as any,
   //   token,
   // });
-// }
+export async function requestReturn(payload: { orderId: string; productId: string; description: string }, token?: string) {
+  return apiClient({
+    endpoint: "/orders/returns",
+    method: "POST",
+    body: payload as any,
+    token,
+  });
+}
+
+export async function getCustomerReturns(token?: string): Promise<any[]> {
+  try {
+    const res = await apiClient<any>({
+      endpoint: "/orders/all-returns",
+      method: "GET",
+      token,
+    });
+    // According to user: "Get returns endpoint rows"
+    // Usually res.data or res.data.data or res
+    return (res as any)?.data?.data || (res as any)?.data || res || [];
+  } catch (err) {
+    console.error("getCustomerReturns failed:", err);
+    return [];
+  }
+}

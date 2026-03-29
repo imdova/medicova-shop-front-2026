@@ -3,8 +3,11 @@
 import CustomAlert from "@/components/shared/CustomAlert";
 import DynamicCheckbox from "@/components/shared/DynamicCheckbox";
 import Image from "next/image";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAppLocale } from "@/hooks/useAppLocale";
+import { useSession } from "next-auth/react";
+import { getCustomerOrders, requestReturn } from "@/services/orderService";
+import { getProductById, mapApiProductToProduct } from "@/services/productService";
 import { LocalizedTitle } from "@/types/language";
 
 type OrderItem = {
@@ -15,6 +18,8 @@ type OrderItem = {
   reason: LocalizedTitle | null;
   returnOption: LocalizedTitle | null;
   selected: boolean;
+  variants?: Array<{ label: string; value: string }>;
+  productId: string;
 };
 
 type Order = {
@@ -84,49 +89,162 @@ const returnOptions: LocalizedTitle[] = [
 
 const ReturnsPage = () => {
   const locale = useAppLocale();
+  const isAr = locale === "ar";
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+
   const [alert, setAlert] = useState<{
     message: string;
     type: "success" | "error" | "info" | "cart" | "wishlist";
   } | null>(null);
 
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: "ORD-12345",
-      date: "2025-05-15",
-      items: [
-        {
-          name: "Wireless Bluetooth Earbuds",
-          image:
-            "https://f.nooncdn.com/p/pzsku/ZE7B062D6B7327CA2C705Z/45/_/1739718311/6609b50c-0851-41f2-9006-5d43b6e9c964.jpg?width=800",
-          price: 59.99,
-          quantity: 1,
-          reason: null,
-          returnOption: null,
-          selected: false,
-        },
-      ],
-      total: 59.99,
-      status: { en: "Delivered", ar: "تم التوصيل" },
-      selected: false,
-    },
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleItemSelect = (orderIndex: number, itemIndex: number) => {
-    const updatedOrders = [...orders];
-    const item = updatedOrders[orderIndex].items[itemIndex];
-    item.selected = !item.selected;
-    updatedOrders[orderIndex].selected = updatedOrders[orderIndex].items.every(
-      (i) => i.selected,
-    );
-    setOrders(updatedOrders);
+  const ensureAbsoluteUrl = (url: any) => {
+    if (!url || typeof url !== "string") return "/images/placeholder.png";
+    if (url.startsWith("http")) return url;
+    const apiBaseUrl = "https://shop-api.medicova.net";
+    return `${apiBaseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
   };
+
+  const fetchOrders = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const apiOrdersRaw = await getCustomerOrders(token);
+
+      // Filter orders: Only show paid and delivered orders
+      const apiOrders = apiOrdersRaw.filter(
+        (o: any) =>
+          o.paymentStatus === "paid" && o.status === "delivered",
+      );
+
+      const transformed: Order[] = await Promise.all(
+        apiOrders.map(async (o: any) => {
+          const sourceItems =
+            o.items && o.items.length > 0 ? o.items : o.units || [];
+
+          const itemsWithDetails = await Promise.all(
+            sourceItems.map(async (u: any) => {
+              const productId =
+                typeof u.productId === "object" ? u.productId?._id : u.productId;
+
+              let productDetails = null;
+              if (productId && typeof productId === "string") {
+                try {
+                  // Attempt to fetch full product details for better name/image
+                  const fullProd = await getProductById(productId, token);
+                  if (fullProd) {
+                    productDetails = mapApiProductToProduct(fullProd);
+                  }
+                } catch (pErr) {
+                  console.warn(
+                    "Failed to fetch product details for item:",
+                    productId,
+                    pErr,
+                  );
+                }
+              }
+
+              // Mapping variants
+              const variantMap = new Map<string, string>();
+              const variantKeys = [
+                "size",
+                "color",
+                "Color",
+                "Size",
+                "Tt",
+                "Strength",
+              ];
+              variantKeys.forEach((key) => {
+                const val = u[key];
+                if (val && val !== "Default" && typeof val === "string") {
+                  let label = key;
+                  if (key === "size") label = isAr ? "المقاس" : "Size";
+                  if (key === "color") label = isAr ? "اللون" : "Color";
+                  variantMap.set(label, val);
+                }
+              });
+
+              const displayVariants = Array.from(variantMap.entries()).map(
+                ([label, value]) => ({ label, value }),
+              );
+
+              return {
+                name:
+                  (isAr
+                    ? productDetails?.title?.ar ||
+                      u.productNameAr ||
+                      u.nameAr ||
+                      u.productName ||
+                      u.name
+                    : productDetails?.title?.en ||
+                      u.productName ||
+                      u.nameEn ||
+                      u.name ||
+                      u.displayName) || (isAr ? "منتج" : "Product"),
+                image: ensureAbsoluteUrl(
+                  productDetails?.images?.[0] ||
+                    u.productImage ||
+                    u.image ||
+                    u.displayImage ||
+                    u.product_image,
+                ),
+                price: u.unitPrice || u.price || u.unit_price || 0,
+                quantity: u.quantity || 1,
+                reason: null,
+                returnOption: null,
+                selected: false,
+                variants: displayVariants,
+                productId: productId,
+              };
+            }),
+          );
+
+          return {
+            id: o._id || o.id,
+            date: o.createdAt
+              ? new Date(o.createdAt).toLocaleDateString()
+              : new Date().toLocaleDateString(),
+            total: o.total || o.totalPrice || 0,
+            status: {
+              en:
+                o.status === "delivered" ? "Delivered" : o.status || "Delivered",
+              ar:
+                o.status === "delivered"
+                  ? "تم التوصيل"
+                  : o.status || "تم التوصيل",
+            },
+            selected: false,
+            items: itemsWithDetails,
+          };
+        }),
+      );
+
+      setOrders(transformed);
+    } catch (err) {
+      console.error("Failed to fetch user orders:", err);
+      setError("Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, isAr]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const handleOrderSelect = (orderIndex: number) => {
     const updatedOrders = [...orders];
     const order = updatedOrders[orderIndex];
-    const selectAll = !order.selected;
-    order.selected = selectAll;
-    order.items.forEach((i) => (i.selected = selectAll));
+    order.selected = !order.selected;
+    // When order is selected, all items are implicitly selected for the return request
+    order.items.forEach((i) => (i.selected = order.selected));
     setOrders(updatedOrders);
   };
 
@@ -152,41 +270,56 @@ const ReturnsPage = () => {
     setOrders(updatedOrders);
   };
 
-  const handleSubmitReturn = (orderIndex: number) => {
+  const handleSubmitReturn = async (orderIndex: number) => {
     const order = orders[orderIndex];
-    const selectedItems = order.items.filter((item) => item.selected);
-    if (selectedItems.length === 0)
+    if (!order.selected) {
       return showAlert(
         locale === "ar"
-          ? "يرجى تحديد عنصر واحد على الأقل"
-          : "Please select at least one item",
+          ? "يرجى تحديد الطلب أولاً"
+          : "Please select the order first",
         "info",
       );
-    if (selectedItems.some((item) => !item.reason || !item.returnOption))
-      return showAlert(
+    }
+
+    const selectedItems = order.items; // All items in the selected order
+
+    try {
+      // API requires separate call for each item
+      const returnPromises = selectedItems.map((item) => {
+        const payload = {
+          orderId: order.id,
+          productId: item.productId,
+          description: isAr ? "طلب إرجاع" : "Return request",
+        };
+        return requestReturn(payload, token);
+      });
+
+      await Promise.all(returnPromises);
+
+      showAlert(
         locale === "ar"
-          ? "يرجى تحديد السبب وخيار الإرجاع لجميع العناصر المحددة"
-          : "Please select reason and option for all selected items",
-        "info",
+          ? `تم إرسال طلب الإرجاع للطلب ${order.id}`
+          : `Return request submitted for order ${order.id}`,
+        "success",
       );
 
-    showAlert(
-      locale === "ar"
-        ? `تم إرسال طلب الإرجاع للطلب ${order.id}`
-        : `Return request submitted for order ${order.id}`,
-      "success",
-    );
-
-    const updatedOrders = [...orders];
-    updatedOrders[orderIndex].items.forEach((item) => {
-      if (item.selected) {
-        item.selected = false;
+      // Reset selection
+      const updatedOrders = [...orders];
+      updatedOrders[orderIndex].selected = false;
+      updatedOrders[orderIndex].items.forEach((item) => {
         item.reason = null;
         item.returnOption = null;
-      }
-    });
-    updatedOrders[orderIndex].selected = false;
-    setOrders(updatedOrders);
+        item.selected = false;
+      });
+      setOrders(updatedOrders);
+    } catch (err: any) {
+      showAlert(
+        locale === "ar"
+          ? `فشل في إرسال طلب الإرجاع: ${err.message}`
+          : `Failed to submit return request: ${err.message}`,
+        "error",
+      );
+    }
   };
 
   const showAlert = (
@@ -215,131 +348,102 @@ const ReturnsPage = () => {
           {translations.selectOrder[locale]}
         </h2>
 
-        {orders.map((order, orderIndex) => (
-          <div key={order.id} className="mb-6 rounded-lg border p-4">
-            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex items-center">
-                <DynamicCheckbox
-                  checked={order.selected}
-                  onChange={() => handleOrderSelect(orderIndex)}
-                />
-                <div className="mx-3">
-                  <h3 className="font-medium">
-                    {translations.order[locale]} #{order.id}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {translations.placedOn[locale]} {order.date}
-                  </p>
-                </div>
-              </div>
-              <div className="text-sm sm:text-right">
-                <p className="font-medium">
-                  {translations.total[locale]}: {order.total.toFixed(2)}{" "}
-                  {translations.egp[locale]}
-                </p>
-                <p className="text-green-600">{order.status[locale]}</p>
-              </div>
-            </div>
+        {loading && (
+          <div className="flex justify-center p-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent"></div>
+          </div>
+        )}
 
-            <div className="border-t pt-3">
-              <h4 className="mb-2 font-medium">
-                {translations.itemsInOrder[locale]}
-              </h4>
-              {order.items.map((item, itemIndex) => (
-                <div
-                  key={itemIndex}
-                  className={`mb-2 flex flex-col items-start gap-3 p-2 sm:flex-row ${item.selected ? "bg-green-50" : "border-b"}`}
-                >
+        {error && (
+          <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
+            {error}
+          </div>
+        )}
+
+        {!loading && orders.length === 0 && (
+          <div className="p-8 text-center text-gray-500">
+            {locale === "ar"
+              ? "لا توجد طلبات متاحة للإرجاع"
+              : "No orders available for return"}
+          </div>
+        )}
+
+        {!loading &&
+          orders.map((order, orderIndex) => (
+            <div key={order.id} className="mb-6 rounded-lg border p-4">
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex items-center">
                   <DynamicCheckbox
-                    checked={item.selected}
-                    onChange={() => handleItemSelect(orderIndex, itemIndex)}
+                    checked={order.selected}
+                    onChange={() => handleOrderSelect(orderIndex)}
                   />
-                  <Image
-                    src={item.image}
-                    alt={item.name}
-                    width={80}
-                    height={80}
-                    className="rounded object-cover"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-600">
-                      {translations.qty[locale]}: {item.quantity}
+                  <div className="mx-3">
+                    <h3 className="font-medium">
+                      {translations.order[locale]} #{order.id}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {translations.placedOn[locale]} {order.date}
                     </p>
-                    <p className="text-sm">
-                      {item.price.toFixed(2)} {translations.egp[locale]}
-                    </p>
-
-                    {item.selected && (
-                      <div className="mt-2 space-y-2">
-                        <div>
-                          <label className="mb-1 block text-sm font-medium">
-                            {translations.reasonLabel[locale]}
-                          </label>
-                          <select
-                            className="w-full rounded border p-2 text-sm outline-none"
-                            value={item.reason?.[locale] || ""}
-                            onChange={(e) =>
-                              handleReasonChange(
-                                orderIndex,
-                                itemIndex,
-                                e.target.value,
-                              )
-                            }
-                          >
-                            <option value="">
-                              {translations.reasonPlaceholder[locale]}
-                            </option>
-                            {returnReasons.map((reason, i) => (
-                              <option key={i} value={reason[locale]}>
-                                {reason[locale]}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-sm font-medium">
-                            {translations.optionLabel[locale]}
-                          </label>
-                          <select
-                            className="w-full rounded border p-2 text-sm outline-none"
-                            value={item.returnOption?.[locale] || ""}
-                            onChange={(e) =>
-                              handleOptionChange(
-                                orderIndex,
-                                itemIndex,
-                                e.target.value,
-                              )
-                            }
-                          >
-                            <option value="">
-                              {translations.optionPlaceholder[locale]}
-                            </option>
-                            {returnOptions.map((opt, i) => (
-                              <option key={i} value={opt[locale]}>
-                                {opt[locale]}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="text-sm sm:text-right">
+                  <p className="font-medium">
+                    {translations.total[locale]}: {order.total.toFixed(2)}{" "}
+                    {translations.egp[locale]}
+                  </p>
+                  <p className="text-green-600">{order.status[locale]}</p>
+                </div>
+              </div>
 
-            <div className="mt-4 text-right">
-              <button
-                onClick={() => handleSubmitReturn(orderIndex)}
-                className="rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
-              >
-                {translations.requestButton[locale]}
-              </button>
+              <div className="border-t pt-3">
+                <h4 className="mb-2 font-medium">
+                  {translations.itemsInOrder[locale]}
+                </h4>
+                {order.items.map((item, itemIndex) => (
+                  <div
+                    key={itemIndex}
+                    className={`mb-2 flex flex-col items-start gap-3 p-2 sm:flex-row ${order.selected ? "bg-green-50" : "border-b"}`}
+                  >
+                    <Image
+                      src={item.image}
+                      alt={item.name || (isAr ? "منتج" : "Product")}
+                      width={80}
+                      height={80}
+                      className="rounded object-cover"
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium">{item.name}</p>
+                      {item.variants && item.variants.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {item.variants.map((v, i) => (
+                            <span
+                              key={i}
+                              className="inline-block rounded bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600"
+                            >
+                              {v.label}: {v.value}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-sm text-gray-600">
+                        {translations.qty[locale]}: {item.quantity}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 text-right">
+                <button
+                  onClick={() => handleSubmitReturn(orderIndex)}
+                  className={`rounded px-4 py-2 text-sm text-white ${order.selected ? "bg-green-600 hover:bg-green-700" : "cursor-not-allowed bg-gray-400"}`}
+                  disabled={!order.selected}
+                >
+                  {translations.requestButton[locale]}
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
       </div>
 
       <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 shadow-sm">
