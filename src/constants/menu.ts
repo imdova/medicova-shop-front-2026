@@ -46,26 +46,11 @@ export const menuGroups: { [key in userType]: MenuGroup[] } = {
           href: "/user/profile",
           icon: UserRoundPen,
         },
-        {
-          title: { en: "Addresses", ar: "العناوين" },
-          href: "/user/addresses",
-          icon: MapPin,
-        },
-        {
-          title: { en: "Payments", ar: "طرق الدفع" },
-          href: "/user/payments",
-          icon: WalletCards,
-        },
       ],
     },
     {
       title: { en: "Others", ar: "أخرى" },
       items: [
-        {
-          title: { en: "Notifications", ar: "الإشعارات" },
-          href: "/user/notifications",
-          icon: Bell,
-        },
         {
           title: { en: "Security Settings", ar: "إعدادات الأمان" },
           href: "/user/security",
@@ -98,16 +83,6 @@ export const menuGroups: { [key in userType]: MenuGroup[] } = {
           icon: UserRoundPen,
         },
         {
-          title: { en: "Addresses", ar: "العناوين" },
-          href: "/seller/addresses",
-          icon: MapPin,
-        },
-        {
-          title: { en: "Payments", ar: "طرق الدفع" },
-          href: "/seller/payments",
-          icon: WalletCards,
-        },
-        {
           title: { en: "Wishlist", ar: "المفضلة" },
           href: "/wishlist",
           icon: Heart,
@@ -117,11 +92,6 @@ export const menuGroups: { [key in userType]: MenuGroup[] } = {
     {
       title: { en: "Others", ar: "أخرى" },
       items: [
-        {
-          title: { en: "Notifications", ar: "الإشعارات" },
-          href: "/seller/notifications",
-          icon: Bell,
-        },
         {
           title: { en: "Security Settings", ar: "إعدادات الأمان" },
           href: "/seller/security",

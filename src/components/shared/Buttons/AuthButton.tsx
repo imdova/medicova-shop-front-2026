@@ -12,20 +12,42 @@ import { useAppLocale } from "@/hooks/useAppLocale";
 import { User } from "next-auth";
 import Image from "next/image";
 
+import { getMyProfile } from "@/services/userService";
+
 const AuthButton = () => {
   const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
   const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [apiUserName, setApiUserName] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const locale = useAppLocale();
 
+  useEffect(() => {
+    async function fetchLatestName() {
+      if (token) {
+        try {
+          const profile = await getMyProfile(token);
+          setApiUserName(`${profile.firstName} ${profile.lastName}`);
+        } catch (err) {
+          console.error("Failed to fetch user name:", err);
+        }
+      }
+    }
+    fetchLatestName();
+
+    const handleProfileUpdate = () => fetchLatestName();
+    window.addEventListener("profileUpdated", handleProfileUpdate);
+    return () => window.removeEventListener("profileUpdated", handleProfileUpdate);
+  }, [token]);
+
   const dummyUserData: User = {
-    id: session?.user.id ?? "0",
-    name: session?.user?.name || "Demo User",
-    email: session?.user?.email || "demo@example.com",
+    id: session?.user?.id ?? "0",
+    name: apiUserName || session?.user?.name || "User",
+    email: session?.user?.email || "",
     role: (session?.user?.role as userType) || "user",
-    image: session?.user?.image || "/placholder.png",
+    image: session?.user?.image || "",
   };
 
   const currentMenuGroups = menuGroups[dummyUserData.role];
@@ -73,27 +95,9 @@ const AuthButton = () => {
               className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl bg-white/90 p-2 shadow-lg ring-1 ring-black/5 backdrop-blur-xl focus:outline-none"
             >
               <div className="flex items-center gap-3 rounded-lg p-3">
-                <div className="to-light-primary flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary text-white">
-                  {dummyUserData?.image ? (
-                    <Image
-                      src={dummyUserData.image}
-                      width={150}
-                      height={150}
-                      alt={dummyUserData.name ?? "user"}
-                      className="rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="font-medium">
-                      {dummyUserData.name?.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">
                     {dummyUserData.name}
-                  </p>
-                  <p className="truncate text-xs text-gray-500">
-                    {dummyUserData.email}
                   </p>
                   {dummyUserData.role !== "user" && (
                     <span className="to-light-primary mt-1 inline-block rounded-full bg-gradient-to-r from-primary px-2 py-0.5 text-[10px] font-medium text-white">
