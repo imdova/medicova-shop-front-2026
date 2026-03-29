@@ -161,6 +161,7 @@ export default function CustomersListPanel({ locale }: { locale: LanguageType })
     }
 
     try {
+      await deleteUser(id, token);
       toast.success(isAr ? "تم حذف المستخدم بنجاح" : "User deleted successfully");
       setUsers(prev => prev.filter(u => u._id !== id));
     } catch (error: any) {

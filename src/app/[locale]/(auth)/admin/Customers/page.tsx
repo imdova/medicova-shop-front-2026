@@ -1,15 +1,11 @@
 "use client";
 
-import { Plus, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import CustomersListPanel from "./panels/CustomersListPanel";
-import { useState } from "react";
-import AddSellerModal from "../components/AddSellerModal";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { useTranslations } from "next-intl";
 
 export default function CustomersPage() {
-  const t = useTranslations("admin");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const locale = useAppLocale();
   const isArabic = locale === "ar";
 
@@ -35,25 +31,9 @@ export default function CustomersPage() {
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-[#2F6B3A] px-5 text-sm font-black text-white shadow-xl shadow-emerald-900/10 transition-all duration-300 hover:brightness-110 active:scale-95"
-          >
-            <Plus
-              size={18}
-              className="transition-transform duration-300 group-hover:rotate-90"
-            />
-            <span>{isArabic ? "إضافة عميل" : "Onboard New Customer"}</span>
-          </button>
         </div>
 
         <CustomersListPanel locale={locale} />
-
-        <AddSellerModal
-          isModalOpen={isModalOpen}
-          setIsModalOpen={setIsModalOpen}
-          locale={locale}
-        />
       </div>
     </div>
   );

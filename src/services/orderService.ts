@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/apiClient";
+import { ApiProduct } from "./productService";
 
 export interface ApiOrderProduct {
   productId: string | null;
@@ -14,8 +15,8 @@ export interface ApiOrderProduct {
 }
 
 export interface ApiOrder {
-  _id: string; // Internal MongoDB ID
-  orderId: string; // Business Order ID (e.g. 69c6...)
+  _id: string; 
+  orderId: string; 
   orderNumber?: string;
   user?: {
     id: string;
@@ -54,6 +55,30 @@ export interface ApiOrder {
     | "returned"
     | "cancelled";
   orderStatus?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiReturn {
+  _id: string;
+  orderId: string;
+  order?: ApiOrder;
+  productId: string;
+  product?: ApiProduct;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  sellerId?: string;
+  seller?: {
+    _id: string;
+    name: string;
+  };
+  quantity?: number;
+  reason?: string;
+  description?: string;
+  status: "pending" | "approved" | "refunded" | "rejected";
   createdAt: string;
   updatedAt: string;
 }
@@ -267,18 +292,71 @@ export async function requestReturn(payload: { orderId: string; productId: strin
   });
 }
 
-export async function getCustomerReturns(token?: string): Promise<any[]> {
+export async function getReturns(token?: string): Promise<ApiReturn[]> {
   try {
+    // 1. Primary Attempt: Standard returns listing endpoint
     const res = await apiClient<any>({
-      endpoint: "/orders/all-returns",
+      endpoint: "/orders/returns", // Changed from all-returns to avoid Cast error
       method: "GET",
       token,
+      suppressErrorLog: true,
     });
-    // According to user: "Get returns endpoint rows"
-    // Usually res.data or res.data.data or res
-    return (res as any)?.data?.data || (res as any)?.data || res || [];
-  } catch (err) {
-    console.error("getCustomerReturns failed:", err);
-    return [];
+    const data = (res as any)?.data?.data || (res as any)?.data || res;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    
+    // If not an array, it might be a redirected response or single object, proceed to fallback
+    throw new Error("Invalid returns data format");
+  } catch (err: any) {
+
+    try {
+      const ordersRes = await apiClient<any>({
+        endpoint: "/orders",
+        method: "GET",
+        token,
+      });
+      
+      const allOrders = (ordersRes as any)?.data?.data || (ordersRes as any)?.data || ordersRes || [];
+      if (Array.isArray(allOrders)) {
+        return allOrders
+          .filter((o: any) => o.status === "returned" || o.paymentStatus === "refunded")
+          .map((o: any) => {
+            const its = o.items || o.units || [];
+            const firstItem = its[0] || {};
+            return {
+              _id: o._id || o.id || "unknown",
+              orderId: o.orderId || o._id || "unknown",
+              productId: firstItem.productId || firstItem.sku || "unknown",
+              userId: o.user?.id || o.userId || "unknown",
+              sellerId: o.sellerId || "unknown",
+              amount: o.total || o.totalPrice || 0,
+              reason: "Return requested",
+              description: "Status: " + (o.status || "Returned"),
+              status: o.status === "returned" ? "approved" : "pending",
+              createdAt: o.createdAt || new Date().toISOString(),
+              updatedAt: o.updatedAt || new Date().toISOString(),
+              user: o.user || { name: "Customer", email: "" },
+              seller: { _id: o.sellerId || "", name: o.sellerName || "Seller" },
+              product: { 
+                _id: firstItem.productId || "", 
+                nameEn: firstItem.productName || "Product", 
+                nameAr: firstItem.productNameAr || "منتج",
+                image: firstItem.productImage || "",
+                sku: firstItem.sku || "",
+                price: firstItem.unitPrice || 0,
+                finalPrice: firstItem.unitPrice || 0,
+                approved: true,
+                totalQuantity: firstItem.quantity || 0,
+              } as any,
+              order: o
+            };
+          });
+      }
+      return [];
+    } catch (fallbackErr) {
+      console.error("Returns lookup failed entirely:", fallbackErr);
+      return [];
+    }
   }
 }

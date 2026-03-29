@@ -7,7 +7,7 @@ import { useUserReturns } from "../hooks/useUserReturns";
 import { ReturnHeader } from "../component/ReturnHeader";
 import { ReturnFilters } from "../component/ReturnFilters";
 import { ReturnList } from "../component/ReturnList";
-import { getCustomerReturns } from "@/services/orderService";
+import { getReturns } from "@/services/orderService";
 import { getProductById } from "@/services/productService";
 import { useSession } from "next-auth/react";
 
@@ -25,7 +25,7 @@ const ReturnsPage = () => {
       if (!token) return;
       try {
         setLoading(true);
-        const rows = await getCustomerReturns(token);
+        const rows = await getReturns(token);
 
         const transformed: ReturnOrder[] = await Promise.all(
           rows.map(async (row: any) => {
