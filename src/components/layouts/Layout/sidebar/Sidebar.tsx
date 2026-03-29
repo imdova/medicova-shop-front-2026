@@ -141,9 +141,7 @@ const Sidebar: React.FC<AccountPageProps> = ({ user }) => {
         <div className="rounded-2xl border border-white/60 bg-white/40 p-2 shadow-lg shadow-gray-100/50 backdrop-blur-md">
           <button
             onClick={async () => {
-              await signOut({ redirect: false });
-              router.push("/");
-              router.refresh();
+              await signOut({ callbackUrl: `/${locale}/signin` });
             }}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-gray-600 transition-all duration-300 hover:bg-rose-50 hover:text-rose-600 hover:shadow-inner"
           >
