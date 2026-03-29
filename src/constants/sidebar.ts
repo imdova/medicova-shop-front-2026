@@ -110,11 +110,11 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
           href: "/seller/orders",
           icon: SendToBack,
         },
-        {
+        /* {
           title: { en: "Returns", ar: "المرتجعات" },
           href: "/seller/returns",
           icon: Undo2,
-        },
+        }, */
       ],
     },
     {

@@ -88,3 +88,30 @@ export async function updateMyPassword(data: any, token?: string): Promise<any> 
     token,
   });
 }
+
+export async function getSellerProfile(token?: string): Promise<any> {
+  const res = await apiClient<any>({
+    endpoint: `/users/seller/me`,
+    method: "GET",
+    token,
+  });
+  return res.data || res;
+}
+
+export async function updateSellerProfile(data: any, token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/users/seller/me`,
+    method: "PUT",
+    body: data,
+    token,
+  });
+}
+
+export async function updateSellerRootEmail(email: string, token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/users/seller/root-email`,
+    method: "PUT",
+    body: { email },
+    token,
+  });
+}
