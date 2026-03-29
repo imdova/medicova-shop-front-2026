@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import { callLoginApi } from "./loginApi";
 import { callRefreshTokenApi } from "./refreshApi";
 
@@ -77,6 +78,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       },
     }),
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
   ],
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   trustHost: true,
@@ -85,18 +90,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     maxAge: 30 * 24 * 60 * 60,
   },
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, account, profile }) {
       if (user) {
-        return {
-          ...token,
-          id: user.id,
-          role: (user as any).role,
-          accessToken: (user as any).accessToken,
-          refreshToken: (user as any).refreshToken,
-          language: (user as any).language,
-          accessTokenExpires: (user as any).accessTokenExpires,
-          tokenIssuedAt: (user as any).tokenIssuedAt,
-        };
+        // If it's a Credentials login, we already have everything in 'user'
+        if (account?.provider === "credentials") {
+          return {
+            ...token,
+            id: user.id,
+            role: (user as any).role,
+            accessToken: (user as any).accessToken,
+            refreshToken: (user as any).refreshToken,
+            language: (user as any).language,
+            accessTokenExpires: (user as any).accessTokenExpires,
+            tokenIssuedAt: (user as any).tokenIssuedAt,
+          };
+        }
+        
+        // If it's a Google login, we need to handle it differently
+        if (account?.provider === "google") {
+          // Here we should ideally call the backend to get a Medicova accessToken
+          // For now, we'll store what we have and maybe call an exchange API
+          return {
+            ...token,
+            id: user.id,
+            role: "user", // Default role for social login
+            googleAccessToken: account.access_token,
+            email: user.email,
+            name: user.name,
+          };
+        }
       }
 
       // Token rotation logic

@@ -119,8 +119,7 @@ const SignInPage: React.FC = () => {
   };
 
   const handleGoogleLogin = () => {
-    // Google OAuth would be implemented here
-    console.log("Google login clicked");
+    signIn("google", { callbackUrl: "/" });
   };
 
   return (

@@ -292,8 +292,7 @@ const RegisterPage: React.FC = () => {
   };
 
   const handleGoogleRegister = () => {
-    // Google OAuth would be implemented here
-    console.log("Google registration clicked");
+    signIn("google", { callbackUrl: "/" });
   };
 
   return (

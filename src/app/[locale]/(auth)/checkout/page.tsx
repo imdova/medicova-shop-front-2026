@@ -234,7 +234,7 @@ export default function CheckoutPage() {
 
             const paymentPayload = {
               orderId: orderId,
-              paymobIntegrationType: "card",
+              paymobIntegrationType: data.paymentMethod === "ewallet" ? "wallet" : data.paymentMethod,
               billingData: {
                 first_name: firstName,
                 last_name: lastName,
