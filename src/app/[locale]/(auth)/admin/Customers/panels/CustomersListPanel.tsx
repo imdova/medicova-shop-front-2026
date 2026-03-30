@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { ar, enUS } from "date-fns/locale";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
+import { confirmToast } from "@/utils/confirmToast";
 
 interface UserRelationOrder {
   id: string;
@@ -156,7 +157,7 @@ export default function CustomersListPanel({ locale }: { locale: LanguageType })
   };
 
   const handleDeleteUser = async (id: string, name: string) => {
-    if (!confirm(isAr ? `هل أنت متأكد من حذف ${name}؟` : `Are you sure you want to delete ${name}?`)) {
+    if (!(await confirmToast(isAr ? `هل أنت متأكد من حذف ${name}؟` : `Are you sure you want to delete ${name}?`, isAr))) {
       return;
     }
 

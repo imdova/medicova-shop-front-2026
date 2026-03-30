@@ -3,8 +3,11 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useState, useEffect, useMemo } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
+import { Tag, CalendarDays, ChevronDown, Search, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
 import {
@@ -23,11 +26,14 @@ import {
   SelectValue,
 } from "@/components/shared/select";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { Card, CardContent } from "@/components/shared/card";
 import { Switch } from "@/components/shared/switch";
-import { dummyDiscounts } from "@/constants/discounts";
 import { Discount } from "@/types/product";
 import { Checkbox } from "@/components/shared/Check-Box";
+import { Link } from "@/i18n/navigation";
+import Loading from "@/app/[locale]/loading";
+import { getProducts } from "@/services/productService";
+import { getCategories } from "@/services/categoryService";
+import { getDiscount, updateDiscount, CreateDiscountPayload } from "@/services/discountService";
 
 // ---------------- Schema & Types ----------------
 const discountSchema = z
@@ -93,41 +99,29 @@ const discountSchema = z
 
 type DiscountFormData = z.infer<typeof discountSchema>;
 
-// Mock data for products and categories
-const mockProducts = [
-  {
-    id: "1",
-    title: { en: "Wireless Bluetooth Headphones", ar: "سماعات بلوتوث لاسلكية" },
-  },
-  { id: "2", title: { en: "Smart Watch Series 5", ar: "ساعة ذكية السلسلة 5" } },
-  { id: "3", title: { en: "Laptop Backpack", ar: "حقيبة كمبيوتر محمول" } },
-  { id: "4", title: { en: "USB-C Charging Cable", ar: "كابل شحن USB-C" } },
-  { id: "5", title: { en: "Wireless Mouse", ar: "ماوس لاسلكي" } },
-  {
-    id: "6",
-    title: { en: "Mechanical Keyboard", ar: "لوحة مفاتيح ميكانيكية" },
-  },
-];
-
-const medicalCategories = [
-  { id: "1", title: { en: "Electronics", ar: "إلكترونيات" } },
-  { id: "2", title: { en: "Fashion", ar: "موضة" } },
-  { id: "3", title: { en: "Home & Kitchen", ar: "المنزل والمطبخ" } },
-  { id: "4", title: { en: "Sports", ar: "رياضة" } },
-  { id: "5", title: { en: "Beauty", ar: "جمال" } },
-  { id: "6", title: { en: "Toys", ar: "ألعاب" } },
-];
 
 // ---------------- Component ----------------
 export default function EditDiscountPage() {
   const locale = useAppLocale();
+  const isRTL = locale === "ar";
   const params = useParams();
   const slug = params.slug as string;
+  const router = useRouter();
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+  const user = (session as any)?.user;
 
   const [discount, setDiscount] = useState<Discount | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [productQuery, setProductQuery] = useState("");
+  const [categoryQuery, setCategoryQuery] = useState("");
+
+  const formId = "edit-discount-form";
 
   const form = useForm<DiscountFormData>({
     resolver: zodResolver(discountSchema),
@@ -152,51 +146,76 @@ export default function EditDiscountPage() {
   });
 
   const applyFor = form.watch("apply_for");
-  const discountType = form.watch("discount_type");
+  const watchCoupon = form.watch("coupon_code");
+  const watchDiscountType = form.watch("discount_type");
+  const watchValue = form.watch("value");
+  const watchStart = form.watch("start_date");
+  const watchEnd = form.watch("end_date");
+  const watchNever = form.watch("never_expired");
 
-  // Load existing discount and map -> form
+  const computedStatus = useMemo(() => {
+    const now = Date.now();
+    const start = watchStart ? new Date(watchStart).getTime() : NaN;
+    const end = watchEnd ? new Date(watchEnd).getTime() : NaN;
+    if (watchNever) return "active";
+    if (!Number.isNaN(start) && start > now) return "scheduled";
+    if (!Number.isNaN(end) && end < now) return "expired";
+    return "active";
+  }, [watchStart, watchEnd, watchNever]);
+
+  const statusChip =
+    computedStatus === "active"
+      ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+      : computedStatus === "scheduled"
+        ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100"
+        : "bg-slate-100 text-slate-600 ring-1 ring-slate-200";
+
+  // Fetch products and categories
   useEffect(() => {
-    const found = dummyDiscounts.find((d) => d.id === slug);
-    if (found) {
-      setDiscount(found);
+    if (!token) return;
+    const fetchData = async () => {
+      try {
+        const [prodData, catData, discData] = await Promise.all([
+          getProducts(token),
+          getCategories(token),
+          getDiscount(slug, token),
+        ]);
+        setProducts(prodData as any);
+        setCategories(catData as any);
+        setDiscount(discData);
 
-      // Map the discount data to form values
-      const formData = {
-        type:
-          found.type ||
-          (found.method === "automatic_discount" ? "promotion" : "coupon"),
-        coupon_code: found.couponCode || found.discountCode,
-        discount_type: found.discountType,
-        value: found.value ?? found.discountValue ?? 0,
-        apply_for: (found.applyFor ?? found.appliesTo ?? "all_orders") as any,
-        start_date: found.startDate,
-        end_date: found.endDate,
-        can_use_with_promotion: found.canUseWithPromotion ?? false,
-        can_use_with_flash_sale: found.canUseWithFlashSale ?? false,
-        is_unlimited: found.isUnlimited ?? true,
-        apply_via_url: found.applyViaUrl ?? false,
-        display_at_checkout: found.displayAtCheckout ?? false,
-        never_expired: found.neverExpired ?? false,
-        minimum_amount: found.minimumAmount ?? 0,
-        selected_products: found.selectedProducts || found.productIds || [],
-        selected_categories:
-          found.selectedCategories || found.categoryIds || [],
-      };
+        // Map the discount data to form values
+        const formData = {
+          type: discData.type || (discData.method === "automatic_discount" ? "promotion" : "coupon"),
+          coupon_code: discData.couponCode || discData.discountCode || "",
+          discount_type: discData.discountType as any || "fixed",
+          value: discData.value ?? discData.discountValue ?? 0,
+          apply_for: (discData.applyFor ?? discData.appliesTo ?? "all_orders") as any,
+          start_date: discData.startDate ? discData.startDate.split("T")[0] : "",
+          end_date: discData.endDate ? discData.endDate.split("T")[0] : "",
+          can_use_with_promotion: (discData as any).canUseWithPromotion ?? false,
+          can_use_with_flash_sale: (discData as any).canUseWithFlashSale ?? false,
+          is_unlimited: (discData as any).isUnlimited ?? true,
+          apply_via_url: (discData as any).applyViaUrl ?? false,
+          display_at_checkout: (discData as any).displayAtCheckout ?? false,
+          never_expired: (discData as any).neverExpired ?? false,
+          minimum_amount: (discData as any).minimumAmount ?? 0,
+          selected_products: discData.selectedProducts || discData.productIds || [],
+          selected_categories: discData.selectedCategories || discData.categoryIds || [],
+        };
 
-      form.reset(formData);
-
-      // Set selected products and categories for UI
-      if (found.selectedProducts || found.productIds) {
-        setSelectedProducts(found.selectedProducts || found.productIds || []);
+        form.reset(formData);
+        setSelectedProducts(discData.selectedProducts || discData.productIds || []);
+        setSelectedCategories(discData.selectedCategories || discData.categoryIds || []);
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+        toast.error(isRTL ? "فشل تحميل البيانات" : "Failed to load discount data");
+      } finally {
+        setIsLoading(false);
       }
-      if (found.selectedCategories || found.categoryIds) {
-        setSelectedCategories(
-          found.selectedCategories || found.categoryIds || [],
-        );
-      }
-    }
-    setIsLoading(false);
-  }, [slug, form]);
+    };
+    fetchData();
+  }, [token, slug, isRTL, form]);
 
   useEffect(() => {
     // Update form values when selections change
@@ -205,38 +224,61 @@ export default function EditDiscountPage() {
   }, [selectedProducts, selectedCategories, form]);
 
   const onSubmit = async (data: DiscountFormData) => {
-    // map back to Discount type
-    const updated: Discount = {
-      ...(discount as Discount),
-      type: data.type,
-      method:
-        data.type === "promotion" ? "automatic_discount" : "discount_code",
-      couponCode: data.coupon_code,
-      discountCode: data.coupon_code,
-      discountType: data.discount_type,
-      value: data.value,
-      discountValue: data.value,
-      applyFor: data.apply_for,
-      appliesTo: data.apply_for,
-      startDate: data.start_date,
-      endDate: data.end_date,
-      canUseWithPromotion: data.can_use_with_promotion,
-      canUseWithFlashSale: data.can_use_with_flash_sale,
-      isUnlimited: data.is_unlimited,
-      applyViaUrl: data.apply_via_url,
-      displayAtCheckout: data.display_at_checkout,
-      neverExpired: data.never_expired,
-      minimumAmount: data.minimum_amount,
-      selectedProducts: data.selected_products,
-      productIds: data.selected_products || [],
-      selectedCategories: data.selected_categories,
-      categoryIds: data.selected_categories || [],
-    };
+    if (!token) return;
+    setIsSubmitting(true);
+    try {
+      const payload: Partial<CreateDiscountPayload> = {
+        sellerId:
+          user?.role === "admin"
+            ? (user as any)?.id || "507f1f77bcf86cd799439011"
+            : (user as any)?.storeId || (user as any)?.id,
+        discountName: data.coupon_code,
+        method: data.type === "promotion" ? "automatic_discount" : "discount_code",
+        discountCode: data.coupon_code,
+        discountType: data.discount_type,
+        discountValue: data.value,
+        appliesTo: data.apply_for === "all_orders" ? "all_products" : data.apply_for,
+        productIds: data.selected_products || [],
+        categoryIds: data.selected_categories || [],
+        startDate: data.start_date, // YYYY-MM-DD
+        startTime: "00:00",
+        endDate: data.never_expired ? "2099-12-31" : data.end_date, // YYYY-MM-DD
+        endTime: "23:59",
+        active: true,
+        status: computedStatus || "active",
+      };
 
-    console.log("Updated Discount:", updated);
-    await new Promise((res) => setTimeout(res, 1000));
-    // Handle successful update
+
+      console.log("Edit Discount Payload:", payload);
+      await updateDiscount(slug, payload, token);
+
+      toast.success(isRTL ? "تم تحديث الخصم بنجاح" : "Discount updated successfully");
+      router.push("/admin/discounts");
+    } catch (error: any) {
+      console.error("Update failed", error);
+      toast.error(error.message || (isRTL ? "فشل تحديث الخصم" : "Failed to update discount"));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const filteredProducts = useMemo(() => {
+    const q = productQuery.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p: any) =>
+      ((p.nameAr || "") + (p.nameEn || "")).toLowerCase().includes(q),
+    );
+  }, [productQuery, products]);
+
+  const filteredCategories = useMemo(() => {
+    const q = categoryQuery.trim().toLowerCase();
+    if (!q) return categories;
+    return categories.filter((c: any) =>
+      ((c.title?.[locale] || c.title?.en || "") as string)
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [categoryQuery, categories, locale]);
 
   const handleProductSelect = (productId: string) => {
     setSelectedProducts((prev) =>
@@ -274,13 +316,10 @@ export default function EditDiscountPage() {
       display_at_checkout: "Display coupon code at the checkout page?",
       checkout_description:
         "The list of coupon codes will be displayed at the checkout page and customers can choose to apply.",
-      time: "Time",
       start_date: "Start date",
       end_date: "End date",
       never_expired: "Never expired?",
       save: "Save Changes",
-      update: "Update",
-      coupon_type: "Coupon type",
       discount: "Discount",
       apply_for: "apply for",
       all_orders: "All orders",
@@ -290,9 +329,6 @@ export default function EditDiscountPage() {
       fixed_amount: "Fixed amount",
       percentage: "Percentage",
       free_shipping: "Free shipping",
-      required: "Required",
-      yes: "Yes",
-      no: "No",
       loading: "Loading discount...",
       not_found: "Discount not found",
       select_products: "Select Products",
@@ -323,13 +359,10 @@ export default function EditDiscountPage() {
       display_at_checkout: "عرض كود الخصم في صفحة الدفع؟",
       checkout_description:
         "سيتم عرض قائمة أكواد الخصم في صفحة الدفع ويمكن للعملاء اختيار التطبيق.",
-      time: "الوقت",
       start_date: "تاريخ البدء",
       end_date: "تاريخ الانتهاء",
       never_expired: "لا ينتهي أبدًا؟",
       save: "حفظ التغييرات",
-      update: "تحديث",
-      coupon_type: "نوع الكوبون",
       discount: "خصم",
       apply_for: "يطبق على",
       all_orders: "جميع الطلبات",
@@ -339,9 +372,6 @@ export default function EditDiscountPage() {
       fixed_amount: "مبلغ ثابت",
       percentage: "نسبة مئوية",
       free_shipping: "شحن مجاني",
-      required: "مطلوب",
-      yes: "نعم",
-      no: "لا",
       loading: "جاري تحميل الخصم...",
       not_found: "الخصم غير موجود",
       select_products: "اختر المنتجات",
@@ -355,184 +385,140 @@ export default function EditDiscountPage() {
     },
   }[locale];
 
-  if (isLoading) return <div>{t.loading}</div>;
-  if (!discount) return <div>{t.not_found}</div>;
+  if (isLoading || isSubmitting) return <Loading />;
+  if (!discount) return <div className="text-center py-20 font-bold">{t.not_found}</div>;
 
   return (
-    <div>
+    <div
+      className="animate-in fade-in space-y-8 duration-700"
+      dir={isRTL ? "rtl" : "ltr"}
+    >
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">{t.title}</h1>
-        <p className="text-gray-600">
-          {t.edit_coupon}: <strong>{discount.couponCode}</strong>
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+              <Tag className="h-3.5 w-3.5" />
+            </span>
+            <Link href="/admin/discounts" className="hover:text-slate-700">
+              {isRTL ? "الخصومات" : "Discounts"}
+            </Link>
+            <ChevronDown className="h-4 w-4 rotate-[-90deg]" />
+            <span className="truncate">{t.title}</span>
+          </div>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">
+            {t.title}
+          </h1>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            {isRTL
+              ? "تحديث تفاصيل الكوبون أو الحملة الترويجية."
+              : "Update your coupon or promotion details and rules."}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/discounts"
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            {isRTL ? "إلغاء" : "Cancel"}
+          </Link>
+          <button
+            type="submit"
+            form={formId}
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
+          >
+            <Plus className="h-4 w-4" />
+            {t.save}
+          </button>
+        </div>
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-6">
+        <form
+          id={formId}
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* Left Column - Main Content */}
-            <div className="space-y-6 lg:col-span-4">
-              {/* Select type of discount */}
-              <Card className="p-6">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold">{t.select_type}</h3>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Coupon Code Section */}
-                  <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="coupon_code"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-medium">
-                            {t.coupon_code} *
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder={t.create_coupon_code}
-                              {...field}
-                            />
-                          </FormControl>
-                          <p className="text-sm text-gray-600">
-                            {t.coupon_description}
-                          </p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Settings Switches */}
-                    <div className="space-y-4 border-t pt-4">
-                      <FormField
-                        control={form.control}
-                        name="can_use_with_promotion"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center justify-between space-y-0">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">
-                                {t.can_use_with_promotion}
-                              </FormLabel>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="can_use_with_flash_sale"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center justify-between space-y-0">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">
-                                {t.can_use_with_flash_sale}
-                              </FormLabel>
-                              <p className="text-sm text-gray-600">
-                                {t.flash_sale_description}
-                              </p>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="is_unlimited"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center justify-between space-y-0">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">
-                                {t.unlimited_coupon}
-                              </FormLabel>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="apply_via_url"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center justify-between space-y-0">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">
-                                {t.apply_via_url}
-                              </FormLabel>
-                              <p className="text-sm text-gray-600">
-                                {t.url_description}
-                              </p>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="display_at_checkout"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center justify-between space-y-0">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">
-                                {t.display_at_checkout}
-                              </FormLabel>
-                              <p className="text-sm text-gray-600">
-                                {t.checkout_description}
-                              </p>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
+            <div className="space-y-6 lg:col-span-8">
+              {/* Discount details */}
+              <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
+                <div className="mb-5 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-extrabold text-slate-900">
+                      {isRTL ? "تفاصيل الخصم" : "Discount Details"}
+                    </div>
+                    <div className="mt-1 text-xs font-semibold text-slate-500">
+                      {isRTL
+                        ? "الكود، النوع، والقيمة"
+                        : "Code, type, and value"}
                     </div>
                   </div>
                 </div>
-              </Card>
 
-              {/* Coupon Type */}
-              <Card className="p-4">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold">{t.coupon_type}</h3>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-semibold text-slate-600">
+                          {isRTL ? "نوع الخصم" : "Discount Kind"}
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500/20">
+                              <SelectValue placeholder={isRTL ? "اختر" : "Select"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="coupon">
+                              {isRTL ? "كوبون" : "Coupon"}
+                            </SelectItem>
+                            <SelectItem value="promotion">
+                              {isRTL ? "حملة" : "Promotion"}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="coupon_code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-semibold text-slate-600">
+                          {t.coupon_code} *
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder={t.create_coupon_code}
+                            {...field}
+                            className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                          />
+                        </FormControl>
+                      
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  {/* Discount Type */}
+                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
                   <FormField
                     control={form.control}
                     name="discount_type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base">
+                        <FormLabel className="text-xs font-semibold text-slate-600">
                           {t.discount}
                         </FormLabel>
                         <Select
@@ -540,29 +526,14 @@ export default function EditDiscountPage() {
                           value={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500/20">
                               <SelectValue placeholder={t.discount} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="fixed">
-                              <div className="flex items-center gap-2">
-                                <span>$</span>
-                                <span>{t.fixed_amount}</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="percentage">
-                              <div className="flex items-center gap-2">
-                                <span>%</span>
-                                <span>{t.percentage}</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="shipping">
-                              <div className="flex items-center gap-2">
-                                <span>🚚</span>
-                                <span>{t.free_shipping}</span>
-                              </div>
-                            </SelectItem>
+                            <SelectItem value="fixed">{t.fixed_amount}</SelectItem>
+                            <SelectItem value="percentage">{t.percentage}</SelectItem>
+                            <SelectItem value="shipping">{t.free_shipping}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -570,41 +541,43 @@ export default function EditDiscountPage() {
                     )}
                   />
 
-                  {/* Value Input */}
                   <FormField
                     control={form.control}
                     name="value"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base">
-                          {discountType === "fixed" && "$"}
-                          {discountType === "percentage" && "%"}
-                          {discountType === "shipping" && "$"}
+                        <FormLabel className="text-xs font-semibold text-slate-600">
+                          {isRTL ? "القيمة" : "Value"}
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseFloat(e.target.value))
-                            }
-                            min="0"
-                            step={discountType === "percentage" ? "1" : "0.01"}
-                          />
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-extrabold text-slate-400">
+                              {watchDiscountType === "percentage" ? "%" : "$"}
+                            </span>
+                            <Input
+                              type="number"
+                              placeholder="0"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value || "0"))
+                              }
+                              min="0"
+                              step={watchDiscountType === "percentage" ? "1" : "0.01"}
+                              className="h-11 rounded-xl border-slate-200 bg-white pl-8 text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  {/* Apply For */}
                   <FormField
                     control={form.control}
                     name="apply_for"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base">
+                        <FormLabel className="text-xs font-semibold text-slate-600">
                           {t.apply_for}
                         </FormLabel>
                         <Select
@@ -612,23 +585,15 @@ export default function EditDiscountPage() {
                           value={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500/20">
                               <SelectValue placeholder={t.apply_for} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="all_orders">
-                              {t.all_orders}
-                            </SelectItem>
-                            <SelectItem value="specific_products">
-                              {t.specific_products}
-                            </SelectItem>
-                            <SelectItem value="specific_categories">
-                              {t.specific_categories}
-                            </SelectItem>
-                            <SelectItem value="minimum_amount">
-                              {t.minimum_amount}
-                            </SelectItem>
+                            <SelectItem value="all_orders">{t.all_orders}</SelectItem>
+                            <SelectItem value="specific_products">{t.specific_products}</SelectItem>
+                            <SelectItem value="specific_categories">{t.specific_categories}</SelectItem>
+                            <SelectItem value="minimum_amount">{t.minimum_amount}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -636,106 +601,138 @@ export default function EditDiscountPage() {
                     )}
                   />
                 </div>
+              </div>
 
-                {/* Conditional Fields Based on Apply For Selection */}
-                <div className="mt-4 space-y-4">
-                  {/* Specific Products Dropdown */}
+              {/* Eligibility */}
+              <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
+                <div className="mb-5">
+                  <div className="text-sm font-extrabold text-slate-900">
+                    {isRTL ? "الأهلية" : "Eligibility"}
+                  </div>
+                  <div className="mt-1 text-xs font-semibold text-slate-500">
+                    {isRTL
+                      ? "حدد أين وكيف يمكن تطبيق الخصم."
+                      : "Define where and how this discount can be applied."}
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-6">
+                  {/* Specific Products Selection */}
                   {applyFor === "specific_products" && (
                     <div className="space-y-3">
-                      <FormLabel className="text-base font-medium">
-                        {t.select_products} *
-                      </FormLabel>
-                      <div className="space-y-2">
-                        <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200 p-2">
-                          {mockProducts.map((product) => (
-                            <div
-                              key={product.id}
-                              className="flex items-center space-x-2 rounded p-2 hover:bg-gray-50"
-                            >
-                              <Checkbox
-                                id={`product-${product.id}`}
-                                checked={selectedProducts.includes(product.id)}
-                                onCheckedChange={() =>
-                                  handleProductSelect(product.id)
-                                }
-                              />
-                              <label
-                                htmlFor={`product-${product.id}`}
-                                className="flex-1 cursor-pointer text-sm font-medium text-gray-700"
-                              >
-                                {product.title[locale]}
-                              </label>
-                            </div>
-                          ))}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-slate-700">
+                          {t.select_products} *
                         </div>
-                        {selectedProducts.length > 0 && (
-                          <div className="text-sm text-gray-600">
-                            {t.selected_items}: {selectedProducts.length}
-                          </div>
-                        )}
-                        {form.formState.errors.selected_products && (
-                          <p className="text-sm text-red-600">
-                            {form.formState.errors.selected_products.message}
-                          </p>
-                        )}
+                        <div className="text-xs font-semibold text-slate-500">
+                          {t.selected_items}: {selectedProducts.length}
+                        </div>
                       </div>
+
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          value={productQuery}
+                          onChange={(e) => setProductQuery(e.target.value)}
+                          placeholder={t.search_placeholder}
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+
+                      <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+                        {filteredProducts.map((product: any) => (
+                          <div
+                            key={product._id}
+                            className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-slate-50"
+                          >
+                            <Checkbox
+                              id={`product-${product._id}`}
+                              checked={selectedProducts.includes(product._id)}
+                              onCheckedChange={() =>
+                                handleProductSelect(product._id)
+                              }
+                            />
+                            <label
+                              htmlFor={`product-${product._id}`}
+                              className="flex-1 cursor-pointer text-sm font-medium text-slate-700"
+                            >
+                              {product.nameAr && locale === "ar"
+                                ? product.nameAr
+                                : product.nameEn || product.nameAr}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+
+                      {form.formState.errors.selected_products && (
+                        <p className="text-sm font-semibold text-rose-600">
+                          {form.formState.errors.selected_products.message}
+                        </p>
+                      )}
                     </div>
                   )}
 
-                  {/* Specific Categories Dropdown */}
+                  {/* Specific Categories Selection */}
                   {applyFor === "specific_categories" && (
                     <div className="space-y-3">
-                      <FormLabel className="text-base font-medium">
-                        {t.select_categories} *
-                      </FormLabel>
-                      <div className="space-y-2">
-                        <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200 p-2">
-                          {medicalCategories.map((category) => (
-                            <div
-                              key={category.id}
-                              className="flex items-center space-x-2 rounded p-2 hover:bg-gray-50"
-                            >
-                              <Checkbox
-                                id={`category-${category.id}`}
-                                checked={selectedCategories.includes(
-                                  category.id,
-                                )}
-                                onCheckedChange={() =>
-                                  handleCategorySelect(category.id)
-                                }
-                              />
-                              <label
-                                htmlFor={`category-${category.id}`}
-                                className="flex-1 cursor-pointer text-sm font-medium text-gray-700"
-                              >
-                                {category.title[locale]}
-                              </label>
-                            </div>
-                          ))}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-slate-700">
+                          {t.select_categories} *
                         </div>
-                        {selectedCategories.length > 0 && (
-                          <div className="text-sm text-gray-600">
-                            {t.selected_items}: {selectedCategories.length}
-                          </div>
-                        )}
-                        {form.formState.errors.selected_categories && (
-                          <p className="text-sm text-red-600">
-                            {form.formState.errors.selected_categories.message}
-                          </p>
-                        )}
+                        <div className="text-xs font-semibold text-slate-500">
+                          {t.selected_items}: {selectedCategories.length}
+                        </div>
                       </div>
+
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          value={categoryQuery}
+                          onChange={(e) => setCategoryQuery(e.target.value)}
+                          placeholder={t.search_placeholder}
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+
+                      <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+                        {filteredCategories.map((category: any) => (
+                          <div
+                            key={category.id}
+                            className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-slate-50"
+                          >
+                            <Checkbox
+                              id={`category-${category.id}`}
+                              checked={selectedCategories.includes(category.id)}
+                              onCheckedChange={() =>
+                                handleCategorySelect(category.id)
+                              }
+                            />
+                            <label
+                              htmlFor={`category-${category.id}`}
+                              className="flex-1 cursor-pointer text-sm font-medium text-slate-700"
+                            >
+                              {category.title?.[locale] || category.title?.en}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+
+                      {form.formState.errors.selected_categories && (
+                        <p className="text-sm font-semibold text-rose-600">
+                          {form.formState.errors.selected_categories.message}
+                        </p>
+                      )}
                     </div>
                   )}
 
-                  {/* Minimum Amount Input */}
                   {applyFor === "minimum_amount" && (
                     <div className="space-y-3">
-                      <FormLabel className="text-base font-medium">
+                      <div className="text-sm font-semibold text-slate-700">
                         {t.minimum_amount_label} *
-                      </FormLabel>
-                      <p className="text-sm text-gray-600">
+                      </div>
+                      <div className="text-sm font-medium text-slate-500">
                         {t.minimum_amount_description}
-                      </p>
+                      </div>
                       <FormField
                         control={form.control}
                         name="minimum_amount"
@@ -747,10 +744,10 @@ export default function EditDiscountPage() {
                                 placeholder={t.enter_minimum_amount}
                                 {...field}
                                 onChange={(e) =>
-                                  field.onChange(parseFloat(e.target.value))
+                                  field.onChange(parseFloat(e.target.value || "0"))
                                 }
                                 min="0"
-                                step="0.01"
+                                className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                               />
                             </FormControl>
                             <FormMessage />
@@ -760,15 +757,136 @@ export default function EditDiscountPage() {
                     </div>
                   )}
                 </div>
-              </Card>
+
+                {/* Additional Settings */}
+                <div className="mt-8 space-y-4 border-t border-slate-100 pt-6">
+                  <FormField
+                    control={form.control}
+                    name="can_use_with_promotion"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between space-y-0 rounded-xl border border-slate-100 p-4 transition-colors hover:bg-slate-50/50">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm font-bold text-slate-800">
+                            {t.can_use_with_promotion}
+                          </FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="can_use_with_flash_sale"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between space-y-0 rounded-xl border border-slate-100 p-4 transition-colors hover:bg-slate-50/50">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm font-bold text-slate-800">
+                            {t.can_use_with_flash_sale}
+                          </FormLabel>
+                          <p className="max-w-[400px] text-xs font-semibold text-slate-500">
+                            {t.flash_sale_description}
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="is_unlimited"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between space-y-0 rounded-xl border border-slate-100 p-4 transition-colors hover:bg-slate-50/50">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm font-bold text-slate-800">
+                            {t.unlimited_coupon}
+                          </FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  {watchCoupon && (
+                    <FormField
+                      control={form.control}
+                      name="apply_via_url"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between space-y-0 rounded-xl border border-slate-100 p-4 transition-colors hover:bg-slate-50/50">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-sm font-bold text-slate-800">
+                              {t.apply_via_url}
+                            </FormLabel>
+                            <p className="max-w-[400px] text-xs font-semibold text-slate-500">
+                              {t.url_description}
+                            </p>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  <FormField
+                    control={form.control}
+                    name="display_at_checkout"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between space-y-0 rounded-xl border border-slate-100 p-4 transition-colors hover:bg-slate-50/50">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm font-bold text-slate-800">
+                            {t.display_at_checkout}
+                          </FormLabel>
+                          <p className="max-w-[400px] text-xs font-semibold text-slate-500">
+                            {t.checkout_description}
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Right Column - Sidebar */}
-            <div className="space-y-6 lg:col-span-2">
-              {/* Time Section */}
-              <Card className="p-6">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold">{t.time}</h3>
+            <div className="space-y-6 lg:col-span-4">
+              {/* Status Section */}
+              <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    {isRTL ? "الحالة" : "Status"}
+                  </h3>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-black uppercase tracking-wider ${statusChip}`}
+                  >
+                    {computedStatus}
+                  </span>
                 </div>
 
                 <div className="space-y-4">
@@ -778,11 +896,18 @@ export default function EditDiscountPage() {
                       name="start_date"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base">
+                          <FormLabel className="text-xs font-semibold text-slate-600">
                             {t.start_date} *
                           </FormLabel>
                           <FormControl>
-                            <Input type="date" {...field} />
+                            <div className="relative">
+                              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                              <Input
+                                type="date"
+                                {...field}
+                                className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                              />
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -794,15 +919,19 @@ export default function EditDiscountPage() {
                       name="end_date"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base">
+                          <FormLabel className="text-xs font-semibold text-slate-600">
                             {t.end_date} *
                           </FormLabel>
                           <FormControl>
-                            <Input
-                              type="date"
-                              {...field}
-                              disabled={form.watch("never_expired")}
-                            />
+                            <div className="relative">
+                              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                              <Input
+                                type="date"
+                                {...field}
+                                disabled={watchNever}
+                                className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-400"
+                              />
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -814,30 +943,72 @@ export default function EditDiscountPage() {
                     control={form.control}
                     name="never_expired"
                     render={({ field }) => (
-                      <FormItem className="flex items-center space-x-2">
+                      <FormItem className="flex items-center space-x-2 space-y-0">
                         <FormControl>
                           <Switch
                             checked={field.value}
                             onCheckedChange={field.onChange}
                           />
                         </FormControl>
-                        <FormLabel className="text-base">
+                        <FormLabel className="text-xs font-black uppercase tracking-tight text-slate-500">
                           {t.never_expired}
                         </FormLabel>
                       </FormItem>
                     )}
                   />
                 </div>
-              </Card>
+              </div>
 
-              {/* Save Button */}
-              <Card className="p-4">
-                <CardContent className="p-0">
-                  <Button type="submit" className="w-full">
-                    {t.save}
-                  </Button>
-                </CardContent>
-              </Card>
+              {/* Summary Section */}
+              <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
+                <h3 className="mb-4 text-sm font-extrabold text-slate-900">
+                  {isRTL ? "الملخص" : "Summary"}
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-500">
+                      {isRTL ? "الكود" : "Code"}
+                    </div>
+                    <div className="mt-1 font-black text-slate-900">
+                      {watchCoupon || (isRTL ? "لا يوجد" : "No code yet")}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-500">
+                        {isRTL ? "القيمة" : "Value"}
+                      </div>
+                      <div className="mt-1 font-black text-emerald-600">
+                        {watchDiscountType === "percentage" ? "%" : "$"}
+                        {watchValue || "0"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-slate-500">
+                        {isRTL ? "يطبق على" : "Applies to"}
+                      </div>
+                      <div className="mt-1 text-sm font-black text-slate-900">
+                        {t[applyFor as keyof typeof t] || applyFor}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      {isRTL ? "الجدول الزمني" : "Schedule"}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-xs font-bold text-slate-700">
+                      <CalendarDays className="h-3 w-3" />
+                      {watchStart || (isRTL ? "لم يحدد" : "Not set")}
+                      {" → "}
+                      {watchNever
+                        ? isRTL
+                          ? "لا ينتهي"
+                          : "Never"
+                        : watchEnd || (isRTL ? "لم يحدد" : "Not set")}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </form>

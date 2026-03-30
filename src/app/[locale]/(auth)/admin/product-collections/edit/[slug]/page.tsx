@@ -38,7 +38,7 @@ import {
   updateProductCollection,
   CreateProductCollectionPayload,
 } from "@/services/productCollectionService";
-import { getProducts, ApiProduct } from "@/services/productService";
+import { getProducts, ApiProduct, mapApiProductToProduct } from "@/services/productService";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
@@ -110,39 +110,7 @@ export default function EditCollectionPage() {
       try {
         const apiProducts = await getProducts(token);
         // Map ApiProduct to frontend Product type
-        const mapped: Product[] = apiProducts.map((p) => ({
-          id: p._id,
-          sku: p.sku || "",
-          brand: { id: "", name: { en: "", ar: "" }, image: "", slug: "" }, // Placeholder
-          model: { en: "", ar: "" },
-          category: { id: "", title: { en: "", ar: "" }, image: "", slug: "" }, // Placeholder
-          title: { en: p.nameEn, ar: p.nameAr },
-          slug: { en: p.slugEn || "", ar: p.slugAr || "" },
-          price: p.price || p.pricing?.originalPrice || 0,
-          images:
-            p.media?.galleryImages ||
-            (p.media?.featuredImages ? [p.media.featuredImages] : []),
-          rating: 0,
-          isBestSaller: false,
-          reviewCount: 0,
-          description: { en: "", ar: "" },
-          features: { en: [], ar: [] },
-          overview_desc: { en: "", ar: "" },
-          highlights: { en: [], ar: [] },
-          specifications: [],
-          shipping_fee: 0,
-          shippingMethod: { en: "standard", ar: "قياسي" },
-          weightKg: 0,
-          sellers: {
-            id: "",
-            name: "",
-            rating: 0,
-            isActive: true,
-            returnPolicy: { en: "", ar: "" },
-            itemShown: 0,
-            status: { en: "", ar: "" },
-          },
-        }));
+        const mapped: Product[] = apiProducts.map((p) => mapApiProductToProduct(p));
         setAllProducts(mapped);
       } catch (error) {
         console.error("Failed to fetch products:", error);
@@ -209,6 +177,33 @@ export default function EditCollectionPage() {
 
     fetchCollection();
   }, [collectionId, form, router, isAr, token]);
+
+  // Enrich selected products with full metadata from allProducts (e.g. images)
+  useEffect(() => {
+    if (allProducts.length > 0 && selectedProducts.length > 0) {
+      const needsEnrichment = selectedProducts.some(
+        (p) => !p.images || p.images.length === 0 || p.images[0].includes("placeholder"),
+      );
+
+      if (needsEnrichment) {
+        const enriched = selectedProducts.map((current) => {
+          const full = allProducts.find((p) => p.id === current.id);
+          if (full) {
+            return {
+              ...full,
+              // Keep any existing fields if necessary, but full product from mapped api is better
+            };
+          }
+          return current;
+        });
+
+        // Only update if something actually changed to avoid infinite loops
+        if (JSON.stringify(enriched) !== JSON.stringify(selectedProducts)) {
+          setSelectedProducts(enriched);
+        }
+      }
+    }
+  }, [allProducts, selectedProducts]);
 
   // Filter products based on search
   const filteredProducts = useMemo(() => {
@@ -570,10 +565,7 @@ export default function EditCollectionPage() {
                           >
                             <Image
                               src={
-                                (product as any).media?.featuredImages ||
-                                (product as any).media?.galleryImages?.[0] ||
-                                (product as any).images?.[0] ||
-                                "/images/placeholder.png"
+                                product.images?.[0] || "/images/placeholder.png"
                               }
                               width={100}
                               height={100}
@@ -634,10 +626,7 @@ export default function EditCollectionPage() {
                           <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-gray-50 ring-1 ring-gray-100">
                             <Image
                               src={
-                                (product as any).media?.featuredImages ||
-                                (product as any).media?.galleryImages?.[0] ||
-                                (product as any).images?.[0] ||
-                                "/images/placeholder.png"
+                                product.images?.[0] || "/images/placeholder.png"
                               }
                               width={64}
                               height={64}

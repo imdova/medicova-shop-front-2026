@@ -26,6 +26,8 @@ import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { getProductById, mapApiProductToProduct } from "@/services/productService";
+import { confirmToast } from "@/utils/confirmToast";
+
 
 function formatDateTime(value: Date, locale: string) {
   if (!value || isNaN(value.getTime())) return "N/A";
@@ -403,14 +405,22 @@ export default function AdminOrderDetailsPage({
 
               <div className="mt-8 pt-6 border-t border-gray-50">
                 <button
-                  onClick={() => {
-                    if (window.confirm(isAr ? "هل أنت متأكد من حذف هذا الطلب؟" : "Are you sure you want to delete this order?")) {
+                  onClick={async () => {
+                    if (
+                      await confirmToast(
+                        isAr
+                          ? "هل أنت متأكد من حذف هذا الطلب؟"
+                          : "Are you sure you want to delete this order?",
+                        isAr,
+                      )
+                    ) {
                       deleteOrder(order._id, token).then(() => {
                         toast.success(isAr ? "تم حذف الطلب" : "Order deleted");
                         router.push(`/${locale}/admin/orders`);
                       });
                     }
                   }}
+
                   className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50/50 py-3 text-sm font-bold text-red-600 transition-colors hover:bg-red-50"
                 >
                   {isAr ? "حذف الطلب" : "Delete Order"}

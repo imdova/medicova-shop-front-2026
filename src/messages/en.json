@@ -782,6 +782,7 @@
     "allStatuses": "All Statuses",
     "active": "Active",
     "pending": "Pending",
+    "approved": "Approved",
     "draft": "Draft",
     "allStock": "All Stock",
     "inStock": "In Stock",

@@ -34,7 +34,7 @@ import {
   createProductCollection,
   CreateProductCollectionPayload,
 } from "@/services/productCollectionService";
-import { getProducts, ApiProduct } from "@/services/productService";
+import { getProducts, ApiProduct, mapApiProductToProduct } from "@/services/productService";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
@@ -115,39 +115,7 @@ export default function CreateCollectionPage() {
       try {
         const apiProducts = await getProducts(token);
         // Map ApiProduct to frontend Product type
-        const mapped: Product[] = apiProducts.map((p) => ({
-          id: p._id,
-          sku: p.sku || "",
-          brand: { id: "", name: { en: "", ar: "" }, image: "", slug: "" }, // Added slug
-          model: { en: "", ar: "" },
-          category: { id: "", title: { en: "", ar: "" }, image: "", slug: "" }, // Added slug
-          title: { en: p.nameEn, ar: p.nameAr },
-          slug: { en: p.slugEn || "", ar: p.slugAr || "" },
-          price: p.price || p.pricing?.originalPrice || 0,
-          images:
-            p.media?.galleryImages ||
-            (p.media?.featuredImages ? [p.media.featuredImages] : []),
-          rating: 0,
-          isBestSaller: false,
-          reviewCount: 0,
-          description: { en: "", ar: "" },
-          features: { en: [], ar: [] },
-          overview_desc: { en: "", ar: "" },
-          highlights: { en: [], ar: [] },
-          specifications: [],
-          shipping_fee: 0,
-          shippingMethod: { en: "standard", ar: "قياسي" },
-          weightKg: 0,
-          sellers: {
-            id: "",
-            name: "",
-            rating: 0,
-            isActive: true,
-            returnPolicy: { en: "", ar: "" },
-            itemShown: 0,
-            status: { en: "", ar: "" },
-          },
-        }));
+        const mapped: Product[] = apiProducts.map((p) => mapApiProductToProduct(p));
         setAllProducts(mapped);
       } catch (error) {
         console.error("Failed to fetch products:", error);
@@ -601,10 +569,7 @@ export default function CreateCollectionPage() {
                                 (product as any).title?.ar ||
                                 "—";
                             const imageUrl =
-                              (product as any).media?.featuredImages ||
-                              (product as any).media?.galleryImages?.[0] ||
-                              (product as any).images?.[0] ||
-                              "/images/placeholder.png";
+                              product.images?.[0] || "/images/placeholder.png";
 
                             return (
                               <div
@@ -660,10 +625,7 @@ export default function CreateCollectionPage() {
                                 p.title?.ar ||
                                 "—";
                             const imageUrl =
-                              p.media?.featuredImages ||
-                              p.media?.galleryImages?.[0] ||
-                              p.images?.[0] ||
-                              "";
+                              p.images?.[0] || "";
                             return (
                               <div
                                 key={p.id}

@@ -59,16 +59,29 @@ export function useGetProductsByCategory({
         // Map and filter products
         let filtered = allApiProducts.map(mapApiProductToProduct);
 
-        // Filter by category (from URL param)
-        if (categorySlug) {
-          filtered = filtered.filter((p: Product) => 
-            p.category?.id === categorySlug || 
-            p.category?.slug === categorySlug ||
-            p.category?.subcategory?.url?.includes(categorySlug) ||
-            p.category?.title?.en?.toLowerCase() === categorySlug.toLowerCase() ||
-            p.category?.subcategory?.title?.en?.toLowerCase() === categorySlug.toLowerCase()
-          );
+        // Combine categorySlug (path) and categories (query) into a single list
+        const allCategoryFilters = new Set<string>();
+        if (categorySlug) allCategoryFilters.add(categorySlug.toLowerCase());
+        if (categories && categories.length > 0) {
+          categories.forEach(c => allCategoryFilters.add(c.toLowerCase()));
         }
+
+        if (allCategoryFilters.size > 0) {
+          filtered = filtered.filter((p: Product) => {
+            const pCatId = p.category?.id?.toLowerCase();
+            const pCatSlug = p.category?.slug?.toLowerCase();
+            const pCatTitle = p.category?.title?.en?.toLowerCase();
+            const pSubUrl = p.category?.subcategory?.url?.toLowerCase();
+            
+            return (
+              (pCatId && allCategoryFilters.has(pCatId)) ||
+              (pCatSlug && allCategoryFilters.has(pCatSlug)) ||
+              (pCatTitle && allCategoryFilters.has(pCatTitle)) ||
+              (pSubUrl && Array.from(allCategoryFilters).some(f => pSubUrl.includes(f)))
+            );
+          });
+        }
+
 
         // Filter by subcategory (from query param)
         if (subcategorySlug) {
@@ -112,15 +125,6 @@ export function useGetProductsByCategory({
           );
         }
 
-        // Filter by multiple Categories (from filter sidebar)
-        if (categories && categories.length > 0) {
-          filtered = filtered.filter((p: Product) => 
-            categories.includes(p.category?.id || "") || 
-            categories.includes(p.category?.slug || "")
-          );
-        }
-
-        // Filter by Price Range
         if (minPrice !== undefined) {
           filtered = filtered.filter((p: Product) => p.price >= minPrice);
         }

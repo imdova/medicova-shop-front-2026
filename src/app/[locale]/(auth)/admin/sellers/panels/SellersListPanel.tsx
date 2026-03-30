@@ -15,6 +15,7 @@ import {
 } from "@/services/sellerService";
 import { MultiCategory } from "@/types";
 import { toast } from "react-hot-toast";
+import { confirmToast } from "@/utils/confirmToast";
 import { getProducts, ApiProduct } from "@/services/productService";
 import { useSession } from "next-auth/react";
 
@@ -85,14 +86,16 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
 
   const handleDelete = async (id: string, name: string) => {
     if (
-      !window.confirm(
+      !(await confirmToast(
         isAr
           ? `هل أنت متأكد من حذف البائع ${name}؟`
           : `Are you sure you want to delete seller ${name}?`,
-      )
+        isAr,
+      ))
     ) {
       return;
     }
+
 
     try {
       await deleteSeller(id, token);

@@ -22,7 +22,10 @@ export interface CreateDiscountPayload {
   endDate: string;
   endTime: string;
   active: boolean;
+  status: "active" | "inactive" | "expired" | string;
 }
+
+
 
 export interface ApiDiscountsResponse {
   status: string;
@@ -92,6 +95,21 @@ export const updateDiscount = async (
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || "Failed to update discount");
+  }
+
+  const result = await response.json();
+  return mapDiscount(result.data.discount || result.data);
+};
+
+export const getDiscount = async (id: string, token: string): Promise<Discount> => {
+  const response = await fetch(`${BASE_URL}/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch discount");
   }
 
   const result = await response.json();

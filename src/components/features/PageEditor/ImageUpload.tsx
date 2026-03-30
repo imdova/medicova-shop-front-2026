@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/shared/button";
 import { ImageIcon, Upload, X } from "lucide-react";
 import { Input } from "@/components/shared/input";
+import toast from "react-hot-toast";
 
 // ---------------- Image Upload Component ----------------
 export default function ImageUpload({
@@ -59,7 +60,7 @@ export default function ImageUpload({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert(
+      toast.error(
         language === "en"
           ? "Please select an image file"
           : "يرجى اختيار ملف صورة",
@@ -68,7 +69,7 @@ export default function ImageUpload({
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert(
+      toast.error(
         language === "en"
           ? "Image size should be less than 5MB"
           : "يجب أن يكون حجم الصورة أقل من 5 ميجابايت",
@@ -84,7 +85,7 @@ export default function ImageUpload({
       onChange(objectUrl);
     } catch (error) {
       console.error("Upload failed:", error);
-      alert(language === "en" ? "Upload failed" : "فشل الرفع");
+      toast.error(language === "en" ? "Upload failed" : "فشل الرفع");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
