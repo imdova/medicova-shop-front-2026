@@ -171,15 +171,14 @@ export const VerificationCenter = ({
       status: initialData?.phoneVerified ? "verified" : "notVerified",
       icon: <Phone size={20} />,
     },
-    // Email verification is currently disabled on the backend (Channel Disabled: EMAIL)
-    /*
+
     {
       id: "email",
       title: t("email"),
       status: initialData?.emailVerified ? "verified" : "notVerified",
       icon: <Mail size={20} />,
     },
-    */
+   
     {
       id: "id",
       title: t("id"),

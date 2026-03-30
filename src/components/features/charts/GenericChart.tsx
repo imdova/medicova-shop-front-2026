@@ -57,9 +57,7 @@ const GenericChart = ({
     color: s.color,
   }));
 
-  const hasNoData =
-    filteredSeries.length === 0 ||
-    filteredSeries.every((s) => s.data.length === 0);
+  const hasNoData = false; // Persistent chart as requested
 
   const chartOptions: ApexOptions = {
     chart: {

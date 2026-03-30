@@ -118,6 +118,16 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
       ],
     },
     {
+      title: { en: "Finance", ar: "المالية" },
+      items: [
+        {
+          title: { en: "Withdrawals", ar: "السحوبات" },
+          href: "/seller/withdrawals",
+          icon: WalletCards,
+        },
+      ],
+    },
+    {
       title: { en: "My Account", ar: "حسابي" },
       items: [
         {
@@ -239,11 +249,6 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
           title: { en: "Transactions", ar: "المعاملات" },
           href: "/admin/financial?tab=transactions",
           icon: SendToBack,
-        },
-        {
-          title: { en: "Withdrawals", ar: "السحوبات" },
-          href: "/admin/financial/withdrawals",
-          icon: Undo2,
         },
         {
           title: { en: "Plans", ar: "الخطط" },
