@@ -5,8 +5,8 @@ import CustomAlert from "@/components/shared/CustomAlert";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { useAppSelector } from "@/store/hooks";
 import {
-  clearWishlist,
-  removeFromWishlist,
+  clearWishlistApi,
+  removeFromWishlistApi,
 } from "@/store/slices/wishlistSlice";
 import { LucideHeartOff } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -26,16 +26,26 @@ const WishlistPage: React.FC = () => {
   const userId = session?.user?.id;
 
   const handleClearWishlist = () => {
-    if (userId && wishlistData.length > 0) {
-      dispatch(clearWishlist({ userId }));
+    const anySession = session as any;
+    const token = anySession?.accessToken;
+    if (userId && token && wishlistData.length > 0) {
+      dispatch(clearWishlistApi({ token, userId }) as any);
       showAlert("Cleared wishlist!", "wishlist");
+    } else if (!token || !userId) {
+      const errorMsg = !userId ? "User ID not found" : "Access token missing";
+      showAlert(`Cannot clear: ${errorMsg}`, "error");
     }
   };
 
   const handleDeleteFromWishlist = (id: string) => {
-    if (userId) {
-      dispatch(removeFromWishlist({ id, userId }));
+    const anySession = session as any;
+    const token = anySession?.accessToken;
+    if (userId && token) {
+      dispatch(removeFromWishlistApi({ id, token, userId }) as any);
       showAlert("deleted Product from wishlist!", "wishlist");
+    } else if (!token || !userId) {
+      const errorMsg = !userId ? "User ID not found" : "Access token missing";
+      showAlert(`Cannot delete: ${errorMsg}`, "error");
     }
   };
 

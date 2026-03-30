@@ -181,7 +181,7 @@ export async function createProduct(payload: CreateProductPayload, token?: strin
   });
 }
 
-export async function getProducts(token?: string): Promise<ApiProduct[]> {
+export async function getProducts(token?: string, params?: { sellerId?: string }): Promise<ApiProduct[]> {
   const parseProducts = (res: any): ApiProduct[] => {
     const data = (res as any)?.data || res;
     console.log(
@@ -195,14 +195,19 @@ export async function getProducts(token?: string): Promise<ApiProduct[]> {
     return [];
   };
 
-  const fetchProducts = (authToken?: string) =>
-    apiClient({
-      endpoint: "/products?limit=1000",
+  const fetchProducts = (authToken?: string) => {
+    let endpoint = "/products?limit=1000";
+    if (params?.sellerId) {
+      endpoint += `&sellerId=${params.sellerId}`;
+    }
+    return apiClient({
+      endpoint,
       method: "GET",
       token: authToken,
       suppressErrorLog: true,
       suppressAutoLogout: true,
     });
+  };
 
   try {
     const res = await fetchProducts(token?.trim() || undefined);

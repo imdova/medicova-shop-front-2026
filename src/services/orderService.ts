@@ -83,10 +83,14 @@ export interface ApiReturn {
   updatedAt: string;
 }
 
-export async function getOrders(token?: string): Promise<ApiOrder[]> {
+export async function getOrders(token?: string, params?: { sellerId?: string }): Promise<ApiOrder[]> {
   try {
+    let endpoint = "/orders";
+    if (params?.sellerId) {
+      endpoint += `?sellerId=${params.sellerId}`;
+    }
     const res = await apiClient({
-      endpoint: "/orders",
+      endpoint,
       method: "GET",
       token,
     });

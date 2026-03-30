@@ -14,6 +14,7 @@ import {
   Mail,
   User as UserIcon,
   Globe,
+  Store,
 } from "lucide-react";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
@@ -25,6 +26,7 @@ import { CountryDropdown } from "@/components/features/CountryDropdown";
 import PhoneInput from "@/components/forms/Forms/formFields/PhoneInput";
 import DynamicButton from "@/components/shared/Buttons/DynamicButton";
 import { updateSellerProfile } from "@/services/userService";
+import { uploadImage } from "@/lib/uploadService";
 
 const DEFAULT_COUNTRIES = [
   { id: "EG", code: "eg", name: { en: "Egypt", ar: "مصر" } },
@@ -48,13 +50,18 @@ export const ProfileForm = ({ initialData, locale }: ProfileFormProps) => {
     initialData?.image || null,
   );
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { data: session } = useSession();
   const token = (session as any)?.accessToken;
 
   const methods = useForm({
     defaultValues: {
-      fullName: initialData?.fullName || initialData?.name || "",
+      firstName: initialData?.firstName || initialData?.fullName?.split(" ")[0] || "",
+      lastName: initialData?.lastName || initialData?.fullName?.split(" ").slice(1).join(" ") || "",
       email: initialData?.email || "",
+      brandName: initialData?.brandName || "",
+      contactEmail: initialData?.sellerContactEmail || initialData?.SellerContactEmail || "",
+      phone_code: initialData?.phoneCode || "+20",
       phone: initialData?.phone || "",
       country: initialData?.country || "EG",
       state: initialData?.state || "",
@@ -72,15 +79,32 @@ export const ProfileForm = ({ initialData, locale }: ProfileFormProps) => {
 
   useEffect(() => {
     if (initialData) {
+      // Strip dial codes from the incoming phone number for display
+      let displayPhone = initialData.phone || "";
+      if (displayPhone.startsWith("+20")) {
+        displayPhone = displayPhone.slice(3);
+      } else if (displayPhone.startsWith("20")) {
+        displayPhone = displayPhone.slice(2);
+      }
+
+      // Handle name splitting for display if needed
+      const firstName = initialData.firstName || initialData.fullName?.split(" ")[0] || "";
+      const lastName = initialData.lastName || initialData.fullName?.split(" ").slice(1).join(" ") || "";
+
       reset({
-      fullName: initialData?.fullName || initialData?.name || session?.user?.name || "",
+        firstName,
+        lastName,
         email: initialData.email || "",
-        phone: initialData.phone || "",
+        brandName: initialData.brandName || "",
+        contactEmail: initialData.sellerContactEmail || initialData.SellerContactEmail || "",
+        phone_code: initialData.phoneCode || "+20",
+        phone: displayPhone,
         country: initialData.country || "EG",
         state: initialData.state || "",
         city: initialData.city || "",
       });
-      if (initialData.image) setPreviewImage(initialData.image);
+      const currentImage = initialData.profileImage || initialData.image;
+      if (currentImage) setPreviewImage(currentImage);
     }
   }, [initialData, reset]);
 
@@ -88,6 +112,7 @@ export const ProfileForm = ({ initialData, locale }: ProfileFormProps) => {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
+        setSelectedFile(file);
         const url = URL.createObjectURL(file);
         setPreviewImage(url);
       }
@@ -99,18 +124,53 @@ export const ProfileForm = ({ initialData, locale }: ProfileFormProps) => {
     if (!token) return;
     try {
       setIsSubmitting(true);
-      await updateSellerProfile({
-        fullName: data.fullName,
-        phone: data.phone,
+
+      let finalImageUrl = initialData?.profileImage || initialData?.image || "";
+
+      // 1. Upload image if a new one is selected
+      if (selectedFile) {
+        try {
+          finalImageUrl = await uploadImage(selectedFile, "seller", token);
+        } catch (uploadErr: any) {
+          throw new Error(uploadErr.message || "Failed to upload image");
+        }
+      }
+
+      // Helper to ensure URL is absolute
+      const ensureAbsoluteUrl = (url: string) => {
+        if (!url || typeof url !== "string") return "";
+        if (url.startsWith("http")) return url;
+        const apiBaseUrl = "https://shop-api.medicova.net";
+        return `${apiBaseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+      };
+
+      const payload: any = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        brandName: data.brandName,
+        phoneCode: data.phone_code,
+        phone: `${data.phone_code.replace("+", "")}${data.phone.replace(/^0+/, "")}`,
         country: data.country,
         state: data.state,
         city: data.city,
-      }, token);
-      
-      toast.success(locale === "ar" ? "تم تحديث الملف الشخصي بنجاح" : "Profile updated successfully");
+        profileImage: ensureAbsoluteUrl(finalImageUrl),
+      };
+
+      console.log("DEBUG: updateSellerProfile payload:", JSON.stringify(payload, null, 2));
+
+      const res = await updateSellerProfile(payload, token);
+      console.log("DEBUG: updateSellerProfile response:", JSON.stringify(res, null, 2));
+
+      toast.success(
+        locale === "ar"
+          ? "تم تحديث ملف البائع بنجاح"
+          : "Seller profile updated successfully",
+      );
       window.dispatchEvent(new Event("profileUpdated"));
     } catch (err: any) {
-      toast.error(err.message || (locale === "ar" ? "حدث خطأ ما" : "An error occurred"));
+      toast.error(
+        err.message || (locale === "ar" ? "حدث خطأ ما" : "An error occurred"),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -122,9 +182,7 @@ export const ProfileForm = ({ initialData, locale }: ProfileFormProps) => {
         <h2 className="text-lg font-black tracking-tight text-gray-900">
           {t("title")}
         </h2>
-        <p className="text-[13px] font-medium text-gray-500">
-          {t("subtitle")}
-        </p>
+        <p className="text-[13px] font-medium text-gray-500">{t("subtitle")}</p>
       </div>
 
       <FormProvider {...methods}>
@@ -175,12 +233,38 @@ export const ProfileForm = ({ initialData, locale }: ProfileFormProps) => {
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label className="text-[11px] font-black uppercase tracking-widest text-gray-400">
-                      {t("fullName")}
+                      {t("firstName")}
                     </Label>
                     <div className="relative">
                       <UserIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                       <Input
-                        {...register("fullName", { required: true })}
+                        {...register("firstName", { required: true })}
+                        className="h-11 rounded-xl border-gray-100 bg-gray-50/50 pl-10 text-sm font-bold transition-all focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+                      {t("lastName")}
+                    </Label>
+                    <div className="relative">
+                      <UserIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        {...register("lastName", { required: true })}
+                        className="h-11 rounded-xl border-gray-100 bg-gray-50/50 pl-10 text-sm font-bold transition-all focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
+                      />
+                    </div>
+                  </div>
+
+                   <div className="space-y-1.5">
+                    <Label className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+                      {t("brandName")}
+                    </Label>
+                    <div className="relative">
+                      <Store className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        {...register("brandName")}
                         className="h-11 rounded-xl border-gray-100 bg-gray-50/50 pl-10 text-sm font-bold transition-all focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
                       />
                     </div>
@@ -195,7 +279,7 @@ export const ProfileForm = ({ initialData, locale }: ProfileFormProps) => {
                       <Input
                         {...register("email")}
                         disabled
-                        className="h-11 rounded-xl border-gray-100 bg-gray-100/30 pl-10 text-sm font-bold text-gray-400 cursor-not-allowed"
+                        className="h-11 cursor-not-allowed rounded-xl border-gray-100 bg-gray-100/30 pl-10 text-sm font-bold text-gray-400"
                       />
                     </div>
                   </div>
@@ -257,8 +341,16 @@ export const ProfileForm = ({ initialData, locale }: ProfileFormProps) => {
                     variant="primary"
                     type="submit"
                     disabled={isSubmitting}
-                    label={isSubmitting ? (locale === "ar" ? "جاري الحفظ..." : "Saving...") : (locale === "ar" ? "حفظ التغييرات" : "Save Changes")}
-                    className="h-10 rounded-xl bg-emerald-600 px-8 text-[11px] font-black uppercase tracking-widest text-white transition-all hover:bg-emerald-700 active:scale-95 shadow-lg shadow-emerald-500/20"
+                    label={
+                      isSubmitting
+                        ? locale === "ar"
+                          ? "جاري الحفظ..."
+                          : "Saving..."
+                        : locale === "ar"
+                          ? "حفظ التغييرات"
+                          : "Save Changes"
+                    }
+                    className="h-10 rounded-xl bg-emerald-600 px-8 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-700 active:scale-95"
                   />
                 </div>
               </div>

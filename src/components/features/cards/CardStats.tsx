@@ -96,7 +96,7 @@ export function CardStats({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="group relative overflow-hidden rounded-[2.5rem] border border-white/60 bg-white/70 p-7 shadow-2xl shadow-gray-200/50 backdrop-blur-2xl"
+      className="group relative overflow-hidden rounded-[2.5rem] border border-gray-200/60 bg-white shadow-2xl shadow-gray-200/40 p-7 backdrop-blur-2xl transition-all hover:border-emerald-500/30"
     >
       {/* Premium Mesh Background Effect */}
       <div className="absolute inset-0 z-0 opacity-0 transition-opacity duration-700 group-hover:opacity-10">

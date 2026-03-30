@@ -12,6 +12,7 @@ import StoreProvider from "@/store/StoreProvider";
 import { NextAuthProvider } from "@/NextAuthProvider";
 import DynamicFooter from "@/components/layouts/Layout/Footer/DynamicFooter";
 import { auth } from "@/lib/auth/auth";
+import WishlistSync from "@/components/shared/WishlistSync";
 
 const raleway = Raleway({
   subsets: ["latin"],
@@ -73,6 +74,7 @@ export default async function LocaleLayout({ children, params }: Props) {
         <NextIntlClientProvider locale={locale} messages={messages}>
           <StoreProvider>
             <NextAuthProvider session={session}>
+              <WishlistSync />
               <DynamicHeaderWrapper headerLinks={headerLinks}>
                 {children}
                 <DynamicFooter footerData={footerData} />

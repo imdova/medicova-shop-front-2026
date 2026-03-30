@@ -11,8 +11,9 @@ import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { getSellerOrders, ApiOrder } from "@/services/orderService";
+import { getSellerOrders, getReturns, ApiOrder, ApiReturn } from "@/services/orderService";
 import { getProducts, ApiProduct } from "@/services/productService";
+import { getFinanceSummary, FinanceSummary } from "@/services/financeService";
 import { collectCurrentSellerIds, productBelongsToSeller } from "@/components/features/ProductManagement/ownership";
 
 export default function SellerDashboard() {
@@ -25,6 +26,8 @@ export default function SellerDashboard() {
 
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [returns, setReturns] = useState<ApiReturn[]>([]);
+  const [finance, setFinance] = useState<FinanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,12 +35,16 @@ export default function SellerDashboard() {
       if (!token) return;
       try {
         setLoading(true);
-        const [ordersData, productsData] = await Promise.all([
+        const [ordersData, productsData, returnsData, financeData] = await Promise.all([
           getSellerOrders(token),
-          getProducts(token)
+          getProducts(token),
+          getReturns(token),
+          getFinanceSummary(token)
         ]);
         setOrders(ordersData);
         setProducts(productsData);
+        setReturns(returnsData);
+        setFinance(financeData);
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
       } finally {
@@ -67,24 +74,17 @@ export default function SellerDashboard() {
 
   const stats = useMemo(() => {
     const totalOrders = filteredOrders.length;
-    let totalRevenue = 0;
-    
-    filteredOrders.forEach(order => {
-      order.items?.forEach(item => {
-        if (item.productId && myProductIds.has(item.productId)) {
-          totalRevenue += (item.unitPrice || 0) * (item.quantity || 0);
-        }
-      });
-    });
-
+    const totalRevenue = finance?.grossVolume || 0;
     const productCount = myProducts.length;
+    const netEarnings = finance?.netEarnings || 0;
 
     return {
       totalRevenue: `${isAr ? "ر.س" : "$"}${totalRevenue.toLocaleString()}`,
       totalOrders: totalOrders.toString(),
-      productCount: productCount.toString()
+      productCount: productCount.toString(),
+      netEarnings: `${isAr ? "ر.س" : "$"}${netEarnings.toLocaleString()}`,
     };
-  }, [filteredOrders, myProducts, myProductIds, isAr]);
+  }, [filteredOrders, myProducts, finance, isAr]);
 
   const statsData: {
     title: string;
@@ -95,22 +95,85 @@ export default function SellerDashboard() {
     {
       title: t("totalRevenue"),
       value: stats.totalRevenue,
-      change: "+12.5%",
+      change: "",
       icon: "dollar",
     },
     {
-      title: t("totalOrders"),
-      value: stats.totalOrders,
-      change: "+8.2%",
-      icon: "shoppingCart",
+      title: isAr ? "صافي الربح" : "Net Earnings",
+      value: stats.netEarnings,
+      change: "",
+      icon: "dollar",
     },
     {
       title: t("products"),
       value: stats.productCount,
-      change: "+3.1%",
+      change: "",
       icon: "package",
     },
   ];
+
+  const dynamicChartData = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const revData = new Array(12).fill(0);
+    const ordData = new Array(12).fill(0);
+    const retData = new Array(12).fill(0);
+
+    filteredOrders.forEach(order => {
+      const date = new Date(order.createdAt);
+      if (date.getFullYear() === currentYear) {
+        const month = date.getMonth();
+        let orderTotal = 0;
+        order.items?.forEach(item => {
+          if (item.productId && myProductIds.has(item.productId)) {
+            orderTotal += (item.unitPrice || 0) * (item.quantity || 0);
+          }
+        });
+        revData[month] += orderTotal;
+        ordData[month] += 1;
+      }
+    });
+
+    returns.forEach(ret => {
+      const date = new Date(ret.createdAt);
+      if (date.getFullYear() === currentYear) {
+        retData[date.getMonth()] += 1;
+      }
+    });
+
+    return {
+      yearly: {
+        categories: {
+          en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+          ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+        },
+        series: [
+          {
+            name: { en: "Revenue", ar: "الإيرادات" },
+            data: revData,
+            color: "#3b82f6",
+          },
+          {
+            name: { en: "Orders", ar: "الطلبات" },
+            data: ordData,
+            color: "#10b981",
+          },
+          {
+            name: { en: "Returns", ar: "المرتجعات" },
+            data: retData,
+            color: "#ef4444",
+          },
+        ]
+      },
+      monthly: {
+        categories: { en: [], ar: [] },
+        series: []
+      },
+      weekly: {
+        categories: { en: [], ar: [] },
+        series: []
+      }
+    };
+  }, [filteredOrders, returns, myProductIds]);
 
   const translatedColumns = useMemo(() => [
     {
@@ -182,11 +245,11 @@ export default function SellerDashboard() {
     },
     {
       title: { en: "Returns", ar: "المرتجعات" },
-      value: "0",
+      value: returns.length.toString(),
       color: "#ef4444",
       icon: RotateCcw,
     },
-  ], [stats]);
+  ], [stats, returns.length]);
 
   if (loading && token) {
     return (
@@ -235,7 +298,7 @@ export default function SellerDashboard() {
         >
           <GenericChart
             chartTitle={t("salesOverview")}
-            data={dummyChartData}
+            data={dynamicChartData}
             showCards={true}
             cards={chartCards}
             locale={locale}

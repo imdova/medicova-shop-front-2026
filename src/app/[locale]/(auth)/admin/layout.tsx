@@ -1,5 +1,5 @@
 import React, { ReactNode } from "react";
-import { Toaster } from "react-hot-toast";
+import ToastProvider from "@/components/shared/ToastProvider";
 import Sidebar from "@/components/layouts/Layout/sidebar/Sidebar";
 import { auth } from "@/lib/auth/auth";
 
@@ -40,20 +40,7 @@ const AccountLayout = async ({ children }: AccountLayoutProps) => {
         <div className="absolute -right-[10%] bottom-[10%] h-[30%] w-[30%] rounded-full bg-indigo-500/5 blur-[120px]"></div>
       </div>
 
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            borderRadius: "16px",
-            padding: "12px 20px",
-            fontSize: "14px",
-            fontWeight: 600,
-          },
-          success: { iconTheme: { primary: "#10b981", secondary: "#fff" } },
-          error: { iconTheme: { primary: "#ef4444", secondary: "#fff" } },
-        }}
-      />
+      <ToastProvider />
       </div>
     </NextAuthProvider>
   );

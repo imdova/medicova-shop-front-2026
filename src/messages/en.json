@@ -525,6 +525,10 @@
     "personal": {
       "title": "Personal Information",
       "subtitle": "Update your personal details and profile picture.",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "brandName": "Brand Name",
+      "sellerContactEmail": "Contact Email",
       "fullName": "Full Name",
       "email": "Email Address",
       "phone": "Phone Number",
