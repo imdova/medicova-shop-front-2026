@@ -142,10 +142,11 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
     {
       items: [
         {
-          title: { en: "Dashboard", ar: "لوحة التحكم" },
+          title: { en: "Overview", ar: "نظرة عامة" },
           href: "/admin",
           icon: LayoutDashboard,
         },
+
       ],
     },
     {
@@ -241,20 +242,12 @@ export const sidebarGroups: { [key: string]: SidebarGroup[] } = {
       title: { en: "Finance", ar: "المالية" },
       items: [
         {
-          title: { en: "Overview", ar: "نظرة عامة" },
-          href: "/admin/financial",
-          icon: Building2,
-        },
-        {
-          title: { en: "Transactions", ar: "المعاملات" },
-          href: "/admin/financial?tab=transactions",
-          icon: SendToBack,
-        },
-        {
           title: { en: "Plans", ar: "الخطط" },
           href: "/admin/financial/plans",
           icon: BadgePercent,
         },
+
+
       ],
     },
   ],
