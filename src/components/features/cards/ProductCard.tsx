@@ -16,8 +16,8 @@ import {
 import CartButton from "../../shared/Buttons/CartButton";
 import CustomAlert from "../../shared/CustomAlert";
 import {
-  addToWishlist,
-  removeFromWishlist,
+  addToWishlistApi,
+  removeFromWishlistApi,
 } from "@/store/slices/wishlistSlice";
 import WishlistButton from "../../shared/Buttons/WishlistButton";
 import { useSession } from "next-auth/react";
@@ -156,23 +156,35 @@ const ProductCard: React.FC<ProductCardProps> = ({ loading, product }) => {
         return;
       }
 
-      const userId = session.data.user.id;
+      const anySession = session.data as any;
+      const userId = anySession?.user?.id;
+      const token = anySession?.accessToken;
+
+      if (!userId || !token) {
+        const errorMsg = !userId ? "User ID not found" : "Access token missing";
+        console.warn(`Wishlist attempt aborted: ${errorMsg}`, { userId, hasToken: !!token });
+        showAlert(`${t("pleaseLoginToWishlist")} (${errorMsg})`, "error");
+        return;
+      }
 
       try {
         if (!isInWishlist) {
-          dispatch(addToWishlist(product, userId));
+          console.log("Dispatching addToWishlistApi for product:", product.id);
+          dispatch(addToWishlistApi({ productId: product.id, product, token, userId }));
           showAlert(t("addedToWishlist"), "wishlist");
         } else {
+          console.log("Dispatching removeFromWishlistApi for product:", product.id);
           dispatch(
-            removeFromWishlist({
+            removeFromWishlistApi({
               id: product.id,
+              token: token,
               userId: userId,
             }),
           );
           showAlert(t("removedFromWishlist"), "wishlist");
         }
       } catch (error) {
-        console.error("Wishlist operation failed:", error);
+        console.error("Wishlist dispatch error:", error);
         showAlert(t("failedToUpdateWishlist"), "error");
       }
     },
