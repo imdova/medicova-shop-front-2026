@@ -3,7 +3,7 @@ import Sidebar from "@/components/layouts/Layout/sidebar/Sidebar";
 import GoBackButton from "@/components/shared/Buttons/GoBackButton";
 import { auth } from "@/lib/auth/auth";
 import { NextAuthProvider } from "@/NextAuthProvider";
-import { Toaster } from "react-hot-toast";
+import ToastProvider from "@/components/shared/ToastProvider";
 
 interface AccountLayoutProps {
   children: ReactNode;
@@ -54,20 +54,7 @@ export default async function AccountLayout({ children, params }: AccountLayoutP
         </main>
       </div>
 
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            borderRadius: "16px",
-            padding: "12px 20px",
-            fontSize: "14px",
-            fontWeight: 600,
-          },
-          success: { iconTheme: { primary: "#10b981", secondary: "#fff" } },
-          error: { iconTheme: { primary: "#ef4444", secondary: "#fff" } },
-        }}
-      />
+      <ToastProvider />
     </div>
   );
 }

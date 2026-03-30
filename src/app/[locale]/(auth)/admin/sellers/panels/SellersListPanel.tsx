@@ -5,7 +5,7 @@ import { LanguageType } from "@/util/translations";
 import Avatar from "@/components/shared/Avatar";
 import { Link } from "@/i18n/navigation";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Filter, Pencil, Search, Star, Loader2, Trash2 } from "lucide-react";
+import { Filter, Eye, Search, Star, Loader2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   getAdminSellers,
@@ -471,11 +471,11 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                       <td className="whitespace-nowrap px-5 py-4">
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/admin/sellers/${encodeURIComponent(s.id)}?edit=1`}
+                            href={`/admin/sellers/${encodeURIComponent(s.id)}`}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
-                            aria-label={isAr ? "تعديل" : "Edit"}
+                            aria-label={isAr ? "عرض" : "View"}
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </Link>
                           <button
                             type="button"

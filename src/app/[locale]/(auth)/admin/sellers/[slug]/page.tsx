@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   BadgeCheck,
@@ -12,9 +12,9 @@ import {
   FileText,
   Mail,
   MapPin,
+  Eye,
   MessageSquare,
   MoreVertical,
-  Pencil,
   Phone,
   ShieldCheck,
   SlidersHorizontal,
@@ -27,14 +27,14 @@ import {
 import Avatar from "@/components/shared/Avatar";
 import { Link } from "@/i18n/navigation";
 import { useAppLocale } from "@/hooks/useAppLocale";
-import { getSellerById, Seller } from "@/services/sellerService";
+import { getSellerById, Seller, updateSellerStatus } from "@/services/sellerService";
 import { getProducts, ApiProduct } from "@/services/productService";
 import { getCategories } from "@/services/categoryService";
 import { MultiCategory } from "@/types";
 import { useSession } from "next-auth/react";
-import { useEffect } from "react";
 import toast from "react-hot-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
+import { getOrders, ApiOrder } from "@/services/orderService";
 
 function formatNumber(value: number, locale: string) {
   const loc = locale === "ar" ? "ar-EG" : "en-US";
@@ -77,35 +77,49 @@ export default function SellerDetailsPage({
 
   const [seller, setSeller] = useState<Seller | null>(null);
   const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [categories, setCategories] = useState<MultiCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     if (!token || !slug) return;
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [sData, pData, cData] = await Promise.all([
+        const [sData, pData, cData, oData] = await Promise.all([
           getSellerById(slug, token),
-          getProducts(token),
+          getProducts(token, { sellerId: slug }),
           getCategories(token),
+          getOrders(token, { sellerId: slug }),
         ]);
         setSeller(sData);
         setCategories(cData);
-        // Filter products for this seller
-        const sellerProducts = pData.filter((p) => {
-          const sid =
-            p.sellerId ||
-            (typeof p.seller === "object"
-              ? (p.seller as any)?._id || (p.seller as any)?.id
-              : p.seller);
-          return (
-            String(sid) === String(slug) ||
-            String(p.store) === String(slug) ||
-            String(p.createdBy) === String(slug)
-          );
+        setProducts(pData);
+
+        // Refine order filtering: Only show orders containing this seller's products
+        const sellerProductIds = new Set(pData.map((p) => String(p._id)));
+        const sellerOrders = oData.filter((o) => {
+          // Check root sellerId
+          const rootSid =
+            o.sellerId ||
+            (typeof (o as any).seller === "object"
+              ? (o as any).seller?._id || (o as any).seller?.id
+              : (o as any).seller);
+          if (String(rootSid) === String(slug)) return true;
+
+          // Check if any item in the order belongs to this seller
+          const items = o.items || o.units || [];
+          return items.some((item: any) => {
+            const pid =
+              item.productId ||
+              (typeof item.product === "object"
+                ? item.product?._id || item.product?.id
+                : item.product);
+            return sellerProductIds.has(String(pid));
+          });
         });
-        setProducts(sellerProducts);
+        setOrders(sellerOrders);
       } catch (err) {
         console.error("Failed to fetch seller detail:", err);
         toast.error(isAr ? "فشل تحميل البيانات" : "Failed to load data");
@@ -115,6 +129,30 @@ export default function SellerDetailsPage({
     };
     fetchData();
   }, [slug, token, isAr]);
+
+  const handleToggleStatus = async () => {
+    if (!token || !seller || isUpdating) return;
+
+    const currentStatus = seller.status || "active";
+    const newStatus = currentStatus === "suspended" ? "active" : "suspended";
+
+    setIsUpdating(true);
+    toast.promise(
+      updateSellerStatus(seller.id, newStatus, token),
+      {
+        loading: isAr ? "جاري تحديث حالة البائع..." : "Updating seller status...",
+        success: (res) => {
+          setSeller((prev) => prev ? { ...prev, status: newStatus } : null);
+          setIsUpdating(false);
+          return isAr ? "تم تحديث الحالة بنجاح" : "Status updated successfully!";
+        },
+        error: (err) => {
+          setIsUpdating(false);
+          return isAr ? "فشل في تحديث الحالة" : "Failed to update status.";
+        },
+      }
+    );
+  };
 
   const title = seller?.name || (isAr ? "تفاصيل البائع" : "Seller Details");
 
@@ -152,7 +190,7 @@ export default function SellerDetailsPage({
   const joiningDateText = useMemo(() => {
     const s = seller as any;
     if (!s?.joiningDate && !s?.createdAt) return "—";
-    const date = new Date(s?.joiningDate || s?.createdAt);
+    const date = new Date(s?.createdAt || s?.joiningDate);
     const loc = isAr ? "ar-EG" : "en-US";
     return new Intl.DateTimeFormat(loc, {
       year: "numeric",
@@ -160,6 +198,30 @@ export default function SellerDetailsPage({
       day: "2-digit",
     }).format(date);
   }, [isAr, seller]);
+
+  const memberDuration = useMemo(() => {
+    if (!seller?.createdAt) return "—";
+    const start = new Date(seller.createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 30)
+      return isAr ? `عضو منذ ${diffDays} يوم` : `Member for ${diffDays} days`;
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths < 12)
+      return isAr
+        ? `عضو منذ ${diffMonths} شهر`
+        : `Member for ${diffMonths} months`;
+    const diffYears = (diffDays / 365.25).toFixed(1);
+    return isAr ? `عضو منذ ${diffYears} سنة` : `Member for ${diffYears} years`;
+  }, [isAr, seller?.createdAt]);
+
+  const outOfStockCount = useMemo(() => {
+    return products.filter(
+      (p) => (p.inventory?.stockQuantity || p.stock || 0) === 0,
+    ).length;
+  }, [products]);
 
   const lifetimeSales = seller?.sales || 0;
   const currentRating = seller?.rating || 0;
@@ -175,24 +237,35 @@ export default function SellerDetailsPage({
   const [productQuery, setProductQuery] = useState("");
   const [productCategory, setProductCategory] = useState<string>("all");
   const [productPage, setProductPage] = useState(1);
+  const [orderPage, setOrderPage] = useState(1);
 
   const productCatalog = useMemo(() => {
     return products.map((p) => {
       const name = isAr ? p.nameAr : p.nameEn;
       const sku = p.sku || p.identity?.sku || `SKU-${p._id.slice(-6)}`;
       const price = p.salePrice || p.pricing?.salePrice || p.price || 0;
-      const stock = p.inventory?.stockQuantity || p.stock || 0;
+      const stock =
+        p.stockQuantity || p.stock || p.inventory?.stockQuantity || 0;
       const img =
+        (p as any).featuredImages ||
         p.media?.featuredImages ||
         (p.media?.galleryImages && p.media.galleryImages[0]) ||
-        "";
+        null;
       const stockPct = clamp(Math.round((stock / 100) * 100), 0, 100);
 
       const categoryObj =
         typeof p.category === "object"
           ? {
               id: p.category?._id || p.category?.id,
-              label: isAr ? p.category.nameAr : p.category.nameEn,
+              label: isAr
+                ? p.category.nameAr ||
+                  p.category.title?.ar ||
+                  p.category.name ||
+                  "قسم"
+                : p.category.nameEn ||
+                  p.category.title?.en ||
+                  p.category.name ||
+                  "Category",
             }
           : {
               id: String(p.category),
@@ -374,26 +447,28 @@ export default function SellerDetailsPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href={`/admin/sellers/${encodeURIComponent(slug)}?edit=1`}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 shadow-sm transition hover:bg-slate-50"
-              >
-                <Pencil className="h-4 w-4" />
-                {isAr ? "تعديل البائع" : "Edit Seller"}
-              </Link>
               <button
                 type="button"
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-extrabold text-white shadow-sm transition hover:bg-emerald-700"
+                onClick={handleToggleStatus}
+                disabled={isUpdating}
+                className={`inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-xs font-extrabold shadow-sm transition disabled:opacity-50 ${
+                  seller?.status === "suspended"
+                    ? "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"
+                    : "border-rose-200 bg-white text-rose-700 hover:bg-rose-50"
+                }`}
               >
-                <MessageSquare className="h-4 w-4" />
-                {isAr ? "رسالة" : "Message"}
-              </button>
-              <button
-                type="button"
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 text-xs font-extrabold text-rose-700 shadow-sm transition hover:bg-rose-50"
-              >
-                <span className="h-2 w-2 rounded-full bg-rose-500" />
-                {isAr ? "إيقاف" : "Suspend"}
+                {isUpdating ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                ) : (
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      seller?.status === "suspended" ? "bg-emerald-500" : "bg-rose-500"
+                    }`}
+                  />
+                )}
+                {seller?.status === "suspended" 
+                  ? (isAr ? "تفعيل" : "Activate") 
+                  : (isAr ? "إيقاف" : "Suspend")}
               </button>
             </div>
           </div>
@@ -405,28 +480,30 @@ export default function SellerDetailsPage({
             {
               label: isAr ? "إجمالي المبيعات" : "Lifetime Sales",
               value: formatCurrency(lifetimeSales, locale),
-              sub: isAr ? "+12% هذا الشهر" : "+12% this month",
+              sub: isAr ? "إجمالي الإيرادات" : "Total revenue tracked",
               icon: DollarSign,
               tone: "emerald",
             },
             {
               label: isAr ? "التقييم الحالي" : "Current Rating",
               value: `${currentRating.toFixed(1)} / 5.0`,
-              sub: isAr ? "من 8.2 مراجعة" : "From 8.2 total reviews",
+              sub: isAr ? "بناءً على التقييمات" : "Based on verified ratings",
               icon: Star,
               tone: "amber",
             },
             {
               label: isAr ? "إجمالي المنتجات" : "Total Products",
               value: formatNumber(totalProducts, locale),
-              sub: isAr ? "24 منتج نفد" : "24 items out of stock",
+              sub: isAr
+                ? `${outOfStockCount} منتج نفد`
+                : `${outOfStockCount} items out of stock`,
               icon: Tag,
               tone: "indigo",
             },
             {
               label: isAr ? "تاريخ الانضمام" : "Joining Date",
               value: joiningDateText,
-              sub: isAr ? "عضو منذ 2.4 سنة" : "Member for 2.4 years",
+              sub: memberDuration,
               icon: Calendar,
               tone: "slate",
             },
@@ -494,27 +571,6 @@ export default function SellerDetailsPage({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                      {isAr ? "الرقم الضريبي" : "Tax ID / EIN"}
-                    </div>
-                    <div className="mt-2 text-sm font-semibold text-slate-700">
-                      {String(
-                        120000000 + (hashToNumber(slug) % 900000000),
-                      ).replace(/(\d{2})(\d{7})(\d)/, "$1-$2$3")}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                      {isAr ? "نوع الشركة" : "Company Type"}
-                    </div>
-                    <div className="mt-2 text-sm font-semibold text-slate-700">
-                      {isAr ? "شركة" : "Corporation"}
-                    </div>
-                  </div>
-                </div>
-
                 <div>
                   <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
                     {isAr ? "جهة الاتصال" : "Primary Contact"}
@@ -551,26 +607,6 @@ export default function SellerDetailsPage({
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/60 p-5 shadow-sm">
-              <div className="flex items-center gap-2 text-slate-900">
-                <ShieldCheck className="h-4 w-4 text-emerald-700" />
-                <div className="text-sm font-extrabold">
-                  {isAr ? "حالة الامتثال" : "Compliance Status"}
-                </div>
-              </div>
-              <p className="mt-2 text-sm font-medium text-emerald-900/80">
-                {isAr
-                  ? "جميع التراخيص الطبية والمستندات الضريبية محدثة. المراجعة القادمة مجدولة في ديسمبر 2024."
-                  : "All medical licenses and tax documents are currently up-to-date. Next verification review scheduled for Dec 2024."}
-              </p>
-              <button
-                type="button"
-                className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-xs font-extrabold text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-50"
-              >
-                {isAr ? "عرض تقرير الامتثال" : "View Compliance Report"}
-              </button>
             </div>
           </div>
 
@@ -623,35 +659,6 @@ export default function SellerDetailsPage({
                           className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50/40 pl-10 pr-4 text-sm font-semibold text-slate-800 outline-none ring-emerald-100 focus:bg-white focus:ring-2"
                         />
                       </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative">
-                          <select
-                            value={productCategory}
-                            onChange={(e) => {
-                              setProductCategory(e.target.value);
-                              setProductPage(1);
-                            }}
-                            className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 shadow-sm outline-none transition hover:bg-slate-50"
-                          >
-                            <option value="all">
-                              {isAr ? "كل الفئات" : "All Categories"}
-                            </option>
-                            {categories.map((cat) => (
-                              <option key={cat.id} value={cat.id}>
-                                {isAr ? cat.title.ar : cat.title.en}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <button
-                          type="button"
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
-                          aria-label={isAr ? "فلترة" : "Filter"}
-                        >
-                          <SlidersHorizontal className="h-4 w-4" />
-                        </button>
-                      </div>
                     </div>
 
                     <div className="overflow-hidden rounded-2xl border border-slate-200/70">
@@ -671,9 +678,6 @@ export default function SellerDetailsPage({
                               <th className="px-5 py-3">
                                 {isAr ? "السعر" : "Price"}
                               </th>
-                              <th className="px-5 py-3">
-                                {isAr ? "إجراءات" : "Actions"}
-                              </th>
                             </tr>
                           </thead>
                           <tbody>
@@ -685,11 +689,13 @@ export default function SellerDetailsPage({
                                 <td className="px-5 py-4">
                                   <div className="flex items-center gap-3">
                                     <div className="h-10 w-12 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-                                      <img
-                                        src={p.img}
-                                        alt={p.name}
-                                        className="h-full w-full object-cover"
-                                      />
+                                      {p.img && (
+                                        <img
+                                          src={p.img}
+                                          alt={p.name}
+                                          className="h-full w-full object-cover"
+                                        />
+                                      )}
                                     </div>
                                     <div className="min-w-0">
                                       <div className="truncate text-sm font-extrabold text-slate-900">
@@ -723,15 +729,6 @@ export default function SellerDetailsPage({
                                   <div className="text-sm font-extrabold text-slate-900">
                                     {formatCurrency(p.price, locale)}
                                   </div>
-                                </td>
-                                <td className="px-5 py-4">
-                                  <button
-                                    type="button"
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
-                                    aria-label={isAr ? "المزيد" : "More"}
-                                  >
-                                    <MoreVertical className="h-4 w-4" />
-                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -813,28 +810,162 @@ export default function SellerDetailsPage({
                       </div>
                     </div>
                   </div>
+                ) : tab === "orders" ? (
+                  <div className="space-y-4">
+                    <div className="overflow-hidden rounded-2xl border border-slate-200/70">
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[860px] text-left text-sm">
+                          <thead>
+                            <tr className="bg-slate-50/60 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                              <th className="px-5 py-3">
+                                {isAr ? "رقم الطلب" : "Order ID"}
+                              </th>
+                              <th className="px-5 py-3">
+                                {isAr ? "العميل" : "Customer"}
+                              </th>
+                              <th className="px-5 py-3">
+                                {isAr ? "المبلغ" : "Amount"}
+                              </th>
+                              <th className="px-5 py-3">
+                                {isAr ? "الحالة" : "Status"}
+                              </th>
+                              <th className="px-5 py-3">
+                                {isAr ? "التاريخ" : "Date"}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const safeOrderPage = clamp(
+                                orderPage,
+                                1,
+                                Math.max(1, Math.ceil(orders.length / 6)),
+                              );
+                              const orderStart = (safeOrderPage - 1) * 6;
+                              const currentOrders = orders.slice(
+                                orderStart,
+                                orderStart + 6,
+                              );
+
+                              return currentOrders.map((o) => (
+                                <tr
+                                  key={o._id}
+                                  className="border-t border-slate-100 hover:bg-slate-50/40"
+                                >
+                                  <td className="px-5 py-4 font-extrabold text-slate-900">
+                                    #{o.orderId || o._id.slice(-6)}
+                                  </td>
+                                  <td className="px-5 py-4">
+                                    <div className="flex flex-col">
+                                      <span className="font-extrabold text-slate-800">
+                                        {o.user?.name || o.name || "Customer"}
+                                      </span>
+                                      <span className="text-[11px] text-slate-500">
+                                        {o.user?.email || o.email}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-5 py-4 font-extrabold text-slate-900">
+                                    {formatCurrency(o.total || 0, locale)}
+                                  </td>
+                                  <td className="px-5 py-4">
+                                    <span
+                                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${
+                                        o.status === "delivered" ||
+                                        o.paymentStatus === "paid"
+                                          ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
+                                          : "bg-amber-50 text-amber-700 ring-amber-600/20"
+                                      }`}
+                                    >
+                                      {o.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-4 text-xs font-semibold text-slate-500">
+                                    {new Date(o.createdAt).toLocaleDateString(
+                                      isAr ? "ar-EG" : "en-US",
+                                      {
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                      },
+                                    )}
+                                  </td>
+                                </tr>
+                              ));
+                            })()}
+                            {orders.length === 0 && (
+                              <tr>
+                                <td
+                                  colSpan={6}
+                                  className="px-5 py-10 text-center text-sm font-semibold text-slate-500"
+                                >
+                                  {isAr ? "لا توجد طلبات" : "No orders found"}
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {orders.length > 6 && (
+                        <div className="flex flex-col gap-3 border-t border-slate-100 bg-white px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="text-xs font-medium text-slate-500">
+                            {isAr
+                              ? `عرض من ${
+                                  (orderPage - 1) * 6 + 1
+                                } إلى ${Math.min(
+                                  orderPage * 6,
+                                  orders.length,
+                                )} من أصل ${orders.length} طلب`
+                              : `Showing ${(orderPage - 1) * 6 + 1} to ${Math.min(
+                                  orderPage * 6,
+                                  orders.length,
+                                )} of ${orders.length} orders`}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() =>
+                                setOrderPage((p) => Math.max(1, p - 1))
+                              }
+                              disabled={orderPage === 1}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 disabled:opacity-50"
+                            >
+                              ‹
+                            </button>
+                            <button
+                              onClick={() =>
+                                setOrderPage((p) =>
+                                  Math.min(Math.ceil(orders.length / 6), p + 1),
+                                )
+                              }
+                              disabled={
+                                orderPage >= Math.ceil(orders.length / 6)
+                              }
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 disabled:opacity-50"
+                            >
+                              ›
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <div className="rounded-2xl border border-slate-200/70 bg-slate-50/40 p-6">
                     <div className="flex items-center gap-2 text-slate-900">
-                      {tab === "orders" ? (
-                        <FileText className="h-4 w-4 text-slate-500" />
-                      ) : tab === "payouts" ? (
+                      {tab === "payouts" ? (
                         <Wallet className="h-4 w-4 text-slate-500" />
                       ) : (
                         <ShieldCheck className="h-4 w-4 text-slate-500" />
                       )}
                       <div className="text-sm font-extrabold">
-                        {tab === "orders"
+                        {tab === "payouts"
                           ? isAr
-                            ? "سجل الطلبات"
-                            : "Order history"
-                          : tab === "payouts"
-                            ? isAr
-                              ? "المدفوعات"
-                              : "Payouts"
-                            : isAr
-                              ? "مستندات التحقق"
-                              : "Verification docs"}
+                            ? "المدفوعات"
+                            : "Payouts"
+                          : isAr
+                            ? "مستندات التحقق"
+                            : "Verification docs"}
                       </div>
                     </div>
                     <p className="mt-2 text-sm font-medium text-slate-600">

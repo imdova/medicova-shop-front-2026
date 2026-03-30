@@ -2,16 +2,15 @@ import React, { ReactNode } from "react";
 import Sidebar from "@/components/layouts/Layout/sidebar/Sidebar";
 import { auth } from "@/lib/auth/auth";
 import { NextAuthProvider } from "@/NextAuthProvider";
-import { Toaster } from "react-hot-toast";
+import ToastProvider from "@/components/shared/ToastProvider";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { NextIntlClientProvider } from "next-intl";
 
 interface AccountLayoutProps {
   children: ReactNode;
-  params: Promise<{ locale: string }>;
 }
 
-export default async function AccountLayout({ children, params }: AccountLayoutProps) {
+export default async function AccountLayout({ children, params }: AccountLayoutProps & { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
   
@@ -45,7 +44,7 @@ export default async function AccountLayout({ children, params }: AccountLayoutP
             </div>
           </main>
         </div>
-        <Toaster position="top-right" />
+        <ToastProvider />
       </div>
     </NextIntlClientProvider>
   );

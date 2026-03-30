@@ -25,6 +25,7 @@ export interface Seller {
   rating?: number;
   sellerCode?: string;
   commission?: number;
+  createdAt?: string;
 }
 
 export async function getSellers(token?: string): Promise<Seller[]> {
@@ -82,6 +83,7 @@ export async function getSellers(token?: string): Promise<Seller[]> {
       name: s.name || (s.firstName ? `${s.firstName} ${s.lastName || ""}`.trim() : s.email),
       storeName: s.storeName || s.store_name || s.name,
       email: s.email,
+      createdAt: s.createdAt || s.created_at || "",
     }));
   } catch (error) {
     const msg =
@@ -142,6 +144,7 @@ export async function getAdminSellers(token?: string): Promise<Seller[]> {
       status: s.status || (s.active === false ? "suspended" : "active"),
       rating: Number(s.rating || s.rate || 0),
       sellerCode: s.sellerCode || s.code || `#SEL-${(s._id || s.id || "").slice(-4)}`,
+      createdAt: s.createdAt || s.created_at || "",
     }));
   } catch (error) {
     console.error("Error fetching admin sellers:", error);
@@ -195,6 +198,7 @@ export async function getSellerById(
       status: data.status || (data.active === false ? "suspended" : "active"),
       rating: Number(data.rating || data.rate || 0),
       sellerCode: data.sellerCode || data.code || `#SEL-${(data._id || data.id || "").slice(-4)}`,
+      createdAt: data.createdAt || data.created_at || "",
     };
   } catch (error) {
     console.error(`Error fetching seller ${id}:`, error);
@@ -205,6 +209,19 @@ export async function deleteSeller(id: string, token?: string): Promise<any> {
   return apiClient<any>({
     endpoint: `/users/${id}`,
     method: "DELETE",
+    token,
+  });
+}
+
+export async function updateSellerStatus(
+  id: string,
+  status: "active" | "suspended" | "pending",
+  token?: string,
+): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/users/admin/sellers/${id}`,
+    method: "PATCH",
+    body: { status },
     token,
   });
 }
