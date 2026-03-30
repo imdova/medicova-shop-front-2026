@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,21 +24,27 @@ const ProfilePage = () => {
 
   const token = (session as any)?.accessToken;
 
-  useEffect(() => {
-    async function fetchProfile() {
-      if (!token) return;
-      try {
-        setLoading(true);
-        const data = await getMyProfile(token);
-        setSellerData(data);
-      } catch (err) {
-        console.error("Failed to fetch seller profile:", err);
-      } finally {
-        setLoading(false);
-      }
+  const fetchProfile = useCallback(async () => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      const data = await getMyProfile(token);
+      setSellerData(data);
+    } catch (err) {
+      console.error("Failed to fetch seller profile:", err);
+    } finally {
+      setLoading(false);
     }
-    fetchProfile();
   }, [token]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  useEffect(() => {
+    window.addEventListener("profileUpdated", fetchProfile);
+    return () => window.removeEventListener("profileUpdated", fetchProfile);
+  }, [fetchProfile]);
 
   const tabs = [
     { id: "profile", label: t("tabs.profile"), icon: <User size={18} /> },
@@ -61,7 +67,7 @@ const ProfilePage = () => {
   const user = {
     name: sellerData?.fullName || sellerData?.name || session?.user?.name || "",
     email: sellerData?.email || session?.user?.email || "",
-    image: session?.user?.image,
+    image: sellerData?.profileImage || sellerData?.image || session?.user?.image,
   };
 
   return (
@@ -113,7 +119,9 @@ const ProfilePage = () => {
             {activeTab === "profile" && (
               <ProfileForm initialData={sellerData} locale={locale} />
             )}
-            {activeTab === "verification" && <VerificationCenter />}
+            {activeTab === "verification" && (
+              <VerificationCenter initialData={sellerData} token={token} />
+            )}
             {activeTab === "settings" && <AccountSettings sellerData={sellerData} />}
           </motion.div>
         </AnimatePresence>

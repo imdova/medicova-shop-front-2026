@@ -8,14 +8,27 @@ import { isCurrentPage } from "@/util";
 import { AccountPageProps } from "@/app/[locale]/(auth)/user/types/account";
 import { useAppLocale } from "@/hooks/useAppLocale";
 
-const Sidebar: React.FC<AccountPageProps> = ({ user }) => {
+const Sidebar: React.FC<AccountPageProps> = ({ user, isRestricted }) => {
   const pathname = usePathname();
   const router = useRouter();
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
   const locale = useAppLocale();
   const isArabic = locale === "ar";
 
-  const groups = sidebarGroups[user.role] || [];
+  const allGroups = sidebarGroups[user.role] || [];
+
+  // Filter groups if restricted (Sellers only)
+  const groups = isRestricted
+    ? allGroups
+        .map((group) => ({
+          ...group,
+          items: group.items.filter(
+            (item) =>
+              item.href === "/seller/profile" || item.href === "/user/profile",
+          ),
+        }))
+        .filter((group) => group.items.length > 0)
+    : allGroups;
 
   // Function to toggle the collapse state of an item
   const toggleItem = (itemHref: string) => {

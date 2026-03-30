@@ -115,3 +115,53 @@ export async function updateSellerRootEmail(email: string, token?: string): Prom
     token,
   });
 }
+
+export async function startPhoneVerification(phone: string, token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/auth/verify/phone/start`,
+    method: "POST",
+    body: { phone, channel: "sms" },
+    token,
+  });
+}
+
+export async function confirmPhoneVerification(
+  phone: string,
+  code: string,
+  token?: string,
+): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/auth/verify/phone/confirm`,
+    method: "POST",
+    body: { phone, code, channel: "sms" },
+    token,
+  });
+}
+
+export async function startEmailVerification(token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/auth/verify/email/start`,
+    method: "POST",
+    token,
+  });
+}
+
+export async function confirmEmailVerification(
+  code: string,
+  token?: string,
+): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/auth/verify/email/confirm`,
+    method: "POST",
+    body: { code },
+    token,
+  });
+}
+
+export async function getVerificationStatus(token?: string, userId?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: userId ? `/auth/verify/status?userId=${userId}` : `/auth/verify/status`,
+    method: "GET",
+    token,
+  });
+}

@@ -35,6 +35,7 @@ const DynamicButton: React.FC<DynamicButtonProps> = ({
   disabled = false,
   fullWidth = false,
   onClick,
+  type,
   style,
 }) => {
   // Base styles
@@ -107,22 +108,36 @@ const DynamicButton: React.FC<DynamicButtonProps> = ({
     </>
   );
 
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={combinedClasses.trim()}
+        style={style}
+        onClick={(e) => {
+          if (disabled) {
+            e.preventDefault();
+          } else if (onClick) {
+            onClick();
+          }
+        }}
+        aria-disabled={disabled}
+      >
+        {buttonContent}
+      </Link>
+    );
+  }
+
   return (
-    <Link
-      href={href ?? ""}
+    <button
+      type={(type as any) || "button"}
       className={combinedClasses.trim()}
       style={style}
-      onClick={(e) => {
-        if (disabled) {
-          e.preventDefault();
-        } else if (onClick) {
-          onClick();
-        }
-      }}
-      aria-disabled={disabled}
+      disabled={disabled}
+      onClick={onClick}
     >
       {buttonContent}
-    </Link>
+    </button>
   );
 };
 

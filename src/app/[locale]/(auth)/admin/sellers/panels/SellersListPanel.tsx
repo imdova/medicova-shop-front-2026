@@ -11,6 +11,7 @@ import {
   getAdminSellers,
   Seller,
   deleteSeller,
+  getAllSellerDocuments,
 } from "@/services/sellerService";
 import { MultiCategory } from "@/types";
 import { toast } from "react-hot-toast";
@@ -54,6 +55,7 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
   const [q, setQ] = useState(searchParams.get("q") || "");
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]); // New state for documents
   const [loading, setLoading] = useState(true);
   const { data: session } = useSession();
   const token = (session as any)?.accessToken;
@@ -62,12 +64,14 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
     if (!token) return;
     setLoading(true);
     try {
-      const [sellersData, productsData] = await Promise.all([
+      const [sellersData, productsData, docsData] = await Promise.all([
         getAdminSellers(token),
         getProducts(token),
+        getAllSellerDocuments(token),
       ]);
       setSellers(sellersData);
       setProducts(productsData);
+      setDocuments(docsData?.data?.documents || docsData?.data || docsData || []);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     } finally {
@@ -105,9 +109,15 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
     return sellers.map((s: any) => {
       const seed = hashToNumber(`${s.id}-${s.name}`);
 
-      // Dynamic priority
+      const verificationStatus = Array.isArray(documents)
+        ? documents.find((d: any) => d.sellerId?._id === s.id)?.status ||
+          "none"
+        : "none";
+
       const derivedStatus: "active" | "pending" | "suspended" =
-        s.status || (s.isActive === false ? "suspended" : "active");
+        verificationStatus !== "approved"
+          ? "pending"
+          : s.status || (s.isActive === false ? "suspended" : "active");
 
       const sellerCode =
         s.sellerCode || `#SEL-${String(81000 + (seed % 9000))}`;
@@ -143,9 +153,10 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
         totalSales,
         productsCount,
         commission: Number(s.commission || 0),
+        verificationStatus,
       };
     });
-  }, [sellers, products]);
+  }, [sellers, products, documents]);
 
   const counts = useMemo(() => {
     return derived.reduce(
@@ -334,6 +345,9 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                 <th className="whitespace-nowrap px-5 py-3">
                   {isAr ? "الحالة" : "Status"}
                 </th>
+                <th className="whitespace-nowrap px-5 py-3 text-center">
+                  {isAr ? "التوثيق" : "Verification"}
+                </th>
                 <th className="whitespace-nowrap px-5 py-3">
                   {isAr ? "إجراءات" : "Actions"}
                 </th>
@@ -467,6 +481,25 @@ export default function SellersListPanel({ locale }: { locale: LanguageType }) {
                           />
                           {statusBadge.label}
                         </span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 text-center">
+                        {s.verificationStatus === "approved" ? (
+                          <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                            {isAr ? "موثق" : "Verified"}
+                          </span>
+                        ) : s.verificationStatus === "pending" ? (
+                          <span className="inline-flex animate-pulse rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">
+                            {isAr ? "قيد المراجع" : "Pending"}
+                          </span>
+                        ) : s.verificationStatus === "rejected" ? (
+                          <span className="inline-flex rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800">
+                            {isAr ? "مرفوض" : "Rejected"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-500">
+                            {isAr ? "لم يقدم" : "Not Provided"}
+                          </span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-5 py-4">
                         <div className="flex items-center gap-2">

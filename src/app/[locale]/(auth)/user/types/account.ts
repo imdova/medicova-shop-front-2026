@@ -62,4 +62,5 @@ export interface AccountPageProps {
   orders?: Order[];
   returns?: ReturnOrder[];
   activeSection?: string;
+  isRestricted?: boolean;
 }

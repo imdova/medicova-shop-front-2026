@@ -59,8 +59,7 @@ const GenericChart = ({
 
   const hasNoData =
     filteredSeries.length === 0 ||
-    filteredSeries.every((s) => s.data.length === 0) ||
-    filteredSeries.every((s) => s.data.every((d) => d === 0));
+    filteredSeries.every((s) => s.data.length === 0);
 
   const chartOptions: ApexOptions = {
     chart: {

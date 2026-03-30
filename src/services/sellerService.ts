@@ -225,3 +225,73 @@ export async function updateSellerStatus(
     token,
   });
 }
+
+export async function uploadSellerDocuments(
+  data: { idFront: string; idBack: string },
+  token?: string,
+): Promise<any> {
+  return apiClient<any>({
+    endpoint: "/seller-documents",
+    method: "POST",
+    body: data,
+    token,
+  });
+}
+
+export async function reuploadSellerDocuments(
+  data: { idFront: string; idBack: string },
+  token?: string,
+): Promise<any> {
+  return apiClient<any>({
+    endpoint: "/seller-documents",
+    method: "PUT",
+    body: data,
+    token,
+  });
+}
+
+export async function getSellerOwnDocuments(token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: "/seller-documents/me",
+    method: "GET",
+    token,
+    suppressErrorLog: true,
+  });
+}
+
+// Admin: Get all seller documents
+export async function getAllSellerDocuments(token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: "/seller-documents",
+    method: "GET",
+    token,
+  });
+}
+
+// Admin: Get specific seller document by ID
+export async function getSellerDocumentById(id: string, token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/seller-documents/${id}`,
+    method: "GET",
+    token,
+  });
+}
+
+// Admin: Approve seller documents
+export async function approveSellerDocument(id: string, token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/seller-documents/${id}/approve`,
+    method: "POST",
+    token,
+  });
+}
+
+// Admin: Reject seller documents
+export async function rejectSellerDocument(id: string, reason: string, token?: string): Promise<any> {
+  return apiClient<any>({
+    endpoint: `/seller-documents/${id}/reject`,
+    method: "POST",
+    body: { reason },
+    token,
+  });
+}
