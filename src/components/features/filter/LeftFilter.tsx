@@ -73,12 +73,14 @@ export default function LeftFilter({
 
   const isFilterActive = (filterKey: string, filterValue: string) => {
     if (filterKey === "category") {
-      return (
-        currentCategoryPath[currentCategoryPath.length - 1] === filterValue
-      );
+      // Check both path-based category and query-param based categories
+      const isPathMatch = currentCategoryPath.includes(filterValue);
+      const isQueryMatch = currentFilters[filterKey]?.includes(filterValue) || false;
+      return isPathMatch || isQueryMatch;
     }
     return currentFilters[filterKey]?.includes(filterValue) || false;
   };
+
 
   const hasActiveFilters =
     Object.values(currentFilters).some((filters) => filters.length > 0) ||

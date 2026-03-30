@@ -2,6 +2,7 @@
 import StatusToggle from "@/components/shared/Buttons/StatusToggle";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import React, { useState } from "react";
+import toast from "react-hot-toast";
 
 const translations = {
   notifications: { en: "Notifications", ar: "الإشعارات" },
@@ -103,7 +104,7 @@ const NotificationsPage = () => {
 
         <div className="mt-6 flex justify-end">
           <button
-            onClick={() => alert("Preferences saved successfully")}
+            onClick={() => toast.success("Preferences saved successfully")}
             className="rounded-md bg-green-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-green-700"
           >
             {t("save")}

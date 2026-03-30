@@ -312,15 +312,51 @@ export function mapApiProductToProduct(item: any): any {
     return `${apiBaseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
-  // The schema shows featuredImages as a string at the root, and galleryImages as an array at the root.
-  // We also check item.media for backward compatibility if some products still use it.
-  const featuredImageRaw = item.featuredImages || item.media?.featuredImages || (Array.isArray(item.galleryImages) ? item.galleryImages[0] : (Array.isArray(item.media?.galleryImages) ? item.media.galleryImages[0] : null));
+  // Robust image detection logic
+  const pickUrl = (value: any): string => {
+    if (!value) return "";
+    if (typeof value === "string") return value.trim();
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const picked = pickUrl(item);
+        if (picked) return picked;
+      }
+      return "";
+    }
+    if (typeof value === "object") {
+      return (
+        pickUrl(value.url) ||
+        pickUrl(value.src) ||
+        pickUrl(value.imageUrl) ||
+        pickUrl(value.path) ||
+        ""
+      );
+    }
+    return "";
+  };
+
+  const featuredImageRaw = 
+    pickUrl(item.featuredImages) || 
+    pickUrl(item.media?.featuredImages) || 
+    pickUrl(item.galleryImages?.[0]) || 
+    pickUrl(item.media?.galleryImages?.[0]) || 
+    pickUrl(item.images?.[0]) || 
+    pickUrl(item.image) || 
+    pickUrl(item.media?.productVideo?.imageUrl);
+
   const featuredImage = ensureAbsoluteUrl(featuredImageRaw);
 
-  const galleryImagesRaw = Array.isArray(item.galleryImages) ? item.galleryImages : (Array.isArray(item.media?.galleryImages) ? item.media.galleryImages : []);
+  const galleryImagesRaw = Array.isArray(item.galleryImages) 
+    ? item.galleryImages 
+    : (Array.isArray(item.media?.galleryImages) 
+        ? item.media.galleryImages 
+        : (Array.isArray(item.images) ? item.images : []));
+  
   const galleryImages = galleryImagesRaw.length > 0 
-    ? galleryImagesRaw.map((img: any) => ensureAbsoluteUrl(img)) 
+    ? galleryImagesRaw.map((img: any) => ensureAbsoluteUrl(pickUrl(img))).filter((url: string) => url && !url.includes("placeholder.jpg"))
     : [featuredImage];
+
+  if (galleryImages.length === 0) galleryImages.push(ensureAbsoluteUrl(""));
 
   // Price mapping based on schema: originalPrice and salePrice at root
   const price = item.salePrice || item.price || item.pricing?.salePrice || item.pricing?.originalPrice || item.sale_price || 0;

@@ -19,6 +19,8 @@ import { getOrders, deleteOrder, ApiOrder } from "@/services/orderService";
 import { getSellers, Seller } from "@/services/sellerService";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
+import { confirmToast } from "@/utils/confirmToast";
+
 
 export default function OrdersListPanel({
   locale = "en",
@@ -75,13 +77,15 @@ export default function OrdersListPanel({
   const handleDelete = async (id: string) => {
     if (!token) return;
     if (
-      !window.confirm(
+      !(await confirmToast(
         isArabic
           ? "هل أنت متأكد من حذف هذا الطلب؟"
           : "Are you sure you want to delete this order?",
-      )
+        isArabic,
+      ))
     )
       return;
+
     try {
       await deleteOrder(id, token);
       toast.success(isArabic ? "تم حذف الطلب" : "Order deleted");

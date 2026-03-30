@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/apiClient";
 import { ProductCollection, Product } from "@/types/product";
+import { mapApiProductToProduct } from "./productService";
 
 export interface ApiProductCollection {
   _id: string;
@@ -64,7 +65,7 @@ function mapToProductCollection(apiCol: ApiProductCollection): ProductCollection
     products: Array.isArray(apiCol.products) 
       ? apiCol.products.map(p => {
           if (typeof p === 'string') return { id: p } as Product;
-          return { ...p, id: p._id || p.id } as Product;
+          return mapApiProductToProduct(p);
         })
       : [],
     sellerId: apiCol.sellerId,

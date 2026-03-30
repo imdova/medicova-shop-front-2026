@@ -229,28 +229,33 @@ export default function CreateDiscountPage() {
           user?.role === "admin"
             ? (user as any)?.id || "507f1f77bcf86cd799439011"
             : (user as any)?.storeId || (user as any)?.id,
-        discountName: data.coupon_code, // Or add a field for name
+        discountName: data.coupon_code,
         method:
           data.type === "promotion" ? "automatic_discount" : "discount_code",
         discountCode: data.coupon_code,
         discountType: data.discount_type,
         discountValue: data.value,
-        appliesTo: data.apply_for,
+        appliesTo:
+          data.apply_for === "all_orders" ? "all_products" : data.apply_for,
         productIds: data.selected_products || [],
         categoryIds: data.selected_categories || [],
-        subcategoryIds: [], // Add if UI supports it
+        subcategoryIds: [],
         availableOnAllSalesChannels: true,
-        eligibility: "all_customers", // Add if UI supports it
+        eligibility: "all_customers",
         customerSegmentIds: [],
         customerIds: [],
-        startDate: data.start_date,
-        startTime: "00:00", // Add if UI supports it
-        endDate: data.end_date,
-        endTime: "23:59", // Add if UI supports it
+        startDate: data.start_date, // YYYY-MM-DD
+        startTime: "00:00",
+        endDate: data.never_expired ? "2099-12-31" : data.end_date, // YYYY-MM-DD
+        endTime: "23:59",
         active: true,
+        status: computedStatus || "active",
       };
 
+
+      console.log("Discount Payload:", payload);
       await createDiscount(payload, token);
+
       toast.success(
         isRTL ? "تم إنشاء الخصم بنجاح" : "Discount created successfully",
       );
@@ -529,9 +534,7 @@ export default function CreateDiscountPage() {
                             className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                           />
                         </FormControl>
-                        <div className="mt-1 text-xs font-medium text-slate-500">
-                          {t.coupon_description}
-                        </div>
+  
                         <FormMessage />
                       </FormItem>
                     )}

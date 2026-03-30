@@ -4,6 +4,7 @@ import Modal from "@/components/shared/Modals/DynamicModal";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
 
 type PasswordFormInputs = {
   currentPassword: string;
@@ -80,14 +81,14 @@ const SecuritySettingsPage = () => {
   } = useForm<PasswordFormInputs>();
 
   const onSubmit = (data: PasswordFormInputs) => {
-    alert("Password changed successfully");
+    toast.success("Password changed successfully");
     setShowPasswordModal(false);
     reset();
     console.log(data);
   };
 
   const handleAccountDeletion = () => {
-    alert("Account deletion request submitted");
+    toast.success("Account deletion request submitted");
     setShowDeleteConfirmation(false);
   };
 

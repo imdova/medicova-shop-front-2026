@@ -26,6 +26,8 @@ import { useSession } from "next-auth/react";
 import { format } from "date-fns";
 import { ar, enUS } from "date-fns/locale";
 import { toast } from "react-hot-toast";
+import { confirmToast } from "@/utils/confirmToast";
+
 
 export default function CustomerDetailsPage({
   params,
@@ -95,9 +97,17 @@ export default function CustomerDetailsPage({
 
   const handleDelete = async () => {
     if (!user) return;
-    if (!confirm(isAr ? `هل أنت متأكد من حذف هذا العميل؟` : `Are you sure you want to delete this customer?`)) {
+    if (
+      !(await confirmToast(
+        isAr
+          ? `هل أنت متأكد من حذف هذا العميل؟`
+          : `Are you sure you want to delete this customer?`,
+        isAr,
+      ))
+    ) {
       return;
     }
+
 
     try {
       await deleteUser(user._id, token);

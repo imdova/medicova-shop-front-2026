@@ -10,6 +10,7 @@ import {
 import { X, UploadCloud, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 import { LanguageType } from "@/util/translations";
+import toast from "react-hot-toast";
 
 import { useLocale, useTranslations } from "next-intl";
 
@@ -56,12 +57,12 @@ const ImageUpload = <T extends FieldValues>({
 
       if (file) {
         if (!file.type.startsWith("image/")) {
-          alert(t("pleaseUploadImageFile"));
+          toast.error(t("pleaseUploadImageFile"));
           return;
         }
 
         if (file.size > maxSizeMB * 1024 * 1024) {
-          alert(t("imageSizeAlert", { maxSize: maxSizeMB }));
+          toast.error(t("imageSizeAlert", { maxSize: maxSizeMB }));
           return;
         }
 

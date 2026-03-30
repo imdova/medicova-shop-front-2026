@@ -106,25 +106,61 @@ export default function DiscountsPage() {
 
   const handleDelete = async (id: string) => {
     if (!token) return;
-    if (
-      !confirm(
-        isArabic
-          ? "هل أنت متأكد من حذف هذا الخصم؟"
-          : "Are you sure you want to delete this discount?",
-      )
-    )
-      return;
-
-    try {
-      await deleteDiscount(id, token);
-      toast.success(
-        isArabic ? "تم حذف الخصم بنجاح" : "Discount deleted successfully",
-      );
-      fetchDiscounts();
-    } catch (error) {
-      console.error("Delete failed:", error);
-      toast.error(isArabic ? "فشل حذف الخصم" : "Failed to delete discount");
-    }
+    toast.custom((t) => (
+      <div
+        className={`${
+          t.visible ? "animate-enter" : "animate-leave"
+        } pointer-events-auto flex w-full max-w-md rounded-2xl border border-rose-100 bg-white shadow-2xl ring-1 ring-black/5`}
+      >
+        <div className="w-0 flex-1 p-5">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 pt-0.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-rose-600 shadow-inner">
+                <Trash2 size={24} />
+              </div>
+            </div>
+            <div className={`ml-4 flex-1 ${isArabic ? "mr-4 text-right" : ""}`}>
+              <p className="text-sm font-black text-slate-900">
+                {isArabic ? "تأكيد الحذف" : "Confirm Deletion"}
+              </p>
+              <p className="mt-1 text-xs font-bold leading-relaxed text-slate-500">
+                {isArabic
+                  ? "هل أنت متأكد من حذف هذا الخصم؟ لا يمكن التراجع عن هذا الإجراء."
+                  : "Are you sure you want to delete this discount? This action cannot be undone."}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col border-l border-slate-100">
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                await deleteDiscount(id, token);
+                toast.success(
+                  isArabic ? "تم حذف الخصم بنجاح" : "Discount deleted successfully",
+                );
+                fetchDiscounts();
+              } catch (error) {
+                console.error("Delete failed:", error);
+                toast.error(
+                  isArabic ? "فشل حذف الخصم" : "Failed to delete discount",
+                );
+              }
+            }}
+            className="flex w-full items-center justify-center rounded-none rounded-tr-2xl border border-transparent p-4 text-xs font-black uppercase tracking-widest text-rose-600 hover:bg-rose-50 focus:outline-none"
+          >
+            {isArabic ? "حذف" : "Delete"}
+          </button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="flex w-full items-center justify-center rounded-none rounded-br-2xl border border-transparent p-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 focus:outline-none"
+          >
+            {isArabic ? "إلغاء" : "Cancel"}
+          </button>
+        </div>
+      </div>
+    ));
   };
 
   const rows = useMemo(() => {

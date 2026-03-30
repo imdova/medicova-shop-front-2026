@@ -109,7 +109,7 @@ const SecuritySettingsPage = () => {
   };
 
   const handleAccountDeletion = () => {
-    window.alert("Account deletion request submitted");
+    toast.success("Account deletion request submitted");
     setShowDeleteConfirmation(false);
   };
 

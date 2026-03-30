@@ -777,6 +777,7 @@
     "allStatuses": "كل الحالات",
     "active": "نشط",
     "pending": "قيد الانتظار",
+    "approved": "تمت الموافقة",
     "draft": "مسودة",
     "allStock": "كل المخزون",
     "inStock": "متوفر",

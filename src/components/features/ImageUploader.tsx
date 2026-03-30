@@ -3,6 +3,7 @@
 import { RotateCw, Upload, X, ZoomIn } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 export interface UploadedImage {
   id: string;
@@ -101,7 +102,7 @@ export const ImageUploader = ({
     Array.from(files).forEach((file) => {
       const error = validateFile(file);
       if (error) {
-        alert(error);
+        toast.error(error);
         return;
       }
 

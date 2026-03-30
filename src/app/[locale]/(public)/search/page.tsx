@@ -184,20 +184,42 @@ export default function CategoryPage({
     const newSearchParams = new URLSearchParams(searchParams.toString());
 
     if (filterKey === "category") {
-      newSearchParams.delete("category");
-      if (isSubcategory) {
-        if (isNestedSubcategory && grandparentCategory) {
-          const newPath = `/search/${grandparentCategory}/${parentCategory}/${filterValue}`;
-          router.push(`${newPath}?${newSearchParams.toString()}`);
-        } else if (parentCategory) {
-          const newPath = `/search/${parentCategory}/${filterValue}`;
-          router.push(`${newPath}?${newSearchParams.toString()}`);
-        }
-      } else {
+      // If we are selecting a single category from the root and none are currently selected in query
+      const currentQueryCategories = newSearchParams.get("category")?.split(",") || [];
+      
+      if (!isSubcategory && !category && currentQueryCategories.length === 0) {
+        // First root category selection: use SEO path
         router.push(`/search/${filterValue}?${newSearchParams.toString()}`);
+        return;
+      }
+
+      // If we already have a category in path OR multiple in query, handle as query params
+      const allSelected = new Set(currentQueryCategories);
+      if (category) allSelected.add(category);
+
+      if (allSelected.has(filterValue)) {
+        allSelected.delete(filterValue);
+      } else {
+        allSelected.add(filterValue);
+      }
+
+      const updatedList = Array.from(allSelected);
+      if (updatedList.length === 0) {
+        // If nothing left, go to base search
+        newSearchParams.delete("category");
+        router.push(`/search?${newSearchParams.toString()}`);
+      } else if (updatedList.length === 1 && !isSubcategory) {
+        // If only one remains and it's a root category, use SEO path
+        newSearchParams.delete("category");
+        router.push(`/search/${updatedList[0]}?${newSearchParams.toString()}`);
+      } else {
+        // Multiple or subcategories: use query params on the base /search path
+        newSearchParams.set("category", updatedList.join(","));
+        router.push(`/search?${newSearchParams.toString()}`);
       }
       return;
     }
+
 
     const currentValues = newSearchParams.get(filterKey)?.split(",") || [];
     if (currentValues.includes(filterValue)) {
